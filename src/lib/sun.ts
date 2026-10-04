@@ -70,28 +70,30 @@ export function calcularSol(
 
   if (H0 === null) return null;
 
-  const minutosDesdeMedianoche = (offset: number) =>
-    new Date(Date.UTC(
-      fecha.getUTCFullYear(),
-      fecha.getUTCMonth(),
-      fecha.getUTCDate(),
-      0,
-      0,
-      0
-    ).getTime() + (mediodiaSolarUTC + offset) * 60000);
+  const baseUTC = Date.UTC(
+    fecha.getUTCFullYear(),
+    fecha.getUTCMonth(),
+    fecha.getUTCDate(),
+    0,
+    0,
+    0
+  );
 
-  const orto = minutosDesdeMedianoche(-4 * H0);
-  const ocaso = minutosDesdeMedianoche(4 * H0);
-  const mediodiaSolar = minutosDesdeMedianoche(0);
+  const desdeMinutos = (minutos: number) =>
+    new Date(baseUTC + minutos * 60000);
+
+  const orto = desdeMinutos(mediodiaSolarUTC - 4 * H0);
+  const ocaso = desdeMinutos(mediodiaSolarUTC + 4 * H0);
+  const mediodiaSolar = desdeMinutos(mediodiaSolarUTC);
 
   // Crepúsculos: si el ángulo no existe (sol no baja tanto), usamos
-  // el orto/ocaso como aproximación y lo marcamos igual.
-  const civilInicio = H6 !== null ? minutosDesdeMedianoche(-4 * H6) : orto;
-  const civilFin = H6 !== null ? minutosDesdeMedianoche(4 * H6) : ocaso;
-  const nauticoInicio = H12 !== null ? minutosDesdeMedianoche(-4 * H12) : orto;
-  const nauticoFin = H12 !== null ? minutosDesdeMedianoche(4 * H12) : ocaso;
-  const astroInicio = H18 !== null ? minutosDesdeMedianoche(-4 * H18) : orto;
-  const astroFin = H18 !== null ? minutosDesdeMedianoche(4 * H18) : ocaso;
+  // el orto/ocaso como aproximación.
+  const civilInicio = H6 !== null ? desdeMinutos(mediodiaSolarUTC - 4 * H6) : orto;
+  const civilFin = H6 !== null ? desdeMinutos(mediodiaSolarUTC + 4 * H6) : ocaso;
+  const nauticoInicio = H12 !== null ? desdeMinutos(mediodiaSolarUTC - 4 * H12) : orto;
+  const nauticoFin = H12 !== null ? desdeMinutos(mediodiaSolarUTC + 4 * H12) : ocaso;
+  const astroInicio = H18 !== null ? desdeMinutos(mediodiaSolarUTC - 4 * H18) : orto;
+  const astroFin = H18 !== null ? desdeMinutos(mediodiaSolarUTC + 4 * H18) : ocaso;
 
   const duracionDia = (ocaso.getTime() - orto.getTime()) / 60000;
 
