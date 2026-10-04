@@ -34,6 +34,7 @@ type SpotDraft = {
 type Props = {
   onCancel?: () => void;
   onSave?: (spot: SpotDraft) => void;
+  initialSpot?: SpotDraft | null;
 };
 
 function ClickHandler({ onPick }: { onPick: (lat: number, lon: number) => void }) {
@@ -45,14 +46,18 @@ function ClickHandler({ onPick }: { onPick: (lat: number, lon: number) => void }
   return null;
 }
 
-export default function MapScreen({ onCancel, onSave }: Props) {
-  const [position, setPosition] = useState<[number, number] | null>(null);
-  const [name, setName] = useState('');
+export default function MapScreen({ onCancel, onSave, initialSpot }: Props) {
+  const [position, setPosition] = useState<[number, number] | null>(
+    initialSpot ? [initialSpot.lat, initialSpot.lon] : null
+  );
+  const [name, setName] = useState(initialSpot?.name ?? '');
   const [busy, setBusy] = useState(false);
+
+  const isEditing = !!initialSpot;
 
   async function handlePick(lat: number, lon: number) {
     setPosition([lat, lon]);
-    setName('');
+    if (!isEditing) setName('');
     setBusy(true);
     try {
       const url =
@@ -102,7 +107,7 @@ export default function MapScreen({ onCancel, onSave }: Props) {
           Cancelar
         </button>
         <span style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }}>
-          NUEVO PUNTO
+          {isEditing ? 'EDITAR PUNTO' : 'NUEVO PUNTO'}
         </span>
         <button
           type="button"
@@ -116,8 +121,8 @@ export default function MapScreen({ onCancel, onSave }: Props) {
 
       <div style={{ flex: 1, position: 'relative' }}>
         <MapContainer
-          center={SPAIN_CENTER}
-          zoom={INITIAL_ZOOM}
+          center={position ?? SPAIN_CENTER}
+          zoom={position ? 12 : INITIAL_ZOOM}
           style={{ width: '100%', height: '100%' }}
         >
           <TileLayer

@@ -19,6 +19,8 @@ export interface AppState {
   setTheme: (theme: 'dark' | 'light') => void;
   markFirstRunDone: () => void;
   addSpot: (spot: Omit<Spot, 'id' | 'createdAt'>) => void;
+  updateSpot: (id: string, patch: Partial<Omit<Spot, 'id' | 'createdAt'>>) => void;
+  removeSpot: (id: string) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -47,6 +49,14 @@ export const useAppStore = create<AppState>()(
               createdAt: Date.now(),
             },
           ],
+        })),
+      updateSpot: (id, patch) =>
+        set((state) => ({
+          spots: state.spots.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+        })),
+      removeSpot: (id) =>
+        set((state) => ({
+          spots: state.spots.filter((s) => s.id !== id),
         })),
     }),
     {
