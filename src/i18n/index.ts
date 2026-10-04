@@ -16,7 +16,7 @@ export function detectInitialLanguage(): 'es' | 'en' {
         }
       }
     } catch {
-      // Fallback to browser language if error reading storage
+      // ignore
     }
 
     if (navigator.language && navigator.language.toLowerCase().startsWith('es')) {
@@ -29,18 +29,16 @@ export function detectInitialLanguage(): 'es' | 'en' {
 
 const initialLang = detectInitialLanguage();
 
-i18n
-  .use(initReactI18next)
-  .init({
-    resources: {
-      es: { translation: stringsEs },
-      en: { translation: stringsEn },
-    },
-    lng: initialLang,
-    fallbackLng: 'en',
-    interpolation: {
-      escapeValue: false,
-    },
-  });
+i18n.use(initReactI18next).init({
+  resources: {
+    es: { translation: stringsEs },
+    en: { translation: stringsEn },
+  },
+  lng: initialLang,
+  fallbackLng: 'en',
+  interpolation: {
+    escapeValue: false,
+  },
+});
 
 export default i18n;

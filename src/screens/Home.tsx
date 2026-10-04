@@ -32,7 +32,9 @@ export function Home() {
   if (showMap) {
     return (
       <MapScreen
-        initialSpot={editing ? { name: editing.name, lat: editing.lat, lon: editing.lon } : null}
+        initialSpot={
+          editing ? { name: editing.name, lat: editing.lat, lon: editing.lon } : null
+        }
         onCancel={() => {
           setShowMap(false);
           setEditing(null);
@@ -81,7 +83,7 @@ export function Home() {
             letterSpacing: '0.05em',
           }}
         >
-          {spots.length} / {MAX_SPOTS}
+          {t('home.counter', { count: spots.length, max: MAX_SPOTS })}
         </span>
       </header>
 
@@ -116,7 +118,7 @@ export function Home() {
                 margin: 0,
               }}
             >
-              {t('home.noSpots', { defaultValue: t('home.empty.title') })}
+              {t('home.noSpots')}
             </p>
           </div>
         ) : (
@@ -194,7 +196,7 @@ export function Home() {
                             cursor: 'pointer',
                           }}
                         >
-                          Cancelar
+                          {t('common.cancel')}
                         </button>
                         <button
                           type="button"
@@ -214,7 +216,7 @@ export function Home() {
                             cursor: 'pointer',
                           }}
                         >
-                          Borrar
+                          {t('common.delete')}
                         </button>
                       </>
                     ) : (
@@ -232,7 +234,7 @@ export function Home() {
                           cursor: 'pointer',
                         }}
                       >
-                        Borrar
+                        {t('common.delete')}
                       </button>
                     )}
                   </div>
@@ -261,9 +263,7 @@ export function Home() {
             boxShadow: atLimit ? 'none' : '0 0 16px rgba(0, 229, 106, 0.35)',
           }}
         >
-          {atLimit
-            ? t('home.limitReached', { defaultValue: 'Límite de 6 puntos alcanzado' })
-            : t('home.addSpot', { defaultValue: 'Añadir punto' })}
+          {atLimit ? t('home.limitReached') : t('home.addSpot')}
         </button>
       </main>
     </div>

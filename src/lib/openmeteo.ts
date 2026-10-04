@@ -12,7 +12,6 @@ export type HourlyPoint = {
 
 export type SpotWeather = {
   fetchedAt: number;
-  // Coordenadas reales que ha devuelto la API (marine ajusta al grid del modelo).
   lat: number;
   lon: number;
   timezone: string;
@@ -58,8 +57,7 @@ export async function fetchSpotWeather(lat: number, lon: number): Promise<SpotWe
   const atmosParams = new URLSearchParams({
     latitude: String(lat),
     longitude: String(lon),
-    hourly:
-      'wind_speed_10m,wind_gusts_10m,wind_direction_10m,temperature_2m,precipitation',
+    hourly: 'wind_speed_10m,wind_gusts_10m,wind_direction_10m,temperature_2m,precipitation',
     forecast_days: '7',
     timezone: 'auto',
   });
@@ -79,7 +77,6 @@ export async function fetchSpotWeather(lat: number, lon: number): Promise<SpotWe
   const marine = (await marineRes.json()) as MarineResponse;
   const atmos = (await atmosRes.json()) as AtmosResponse;
 
-  // Indexamos atmosférico por hora para fusionar sin depender del orden.
   const atmosByTime = new Map<string, number>();
   atmos.hourly.time.forEach((t, i) => atmosByTime.set(t, i));
 

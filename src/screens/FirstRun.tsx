@@ -8,29 +8,70 @@ export const FirstRun: React.FC = () => {
   const markFirstRunDone = useAppStore((state) => state.markFirstRunDone);
 
   return (
-    <main className="min-h-screen w-full flex flex-col items-center justify-center px-4 py-8 select-text">
-      <div className="w-full max-w-lg mx-auto flex flex-col items-center text-center">
-        {/* Large horizontal logo */}
-        <header className="mb-10 sm:mb-12">
+    <main
+      style={{
+        minHeight: '100vh',
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '32px 16px',
+        backgroundColor: 'var(--bg)',
+        color: 'var(--text)',
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 520,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+        }}
+      >
+        <header style={{ marginBottom: 40 }}>
           <Logo variant="horizontal" size="lg" />
         </header>
 
-        {/* Welcome title */}
-        <h1 className="font-sans text-2xl sm:text-3xl font-bold tracking-tight mb-4 text-[var(--text)]">
+        <h1
+          style={{
+            fontFamily: 'var(--font-sans)',
+            fontSize: 28,
+            fontWeight: 700,
+            letterSpacing: '-0.01em',
+            marginBottom: 16,
+            color: 'var(--text)',
+          }}
+        >
           {t('firstrun.welcome')}
         </h1>
 
-        {/* Introductory description */}
-        <p className="font-sans text-base sm:text-lg text-[var(--text-dim)] max-w-md leading-relaxed mb-10">
+        <p
+          style={{
+            fontFamily: 'var(--font-sans)',
+            fontSize: 17,
+            lineHeight: 1.55,
+            color: 'var(--text-dim)',
+            maxWidth: 420,
+            marginBottom: 40,
+          }}
+        >
           {t('firstrun.intro')}
         </p>
 
-        {/* Primary CTA button */}
         <button
           type="button"
           onClick={markFirstRunDone}
-          className="cursor-pointer font-sans font-semibold text-base sm:text-lg px-8 py-4 rounded-lg transition-transform active:scale-95"
           style={{
+            cursor: 'pointer',
+            fontFamily: 'var(--font-sans)',
+            fontWeight: 600,
+            fontSize: 17,
+            padding: '16px 32px',
+            borderRadius: 8,
+            border: 'none',
             backgroundColor: 'var(--accent)',
             color: '#0A0A0A',
             boxShadow: '0 0 20px rgba(0, 229, 106, 0.45)',

@@ -10,12 +10,10 @@ export const App: React.FC = () => {
   const theme = useAppStore((state) => state.theme);
   const language = useAppStore((state) => state.language);
 
-  // Sync theme attribute to root HTML document element
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // Sync language with i18next instance on start and store changes
   useEffect(() => {
     if (i18n.language !== language) {
       void i18n.changeLanguage(language);

@@ -1,0 +1,50 @@
+:root {
+  --bg: #0A0A0A;
+  --surface: #141414;
+  --surface-2: #1C1C1C;
+  --border: #262626;
+  --text: #F2F2F2;
+  --text-primary: #F2F2F2;
+  --text-secondary: #8A8A8A;
+  --text-dim: #8A8A8A;
+
+  --accent: #00E56A;
+  --accent-2: #00B8FF;
+
+  --verdict-favorable: #00E56A;
+  --verdict-acceptable: #E5E500;
+  --verdict-demanding: #FF8A00;
+  --verdict-advised-against: #FF2D55;
+
+  --verdict-favorable-bg: rgba(0, 229, 106, 0.16);
+  --verdict-acceptable-bg: rgba(229, 229, 0, 0.16);
+  --verdict-demanding-bg: rgba(255, 138, 0, 0.18);
+  --verdict-advised-against-bg: rgba(255, 45, 85, 0.18);
+
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+[data-theme='light'] {
+  --bg: #FFFFFF;
+  --surface: #F5F5F5;
+  --surface-2: #ECECEC;
+  --border: #DDDDDD;
+  --text: #0A0A0A;
+  --text-primary: #0A0A0A;
+  --text-secondary: #555555;
+  --text-dim: #555555;
+
+  --accent: #00A34C;
+  --accent-2: #0086CC;
+
+  --verdict-favorable: #00A34C;
+  --verdict-acceptable: #B8B800;
+  --verdict-demanding: #CC6E00;
+  --verdict-advised-against: #CC1E40;
+
+  --verdict-favorable-bg: rgba(0, 163, 76, 0.14);
+  --verdict-acceptable-bg: rgba(184, 184, 0, 0.16);
+  --verdict-demanding-bg: rgba(204, 110, 0, 0.14);
+  --verdict-advised-against-bg: rgba(204, 30, 64, 0.14);
+}

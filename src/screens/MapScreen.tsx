@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -47,6 +48,7 @@ function ClickHandler({ onPick }: { onPick: (lat: number, lon: number) => void }
 }
 
 export default function MapScreen({ onCancel, onSave, initialSpot }: Props) {
+  const { t, i18n } = useTranslation();
   const [position, setPosition] = useState<[number, number] | null>(
     initialSpot ? [initialSpot.lat, initialSpot.lon] : null
   );
@@ -60,9 +62,10 @@ export default function MapScreen({ onCancel, onSave, initialSpot }: Props) {
     if (!isEditing) setName('');
     setBusy(true);
     try {
+      const lang = i18n.language && i18n.language.startsWith('en') ? 'en' : 'es';
       const url =
         `https://nominatim.openstreetmap.org/reverse?format=jsonv2` +
-        `&lat=${lat}&lon=${lon}&zoom=12&accept-language=es,en`;
+        `&lat=${lat}&lon=${lon}&zoom=12&accept-language=${lang}`;
       const res = await fetch(url, { headers: { Accept: 'application/json' } });
       if (!res.ok) throw new Error('nominatim failed');
       const data = await res.json();
@@ -84,7 +87,7 @@ export default function MapScreen({ onCancel, onSave, initialSpot }: Props) {
 
   function handleSave() {
     if (!position || !onSave) return;
-    const trimmed = name.trim() || 'Sin nombre';
+    const trimmed = name.trim() || t('map.unnamed');
     onSave({ name: trimmed, lat: position[0], lon: position[1] });
   }
 
@@ -104,10 +107,10 @@ export default function MapScreen({ onCancel, onSave, initialSpot }: Props) {
         }}
       >
         <button type="button" className="btn-ghost" onClick={onCancel}>
-          Cancelar
+          {t('common.cancel')}
         </button>
         <span style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }}>
-          {isEditing ? 'EDITAR PUNTO' : 'NUEVO PUNTO'}
+          {isEditing ? t('map.editSpot') : t('map.newSpot')}
         </span>
         <button
           type="button"
@@ -115,7 +118,7 @@ export default function MapScreen({ onCancel, onSave, initialSpot }: Props) {
           disabled={!canSave}
           onClick={handleSave}
         >
-          Guardar
+          {t('common.save')}
         </button>
       </header>
 
@@ -155,13 +158,13 @@ export default function MapScreen({ onCancel, onSave, initialSpot }: Props) {
                 marginBottom: 4,
               }}
             >
-              Nombre del punto
+              {t('map.spotName')}
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={busy ? 'Buscando…' : 'Ponle un nombre'}
+              placeholder={busy ? t('map.searching') : t('map.spotNamePlaceholder')}
               style={{
                 width: '100%',
                 padding: '8px 10px',
