@@ -6,6 +6,7 @@ import {
   Marker,
   Polyline,
   Tooltip,
+  useMap,
   useMapEvents,
 } from 'react-leaflet';
 import L from 'leaflet';
@@ -67,6 +68,14 @@ function ClickHandler({
   return null;
 }
 
+function MapController({ onMap }: { onMap: (map: L.Map) => void }) {
+  const map = useMap();
+  React.useEffect(() => {
+    onMap(map);
+  }, [map, onMap]);
+  return null;
+}
+
 export const MapScreen: React.FC<MapScreenProps> = ({
   initialSpot,
   onCancel,
@@ -75,7 +84,15 @@ export const MapScreen: React.FC<MapScreenProps> = ({
   const { t, i18n } = useTranslation();
   const isEditing = !!initialSpot;
 
-  // Estado local
+  // Estado del mapa
+  const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
+
+  // Estado de búsqueda
+  const [busqueda, setBusqueda] = useState('');
+  const [buscando, setBuscando] = useState(false);
+  const [errorBusqueda, setErrorBusqueda] = useState<string | null>(null);
+
+  // Estado local del punto
   const [puntoPesca, setPuntoPesca] = useState<{ lat: number; lon: number } | null>(
     initialSpot ? { lat: initialSpot.lat, lon: initialSpot.lon } : null
   );
@@ -101,6 +118,10 @@ export const MapScreen: React.FC<MapScreenProps> = ({
   );
 
   const [nombre, setNombre] = useState(initialSpot?.name ?? '');
+  const [nombreEditadoManualmente, setNombreEditadoManualmente] = useState(
+    !!initialSpot?.name
+  );
+
   const [zona, setZona] = useState<Zona>(
     initialSpot?.zona ?? 'mediterraneo_espanol'
   );
@@ -120,6 +141,78 @@ export const MapScreen: React.FC<MapScreenProps> = ({
     });
   }, [t]);
 
+  // Buscador por nombre
+  async function handleBuscar(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    const query = busqueda.trim();
+    if (!query) return;
+
+    setBuscando(true);
+    setErrorBusqueda(null);
+
+    const lang = i18n.language && i18n.language.startsWith('en') ? 'en' : 'es';
+
+    try {
+      let lat: number | null = null;
+      let lon: number | null = null;
+
+      // 1. Intentar Nominatim search
+      try {
+        const urlNominatim = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(
+          query
+        )}&limit=5&accept-language=${lang}`;
+        const res = await fetch(urlNominatim, {
+          headers: {
+            Accept: 'application/json',
+            'User-Agent': 'WKF-WebApp/0.1',
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            lat = parseFloat(data[0].lat);
+            lon = parseFloat(data[0].lon);
+          }
+        }
+      } catch {
+        // Continuar al fallback
+      }
+
+      // 2. Si no hay resultados de Nominatim, intentar Open-Meteo Geocoding
+      if (lat === null || lon === null || isNaN(lat) || isNaN(lon)) {
+        try {
+          const urlOpenMeteo = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
+            query
+          )}&count=5&language=${lang}`;
+          const res = await fetch(urlOpenMeteo, {
+            headers: { Accept: 'application/json' },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data?.results) && data.results.length > 0) {
+              lat = data.results[0].latitude;
+              lon = data.results[0].longitude;
+            }
+          }
+        } catch {
+          // Fallback falló
+        }
+      }
+
+      // 3. Evaluar resultado y recentrar
+      if (lat !== null && lon !== null && !isNaN(lat) && !isNaN(lon)) {
+        if (mapInstance) {
+          mapInstance.flyTo([lat, lon], 11);
+        }
+      } else {
+        setErrorBusqueda(t('errores.geocoder'));
+        setTimeout(() => setErrorBusqueda(null), 3000);
+      }
+    } finally {
+      setBuscando(false);
+    }
+  }
+
   // Selección de punto en el mapa (solo creación)
   async function handlePick(lat: number, lon: number) {
     setPuntoPesca({ lat, lon });
@@ -135,11 +228,16 @@ export const MapScreen: React.FC<MapScreenProps> = ({
         setCargandoProfundidad(false);
       });
 
-    // 2. Proponer nombre inverso vía Nominatim si no hay nombre
+    // 2. Proponer nombre inverso vía Nominatim si no ha sido editado manualmente
     try {
       const lang = i18n.language && i18n.language.startsWith('en') ? 'en' : 'es';
       const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=12&accept-language=${lang}`;
-      const res = await fetch(url, { headers: { Accept: 'application/json' } });
+      const res = await fetch(url, {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'WKF-WebApp/0.1',
+        },
+      });
       if (res.ok) {
         const data = await res.json();
         const suggested =
@@ -150,7 +248,7 @@ export const MapScreen: React.FC<MapScreenProps> = ({
           data?.address?.county ||
           data?.name ||
           '';
-        if (suggested && !nombre) {
+        if (suggested && !nombreEditadoManualmente) {
           setNombre(suggested);
         }
       }
@@ -266,14 +364,100 @@ export const MapScreen: React.FC<MapScreenProps> = ({
 
       {/* Mapa Leaflet */}
       <div style={{ flex: 1, position: 'relative' }}>
+        {/* Buscador flotante por nombre */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 12,
+            left: 12,
+            right: 12,
+            zIndex: 1000,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+            pointerEvents: 'none',
+          }}
+        >
+          <form
+            onSubmit={handleBuscar}
+            style={{
+              display: 'flex',
+              gap: 8,
+              backgroundColor: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              padding: 10,
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
+              pointerEvents: 'auto',
+            }}
+          >
+            <input
+              type="text"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder={t('common.search')}
+              style={{
+                flex: 1,
+                backgroundColor: 'var(--bg)',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                padding: '8px 12px',
+                color: 'var(--text)',
+                fontSize: '0.85rem',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+            <button
+              type="submit"
+              disabled={buscando || !busqueda.trim()}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: 'var(--accent)',
+                color: '#000',
+                border: 'none',
+                borderRadius: 6,
+                fontWeight: 600,
+                fontSize: '0.85rem',
+                cursor: buscando || !busqueda.trim() ? 'not-allowed' : 'pointer',
+                opacity: buscando || !busqueda.trim() ? 0.6 : 1,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {buscando ? '...' : t('common.search')}
+            </button>
+          </form>
+
+          {errorBusqueda && (
+            <div
+              style={{
+                backgroundColor: 'rgba(239, 68, 68, 0.95)',
+                color: '#fff',
+                padding: '6px 14px',
+                borderRadius: 6,
+                fontSize: '0.8rem',
+                fontWeight: 500,
+                textAlign: 'center',
+                pointerEvents: 'auto',
+                alignSelf: 'center',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+              }}
+            >
+              {errorBusqueda}
+            </div>
+          )}
+        </div>
+
         <MapContainer
           center={mapCenter}
           zoom={puntoPesca ? 12 : INITIAL_ZOOM}
           style={{ width: '100%', height: '100%' }}
         >
+          <MapController onMap={setMapInstance} />
+
           <TileLayer
-            attribution="&copy; OpenStreetMap &copy; CARTO"
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            attribution="&copy; OpenStreetMap contributors"
+            url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
           <ClickHandler disabled={isEditing} onPick={handlePick} />
@@ -372,7 +556,15 @@ export const MapScreen: React.FC<MapScreenProps> = ({
               <input
                 type="text"
                 value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setNombre(val);
+                  if (val.trim() === '') {
+                    setNombreEditadoManualmente(false);
+                  } else {
+                    setNombreEditadoManualmente(true);
+                  }
+                }}
                 placeholder={t('map.spotNamePlaceholder')}
                 style={{
                   width: '100%',
