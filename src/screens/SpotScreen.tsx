@@ -24,6 +24,7 @@ import {
 } from '../lib/shoaling.ts';
 import { calcularSol } from '../lib/sun.ts';
 import { calcularLuna, type FaseLunar } from '../lib/moon.ts';
+import type { HourlyPoint } from '../lib/openmeteo.ts';
 
 export interface SpotScreenProps {
   spotId: string;
@@ -54,8 +55,6 @@ const ALL_TABS: TabId[] = [
   'tides',
 ];
 
-// Helper para nombres de fase lunar en español
-// TODO i18n: agregar claves traducidas para fase lunar cuando se definan
 const NOMBRES_FASE_LUNAR: Record<FaseLunar, string> = {
   nueva: 'Luna nueva',
   creciente: 'Creciente',
@@ -67,7 +66,25 @@ const NOMBRES_FASE_LUNAR: Record<FaseLunar, string> = {
   menguante: 'Menguante',
 };
 
-// Helper MiniChart: genera polyline SVG viewBox="0 0 100 30"
+// ─── Icono de clima ────────────────────────────────────────────
+// Decide el icono a partir de precipitación y nubosidad.
+function iconoClima(h: HourlyPoint): string {
+  const precip = h.precipitation ?? 0;
+  const cloud = h.cloudCover ?? 0;
+
+  // Lluvia fuerte
+  if (precip >= 2) return '🌧️';
+  // Lluvia ligera
+  if (precip >= 0.2) return '🌦️';
+  // Nublado / cubierto
+  if (cloud >= 75) return '☁️';
+  // Parcialmente nublado
+  if (cloud >= 40) return '⛅';
+  // Despejado
+  return '☀️';
+}
+
+// ─── MiniChart SVG ─────────────────────────────────────────────
 const MiniChart: React.FC<{ valores: (number | null)[]; color: string }> = ({
   valores,
   color,
@@ -85,7 +102,6 @@ const MiniChart: React.FC<{ valores: (number | null)[]; color: string }> = ({
     const val = valores[i];
     if (val === null || isNaN(val)) continue;
     const x = (i / (N - 1)) * 100;
-    // Invertir Y (0 arriba, 30 abajo): rango útil 2 a 28
     const y = 28 - ((val - min) / diff) * 26;
     const prefix = points.length === 0 ? 'M' : 'L';
     points.push(`${prefix} ${x.toFixed(1)},${y.toFixed(1)}`);
@@ -122,6 +138,83 @@ const MiniChart: React.FC<{ valores: (number | null)[]; color: string }> = ({
   );
 };
 
+// ─── Tabla vertical (DP-072) ───────────────────────────────────
+interface FilaTablaVertical {
+  hora: string;
+  valores: (string | React.ReactNode)[];
+}
+
+const TablaVertical: React.FC<{
+  cabeceras: string[];
+  filas: FilaTablaVertical[];
+}> = ({ cabeceras, filas }) => {
+  return (
+    <div
+      style={{
+        borderRadius: 8,
+        border: '1px solid var(--border)',
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `minmax(56px, auto) repeat(${cabeceras.length}, 1fr)`,
+          backgroundColor: 'var(--surface)',
+          borderBottom: '1px solid var(--border)',
+          fontSize: '0.72rem',
+          color: 'var(--text-dim)',
+          fontWeight: 600,
+        }}
+      >
+        <div style={{ padding: '8px 10px', textAlign: 'left' }}>Hora</div>
+        {cabeceras.map((c) => (
+          <div key={c} style={{ padding: '8px 6px', textAlign: 'center' }}>
+            {c}
+          </div>
+        ))}
+      </div>
+      {filas.map((fila, i) => (
+        <div
+          key={i}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `minmax(56px, auto) repeat(${cabeceras.length}, 1fr)`,
+            borderBottom:
+              i < filas.length - 1 ? '1px solid var(--border)' : 'none',
+            fontSize: '0.78rem',
+          }}
+        >
+          <div
+            style={{
+              padding: '8px 10px',
+              textAlign: 'left',
+              fontFamily: 'var(--font-mono, Fira Code, monospace)',
+              color: 'var(--text-dim)',
+              fontWeight: 500,
+            }}
+          >
+            {fila.hora}
+          </div>
+          {fila.valores.map((v, j) => (
+            <div
+              key={j}
+              style={{
+                padding: '8px 6px',
+                textAlign: 'center',
+                fontFamily: 'var(--font-mono, Fira Code, monospace)',
+                color: 'var(--text)',
+              }}
+            >
+              {v}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export const SpotScreen: React.FC<SpotScreenProps> = ({
   spotId,
   onClose,
@@ -129,14 +222,12 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 }) => {
   const { t, i18n } = useTranslation();
 
-  // Store
   const spots = useAppStore((s) => s.spots);
   const getFreshWeather = useAppStore((s) => s.getFreshWeather);
   const ajustes = useAppStore((s) => s.ajustes);
 
   const spot = spots.find((s) => s.id === spotId);
 
-  // Estados locales
   const [tabActiva, setTabActiva] = useState<TabId>('waves');
   const [coordsCopiedFeedback, setCoordsCopiedFeedback] = useState(false);
   const [expandFactors, setExpandFactors] = useState(false);
@@ -148,7 +239,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 
   const weather = getFreshWeather(spot.id);
 
-  // Veredictos por franja para fila 3
   const veredictos = calcularVeredictoPorFranja(
     spot,
     weather,
@@ -157,7 +247,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     ajustes.perfil
   );
 
-  // Franja activa
   const franjaActiva =
     ajustes.franjas.find((f) => f.id === ajustes.franjaActivaId) ??
     ajustes.franjas[0];
@@ -166,7 +255,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     ? veredictos[franjaActiva.id]
     : null;
 
-  // Cálculo detallado para la franja activa (obtener peor factor disparador)
   let detalleFranjaActiva: ResultadoVeredicto | null = null;
   if (weather && weather.hourly.length > 0 && franjaActiva) {
     const inicio = franjaActiva.inicio;
@@ -216,7 +304,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     }
   }
 
-  // Aviso de salida / entrada (Fila 6)
   let veredictoSalida: string | null = null;
   let colorSalida = 'var(--text-dim)';
   let textoSalida = '';
@@ -255,13 +342,11 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     textoSalida = t(veredictoAccesoAClaveI18n(resAcceso));
   }
 
-  // Filtrar subpestañas visibles
   const subpestanasVisibles = ALL_TABS.filter((tab) => {
     if (tab === 'waves' || tab === 'wind') return true;
     return !ajustes.subpestanasOcultas.includes(tab);
   });
 
-  // Próximas 24 horas a partir de ahora
   const nowTs = Date.now();
   let proximas24 = weather?.hourly
     ? weather.hourly.filter((h) => new Date(h.time).getTime() >= nowTs - 3600000)
@@ -272,7 +357,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     proximas24 = proximas24.slice(0, 24);
   }
 
-  // Copia de coordenadas al portapapeles
   const handleCopyCoords = async () => {
     try {
       const texto = `${spot.lat.toFixed(6)}, ${spot.lon.toFixed(6)}`;
@@ -280,11 +364,10 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
       setCoordsCopiedFeedback(true);
       setTimeout(() => setCoordsCopiedFeedback(false), 1500);
     } catch {
-      // Ignorar fallo de portapapeles
+      // Ignorar
     }
   };
 
-  // Formato de hora de tabla
   const formatearHora = (iso: string) => {
     return new Date(iso).toLocaleTimeString(i18n.language || 'es', {
       hour: '2-digit',
@@ -292,7 +375,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     });
   };
 
-  // Mapeo factor disparador -> factor string key
   const factorKeyMap: Record<keyof Umbral, string> = {
     viento: 'windSpeed',
     ola: 'waveHeight',
@@ -315,7 +397,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         overflowY: 'auto',
       }}
     >
-      {/* ─── CABECERA FIJA ─────────────────────────────────────────── */}
       <header
         style={{
           position: 'sticky',
@@ -326,7 +407,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
           padding: '12px 16px',
         }}
       >
-        {/* Fila 1: Botón Volver + Nombre + Balance */}
         <div
           style={{
             display: 'flex',
@@ -370,7 +450,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
           <div style={{ width: '60px' }} />
         </div>
 
-        {/* Fila 2: Coords + Profundidad + Copiar */}
         <div
           onClick={handleCopyCoords}
           style={{
@@ -408,7 +487,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
           </span>
         </div>
 
-        {/* Fila 3: Chips de veredicto por franja */}
         <div
           style={{
             display: 'flex',
@@ -446,7 +524,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
           })}
         </div>
 
-        {/* Fila 4: Factor disparador (si Exigente o Desaconsejado) */}
         {(veredictoFranjaActiva === 'EXIGENTE' ||
           veredictoFranjaActiva === 'DESACONSEJADO') &&
           detalleFranjaActiva?.factorDisparador && (
@@ -490,7 +567,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                 </button>
               </div>
 
-              {/* Panel expandible de factores */}
               {expandFactors && (
                 <div
                   style={{
@@ -547,7 +623,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
             </div>
           )}
 
-        {/* Fila 5: Umbral aplicado */}
         <div
           style={{
             fontSize: '0.75rem',
@@ -562,7 +637,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
           })}
         </div>
 
-        {/* Fila 6: Bloque de aviso de salida */}
         <div
           style={{
             display: 'flex',
@@ -619,7 +693,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         </div>
       </header>
 
-      {/* ─── FILA DE SUBPESTAÑAS HORIZONTALES ──────────────────────── */}
       <nav
         style={{
           display: 'flex',
@@ -657,7 +730,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         })}
       </nav>
 
-      {/* ─── CUERPO DE LA SUBPESTAÑA ACTIVA ─────────────────────────── */}
       <main
         style={{
           flex: 1,
@@ -668,7 +740,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
           boxSizing: 'border-box',
         }}
       >
-        {/* Caso especial: Sol */}
         {tabActiva === 'sun' && (
           <div>
             {(() => {
@@ -749,7 +820,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
           </div>
         )}
 
-        {/* Caso especial: Luna */}
         {tabActiva === 'moon' && (
           <div>
             {(() => {
@@ -846,7 +916,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
           </div>
         )}
 
-        {/* Pestañas dependientes de Weather (waves, wind, weather, air, barometer, activity, tides) */}
         {tabActiva !== 'sun' && tabActiva !== 'moon' && (
           <div>
             {!weather || proximas24.length === 0 ? (
@@ -861,10 +930,8 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
               </div>
             ) : (
               <div>
-                {/* 1. Waves */}
                 {tabActiva === 'waves' && (
                   <div>
-                    {/* Número grande */}
                     <div style={{ marginBottom: '8px' }}>
                       <span
                         style={{
@@ -888,60 +955,31 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                       </span>
                     </div>
 
-                    {/* Gráfico */}
                     <MiniChart
                       valores={proximas24.map((h) => h.waveHeight)}
                       color="var(--accent)"
                     />
 
-                    {/* Tabla por horas */}
-                    <div style={{ overflowX: 'auto', borderRadius: 8, border: '1px solid var(--border)' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', fontSize: '0.8rem' }}>
-                        <thead>
-                          <tr style={{ backgroundColor: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
-                            <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text-dim)' }}>Hora</th>
-                            {proximas24.map((h) => (
-                              <th key={h.time} style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)' }}>
-                                {formatearHora(h.time)}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                            <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>{t('factors.waveHeight')}</td>
-                            {proximas24.map((h) => (
-                              <td key={h.time} style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)' }}>
-                                {h.waveHeight != null ? `${h.waveHeight.toFixed(1)} m` : '—'}
-                              </td>
-                            ))}
-                          </tr>
-                          <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                            <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>{t('factors.wavePeriod')}</td>
-                            {proximas24.map((h) => (
-                              <td key={h.time} style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)' }}>
-                                {h.wavePeriod != null ? `${h.wavePeriod.toFixed(0)} s` : '—'}
-                              </td>
-                            ))}
-                          </tr>
-                          <tr>
-                            <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>{t('factors.waveDirection')}</td>
-                            {proximas24.map((h) => (
-                              <td key={h.time} style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)' }}>
-                                {h.waveDirection != null ? `${h.waveDirection.toFixed(0)}°` : '—'}
-                              </td>
-                            ))}
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
+                    <TablaVertical
+                      cabeceras={[
+                        t('factors.waveHeight'),
+                        t('factors.wavePeriod'),
+                        t('factors.waveDirection'),
+                      ]}
+                      filas={proximas24.map((h) => ({
+                        hora: formatearHora(h.time),
+                        valores: [
+                          h.waveHeight != null ? `${h.waveHeight.toFixed(1)} m` : '—',
+                          h.wavePeriod != null ? `${h.wavePeriod.toFixed(0)} s` : '—',
+                          h.waveDirection != null ? `${h.waveDirection.toFixed(0)}°` : '—',
+                        ],
+                      }))}
+                    />
                   </div>
                 )}
 
-                {/* 2. Wind */}
                 {tabActiva === 'wind' && (
                   <div>
-                    {/* Número grande */}
                     <div style={{ marginBottom: '8px' }}>
                       <span
                         style={{
@@ -965,57 +1003,29 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                       </span>
                     </div>
 
-                    {/* Gráfico */}
                     <MiniChart
                       valores={proximas24.map((h) => h.windSpeed)}
                       color="var(--accent-2)"
                     />
 
-                    {/* Tabla por horas */}
-                    <div style={{ overflowX: 'auto', borderRadius: 8, border: '1px solid var(--border)' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', fontSize: '0.8rem' }}>
-                        <thead>
-                          <tr style={{ backgroundColor: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
-                            <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text-dim)' }}>Hora</th>
-                            {proximas24.map((h) => (
-                              <th key={h.time} style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)' }}>
-                                {formatearHora(h.time)}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                            <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>{t('factors.windSpeed')}</td>
-                            {proximas24.map((h) => (
-                              <td key={h.time} style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)' }}>
-                                {h.windSpeed != null ? `${h.windSpeed.toFixed(1)}` : '—'}
-                              </td>
-                            ))}
-                          </tr>
-                          <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                            <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>{t('factors.windGusts')}</td>
-                            {proximas24.map((h) => (
-                              <td key={h.time} style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)' }}>
-                                {h.windGusts != null ? `${h.windGusts.toFixed(1)}` : '—'}
-                              </td>
-                            ))}
-                          </tr>
-                          <tr>
-                            <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>{t('factors.windDirection')}</td>
-                            {proximas24.map((h) => (
-                              <td key={h.time} style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)' }}>
-                                {h.windDirection != null ? `${h.windDirection.toFixed(0)}°` : '—'}
-                              </td>
-                            ))}
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
+                    <TablaVertical
+                      cabeceras={[
+                        t('factors.windSpeed'),
+                        t('factors.windGusts'),
+                        t('factors.windDirection'),
+                      ]}
+                      filas={proximas24.map((h) => ({
+                        hora: formatearHora(h.time),
+                        valores: [
+                          h.windSpeed != null ? `${h.windSpeed.toFixed(1)}` : '—',
+                          h.windGusts != null ? `${h.windGusts.toFixed(1)}` : '—',
+                          h.windDirection != null ? `${h.windDirection.toFixed(0)}°` : '—',
+                        ],
+                      }))}
+                    />
                   </div>
                 )}
 
-                {/* 3. Weather */}
                 {tabActiva === 'weather' && (
                   <div>
                     <div style={{ marginBottom: '8px' }}>
@@ -1038,42 +1048,24 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                       color="#f59e0b"
                     />
 
-                    <div style={{ overflowX: 'auto', borderRadius: 8, border: '1px solid var(--border)' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', fontSize: '0.8rem' }}>
-                        <thead>
-                          <tr style={{ backgroundColor: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
-                            <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text-dim)' }}>Hora</th>
-                            {proximas24.map((h) => (
-                              <th key={h.time} style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)' }}>
-                                {formatearHora(h.time)}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                            <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>{t('factors.temperature')}</td>
-                            {proximas24.map((h) => (
-                              <td key={h.time} style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)' }}>
-                                {h.temperature != null ? `${h.temperature.toFixed(1)}°` : '—'}
-                              </td>
-                            ))}
-                          </tr>
-                          <tr>
-                            <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>{t('factors.precipitation')}</td>
-                            {proximas24.map((h) => (
-                              <td key={h.time} style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)' }}>
-                                {h.precipitation != null ? `${h.precipitation.toFixed(1)} mm` : '—'}
-                              </td>
-                            ))}
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
+                    <TablaVertical
+                      cabeceras={[
+                        '',
+                        t('factors.temperature'),
+                        t('factors.windSpeed'),
+                      ]}
+                      filas={proximas24.map((h) => ({
+                        hora: formatearHora(h.time),
+                        valores: [
+                          <span key="ico" style={{ fontSize: '1.1rem' }}>{iconoClima(h)}</span>,
+                          h.temperature != null ? `${h.temperature.toFixed(1)}°` : '—',
+                          h.windSpeed != null ? `${h.windSpeed.toFixed(1)}` : '—',
+                        ],
+                      }))}
+                    />
                   </div>
                 )}
 
-                {/* 4. Air */}
                 {tabActiva === 'air' && (
                   <div>
                     <div style={{ marginBottom: '8px' }}>
@@ -1096,34 +1088,18 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                       color="#38bdf8"
                     />
 
-                    <div style={{ overflowX: 'auto', borderRadius: 8, border: '1px solid var(--border)' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', fontSize: '0.8rem' }}>
-                        <thead>
-                          <tr style={{ backgroundColor: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
-                            <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text-dim)' }}>Hora</th>
-                            {proximas24.map((h) => (
-                              <th key={h.time} style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)' }}>
-                                {formatearHora(h.time)}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>{t('factors.temperature')}</td>
-                            {proximas24.map((h) => (
-                              <td key={h.time} style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)' }}>
-                                {h.temperature != null ? `${h.temperature.toFixed(1)}°` : '—'}
-                              </td>
-                            ))}
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
+                    <TablaVertical
+                      cabeceras={[t('factors.temperature')]}
+                      filas={proximas24.map((h) => ({
+                        hora: formatearHora(h.time),
+                        valores: [
+                          h.temperature != null ? `${h.temperature.toFixed(1)}°` : '—',
+                        ],
+                      }))}
+                    />
                   </div>
                 )}
 
-                {/* 5. Barometer */}
                 {tabActiva === 'barometer' && (
                   <div>
                     <div style={{ marginBottom: '8px' }}>
@@ -1146,34 +1122,18 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                       color="#a855f7"
                     />
 
-                    <div style={{ overflowX: 'auto', borderRadius: 8, border: '1px solid var(--border)' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', fontSize: '0.8rem' }}>
-                        <thead>
-                          <tr style={{ backgroundColor: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
-                            <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text-dim)' }}>Hora</th>
-                            {proximas24.map((h) => (
-                              <th key={h.time} style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)' }}>
-                                {formatearHora(h.time)}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>{t('factors.pressure')}</td>
-                            {proximas24.map((h) => (
-                              <td key={h.time} style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)' }}>
-                                {h.pressure != null ? `${h.pressure.toFixed(0)}` : '—'}
-                              </td>
-                            ))}
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
+                    <TablaVertical
+                      cabeceras={[t('factors.pressure')]}
+                      filas={proximas24.map((h) => ({
+                        hora: formatearHora(h.time),
+                        valores: [
+                          h.pressure != null ? `${h.pressure.toFixed(0)}` : '—',
+                        ],
+                      }))}
+                    />
                   </div>
                 )}
 
-                {/* 6. Activity (Current) */}
                 {tabActiva === 'activity' && (
                   <div>
                     <div style={{ marginBottom: '8px' }}>
@@ -1196,42 +1156,19 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                       color="#06b6d4"
                     />
 
-                    <div style={{ overflowX: 'auto', borderRadius: 8, border: '1px solid var(--border)' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', fontSize: '0.8rem' }}>
-                        <thead>
-                          <tr style={{ backgroundColor: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
-                            <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text-dim)' }}>Hora</th>
-                            {proximas24.map((h) => (
-                              <th key={h.time} style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)' }}>
-                                {formatearHora(h.time)}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                            <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>{t('factors.current')}</td>
-                            {proximas24.map((h) => (
-                              <td key={h.time} style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)' }}>
-                                {h.currentVelocity != null ? `${h.currentVelocity.toFixed(2)} kn` : '—'}
-                              </td>
-                            ))}
-                          </tr>
-                          <tr>
-                            <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>Dirección</td>
-                            {proximas24.map((h) => (
-                              <td key={h.time} style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)' }}>
-                                {h.currentDirection != null ? `${h.currentDirection.toFixed(0)}°` : '—'}
-                              </td>
-                            ))}
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
+                    <TablaVertical
+                      cabeceras={[t('factors.current'), 'Dirección']}
+                      filas={proximas24.map((h) => ({
+                        hora: formatearHora(h.time),
+                        valores: [
+                          h.currentVelocity != null ? `${h.currentVelocity.toFixed(2)} kn` : '—',
+                          h.currentDirection != null ? `${h.currentDirection.toFixed(0)}°` : '—',
+                        ],
+                      }))}
+                    />
                   </div>
                 )}
 
-                {/* 7. Tides (Mareas) */}
                 {tabActiva === 'tides' && (
                   <div>
                     <div style={{ marginBottom: '8px' }}>
@@ -1254,30 +1191,15 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                       color="#38bdf8"
                     />
 
-                    <div style={{ overflowX: 'auto', borderRadius: 8, border: '1px solid var(--border)' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', fontSize: '0.8rem' }}>
-                        <thead>
-                          <tr style={{ backgroundColor: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
-                            <th style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text-dim)' }}>Hora</th>
-                            {proximas24.map((h) => (
-                              <th key={h.time} style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)' }}>
-                                {formatearHora(h.time)}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>{t('factors.seaLevel')}</td>
-                            {proximas24.map((h) => (
-                              <td key={h.time} style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)' }}>
-                                {h.seaLevelHeight != null ? `${h.seaLevelHeight.toFixed(2)} m` : '—'}
-                              </td>
-                            ))}
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
+                    <TablaVertical
+                      cabeceras={[t('factors.seaLevel')]}
+                      filas={proximas24.map((h) => ({
+                        hora: formatearHora(h.time),
+                        valores: [
+                          h.seaLevelHeight != null ? `${h.seaLevelHeight.toFixed(2)} m` : '—',
+                        ],
+                      }))}
+                    />
                   </div>
                 )}
               </div>
