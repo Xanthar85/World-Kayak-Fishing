@@ -1,3 +1,4 @@
+// src/screens/Home.tsx — completo
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore, type Spot } from '../state/store.ts';
@@ -38,22 +39,25 @@ export const Home: React.FC = () => {
     }
   };
 
+  // Cierra toda la navegación interna y vuelve a la lista de Home.
+  const volverAHome = () => {
+    setMapMode(null);
+    setEditSpot(null);
+    setViewingSpotId(null);
+  };
+
   if (mapMode !== null) {
     return (
       <MapScreen
         initialSpot={editSpot}
-        onCancel={() => {
-          setMapMode(null);
-          setEditSpot(null);
-        }}
+        onCancel={volverAHome}
         onSave={(draft) => {
           if (editSpot) {
             updateSpot(editSpot.id, draft);
           } else {
             addSpot(draft);
           }
-          setMapMode(null);
-          setEditSpot(null);
+          volverAHome();
         }}
       />
     );
@@ -69,6 +73,10 @@ export const Home: React.FC = () => {
           if (s) {
             setEditSpot(s);
             setMapMode('edit');
+            // Mantenemos viewingSpotId como estaba: si el usuario
+            // cancela el MapScreen, volverAHome lo limpia igual.
+            // Pero como queremos volver a Home tras guardar/cancelar,
+            // volverAHome se encarga de ambos casos.
           }
         }}
       />
