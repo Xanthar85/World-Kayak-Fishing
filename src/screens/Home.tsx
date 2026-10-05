@@ -11,14 +11,12 @@ import { fetchSpotWeather } from '../lib/openmeteo.ts';
 export const Home: React.FC = () => {
   const { t } = useTranslation();
 
-  // Estados locales
   const [showSettings, setShowSettings] = useState(false);
   const [viewingSpotId, setViewingSpotId] = useState<string | null>(null);
   const [mapMode, setMapMode] = useState<'new' | 'edit' | null>(null);
   const [editSpot, setEditSpot] = useState<Spot | null>(null);
   const [refreshingMap, setRefreshingMap] = useState<Record<string, boolean>>({});
 
-  // Store
   const spots = useAppStore((s) => s.spots);
   const ajustes = useAppStore((s) => s.ajustes);
   const getFreshWeather = useAppStore((s) => s.getFreshWeather);
@@ -40,13 +38,7 @@ export const Home: React.FC = () => {
     }
   };
 
-  const handleAddSpotClick = () => {
-    setEditSpot(null);
-    setMapMode('new');
-  };
-
-  // 1. Prioridad de render: MapScreen (crear o editar)
-  if (mapMode != null) {
+  if (mapMode !== null) {
     return (
       <MapScreen
         initialSpot={editSpot}
@@ -67,8 +59,7 @@ export const Home: React.FC = () => {
     );
   }
 
-  // 2. Prioridad de render: SpotScreen (detalle de punto)
-  if (viewingSpotId != null) {
+  if (viewingSpotId !== null) {
     return (
       <SpotScreen
         spotId={viewingSpotId}
@@ -84,7 +75,6 @@ export const Home: React.FC = () => {
     );
   }
 
-  // 3. Render normal de Home
   return (
     <div
       style={{
@@ -96,7 +86,6 @@ export const Home: React.FC = () => {
         fontFamily: 'Inter, system-ui, sans-serif',
       }}
     >
-      {/* Cabecera */}
       <header
         style={{
           display: 'flex',
@@ -150,7 +139,6 @@ export const Home: React.FC = () => {
         </div>
       </header>
 
-      {/* Cuerpo principal */}
       <main
         style={{
           flex: 1,
@@ -207,7 +195,10 @@ export const Home: React.FC = () => {
               {t('home.empty.subtitle')}
             </p>
             <button
-              onClick={handleAddSpotClick}
+              onClick={() => {
+                setEditSpot(null);
+                setMapMode('new');
+              }}
               style={{
                 padding: '12px 24px',
                 backgroundColor: 'var(--accent)',
@@ -244,7 +235,6 @@ export const Home: React.FC = () => {
         )}
       </main>
 
-      {/* Botón flotante para Añadir Punto (si spots.length > 0 y < 6) */}
       {spots.length > 0 && spots.length < 6 && (
         <div
           style={{
@@ -259,7 +249,10 @@ export const Home: React.FC = () => {
           }}
         >
           <button
-            onClick={handleAddSpotClick}
+            onClick={() => {
+              setEditSpot(null);
+              setMapMode('new');
+            }}
             style={{
               pointerEvents: 'auto',
               display: 'inline-flex',
@@ -282,7 +275,6 @@ export const Home: React.FC = () => {
         </div>
       )}
 
-      {/* Footer */}
       <footer
         style={{
           borderTop: '1px solid var(--border)',
@@ -311,7 +303,6 @@ export const Home: React.FC = () => {
         </a>
       </footer>
 
-      {/* Overlay SettingsScreen */}
       {showSettings && (
         <SettingsScreen onClose={() => setShowSettings(false)} />
       )}
