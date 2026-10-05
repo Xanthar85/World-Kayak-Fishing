@@ -1,273 +1,280 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import Logo from '../components/Logo.tsx';
-import MapScreen from './MapScreen.tsx';
-import { useAppStore, type Spot } from '../state/store.ts';
+import { useAppStore } from '../state/store.ts';
+import { Logo } from '../components/Logo.tsx';
+import { SettingsScreen } from './SettingsScreen.tsx';
+import { SpotCard } from '../components/SpotCard.tsx';
+import { fetchSpotWeather } from '../lib/openmeteo.ts';
 
-const MAX_SPOTS = 6;
-
-export function Home() {
+export const Home: React.FC = () => {
   const { t } = useTranslation();
+
+  // State
+  const [showSettings, setShowSettings] = useState(false);
+  const [_editingSpotId, setEditingSpotId] = useState<string | null>(null);
+  const [refreshingMap, setRefreshingMap] = useState<Record<string, boolean>>({});
+
+  // Store
   const spots = useAppStore((s) => s.spots);
-  const addSpot = useAppStore((s) => s.addSpot);
-  const updateSpot = useAppStore((s) => s.updateSpot);
+  const ajustes = useAppStore((s) => s.ajustes);
+  const getFreshWeather = useAppStore((s) => s.getFreshWeather);
+  const setWeather = useAppStore((s) => s.setWeather);
   const removeSpot = useAppStore((s) => s.removeSpot);
 
-  const [showMap, setShowMap] = useState(false);
-  const [editing, setEditing] = useState<Spot | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const handleRefreshSpot = async (spotId: string, lat: number, lon: number) => {
+    if (refreshingMap[spotId]) return;
+    setRefreshingMap((prev) => ({ ...prev, [spotId]: true }));
+    try {
+      const data = await fetchSpotWeather(lat, lon);
+      setWeather(spotId, data);
+    } catch (err) {
+      console.error('Error refreshing weather for spot', spotId, err);
+    } finally {
+      setRefreshingMap((prev) => ({ ...prev, [spotId]: false }));
+    }
+  };
 
-  const atLimit = spots.length >= MAX_SPOTS;
+  const handleAddSpotClick = () => {
+    alert('TODO MapScreen v1.007 bloque 5');
+  };
 
-  function openNew() {
-    setEditing(null);
-    setShowMap(true);
-  }
-
-  function openEdit(spot: Spot) {
-    setEditing(spot);
-    setShowMap(true);
-  }
-
-  if (showMap) {
-    return (
-      <MapScreen
-        initialSpot={
-          editing ? { name: editing.name, lat: editing.lat, lon: editing.lon } : null
-        }
-        onCancel={() => {
-          setShowMap(false);
-          setEditing(null);
-        }}
-        onSave={(draft) => {
-          if (editing) {
-            updateSpot(editing.id, draft);
-          } else {
-            addSpot(draft);
-          }
-          setShowMap(false);
-          setEditing(null);
-        }}
-      />
-    );
-  }
+  const handleEditSpotClick = (spotId: string) => {
+    setEditingSpotId(spotId);
+    alert('TODO SpotScreen v1.007 bloque 3');
+  };
 
   return (
     <div
-      className="screen"
       style={{
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
         backgroundColor: 'var(--bg)',
         color: 'var(--text)',
+        fontFamily: 'Inter, system-ui, sans-serif',
       }}
     >
+      {/* Cabecera */}
       <header
-        className="home-header"
         style={{
-          padding: '12px 16px',
-          borderBottom: '1px solid var(--border)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: 12,
+          padding: '12px 20px',
+          borderBottom: '1px solid var(--border)',
+          backgroundColor: 'var(--surface)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 100,
         }}
       >
         <Logo size="md" />
-        <span
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 12,
-            color: 'var(--text-secondary)',
-            letterSpacing: '0.05em',
-          }}
-        >
-          {t('home.counter', { count: spots.length, max: MAX_SPOTS })}
-        </span>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span
+            style={{
+              fontFamily: 'var(--font-mono, Fira Code, monospace)',
+              fontSize: '0.85rem',
+              color: 'var(--text-dim)',
+              backgroundColor: 'var(--bg)',
+              padding: '4px 10px',
+              borderRadius: 6,
+              border: '1px solid var(--border)',
+            }}
+          >
+            {t('home.counter', { count: spots.length, max: 6 })}
+          </span>
+
+          <button
+            onClick={() => setShowSettings(true)}
+            title={t('settings.title')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 12px',
+              backgroundColor: 'var(--bg)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              color: 'var(--text)',
+              fontSize: '0.85rem',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            <span style={{ fontSize: '1rem', lineHeight: 1 }}>⚙</span>
+            <span>{t('settings.title')}</span>
+          </button>
+        </div>
       </header>
 
+      {/* Cuerpo principal */}
       <main
-        className="home-main"
         style={{
           flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          padding: '16px',
-          gap: 12,
+          width: '100%',
+          maxWidth: '680px',
+          margin: '0 auto',
+          padding: '20px',
+          boxSizing: 'border-box',
+          paddingBottom: spots.length > 0 && spots.length < 6 ? '90px' : '40px',
         }}
       >
         {spots.length === 0 ? (
           <div
             style={{
-              flex: 1,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
+              padding: '60px 20px',
               textAlign: 'center',
-              gap: 16,
+              backgroundColor: 'var(--surface)',
+              borderRadius: 8,
+              border: '1px solid var(--border)',
+              marginTop: '20px',
             }}
           >
-            <p
-              className="home-empty"
+            <div
               style={{
-                color: 'var(--text-dim)',
-                fontFamily: 'var(--font-sans)',
-                fontSize: 16,
-                margin: 0,
+                fontSize: '2rem',
+                marginBottom: '12px',
+                opacity: 0.7,
+              }}
+            >
+              📍
+            </div>
+            <h3
+              style={{
+                margin: '0 0 8px 0',
+                fontSize: '1.1rem',
+                fontWeight: 600,
+                color: 'var(--text)',
               }}
             >
               {t('home.noSpots')}
+            </h3>
+            <p
+              style={{
+                margin: '0 0 20px 0',
+                fontSize: '0.9rem',
+                color: 'var(--text-dim)',
+                maxWidth: '360px',
+              }}
+            >
+              {t('home.empty.subtitle')}
             </p>
+            <button
+              onClick={handleAddSpotClick}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: 'var(--accent)',
+                color: '#000',
+                border: 'none',
+                borderRadius: 8,
+                fontSize: '0.95rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0, 229, 106, 0.25)',
+              }}
+            >
+              + {t('home.addSpot')}
+            </button>
           </div>
         ) : (
-          <ul
-            style={{
-              listStyle: 'none',
-              padding: 0,
-              margin: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 8,
-            }}
-          >
-            {spots.map((spot) => {
-              const isConfirming = confirmDeleteId === spot.id;
-              return (
-                <li
-                  key={spot.id}
-                  style={{
-                    background: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 8,
-                    padding: '12px 14px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 8,
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => openEdit(spot)}
-                    style={{
-                      all: 'unset',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 4,
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontFamily: 'var(--font-sans)',
-                        fontWeight: 600,
-                        fontSize: 15,
-                        color: 'var(--text)',
-                      }}
-                    >
-                      {spot.name}
-                    </span>
-                    <span
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 12,
-                        color: 'var(--text-secondary)',
-                      }}
-                    >
-                      {spot.lat.toFixed(5)}, {spot.lon.toFixed(5)}
-                    </span>
-                  </button>
-
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                    {isConfirming ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => setConfirmDeleteId(null)}
-                          style={{
-                            background: 'transparent',
-                            color: 'var(--text-secondary)',
-                            border: '1px solid var(--border)',
-                            borderRadius: 6,
-                            padding: '6px 12px',
-                            fontFamily: 'var(--font-sans)',
-                            fontSize: 13,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {t('common.cancel')}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            removeSpot(spot.id);
-                            setConfirmDeleteId(null);
-                          }}
-                          style={{
-                            background: '#FF2D55',
-                            color: '#0A0A0A',
-                            border: 'none',
-                            borderRadius: 6,
-                            padding: '6px 12px',
-                            fontFamily: 'var(--font-sans)',
-                            fontWeight: 600,
-                            fontSize: 13,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {t('common.delete')}
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmDeleteId(spot.id)}
-                        style={{
-                          background: 'transparent',
-                          color: 'var(--text-secondary)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 6,
-                          padding: '6px 12px',
-                          fontFamily: 'var(--font-sans)',
-                          fontSize: 13,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {t('common.delete')}
-                      </button>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          <div>
+            {spots.map((spot) => (
+              <SpotCard
+                key={spot.id}
+                spot={spot}
+                weather={getFreshWeather(spot.id)}
+                franjas={ajustes.franjas}
+                categoria={ajustes.categoriaKayak}
+                perfil={ajustes.perfil}
+                formatoCoords={ajustes.formatoCoords}
+                refreshing={!!refreshingMap[spot.id]}
+                onRefresh={() => handleRefreshSpot(spot.id, spot.lat, spot.lon)}
+                onEdit={() => handleEditSpotClick(spot.id)}
+                onDelete={() => removeSpot(spot.id)}
+              />
+            ))}
+          </div>
         )}
+      </main>
 
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={openNew}
-          disabled={atLimit}
+      {/* Botón flotante para Añadir Punto (si spots.length > 0 y < 6) */}
+      {spots.length > 0 && spots.length < 6 && (
+        <div
           style={{
-            marginTop: 'auto',
-            backgroundColor: atLimit ? 'var(--surface)' : 'var(--accent)',
-            color: atLimit ? 'var(--text-secondary)' : '#0A0A0A',
-            border: atLimit ? '1px solid var(--border)' : 'none',
-            borderRadius: 8,
-            padding: '12px 24px',
-            fontFamily: 'var(--font-sans)',
-            fontWeight: 600,
-            fontSize: 15,
-            cursor: atLimit ? 'not-allowed' : 'pointer',
-            boxShadow: atLimit ? 'none' : '0 0 16px rgba(0, 229, 106, 0.35)',
+            position: 'fixed',
+            bottom: '20px',
+            left: 0,
+            right: 0,
+            display: 'flex',
+            justifyContent: 'center',
+            zIndex: 90,
+            pointerEvents: 'none',
           }}
         >
-          {atLimit ? t('home.limitReached') : t('home.addSpot')}
-        </button>
-      </main>
+          <button
+            onClick={handleAddSpotClick}
+            style={{
+              pointerEvents: 'auto',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '12px 24px',
+              backgroundColor: 'var(--accent)',
+              color: '#000',
+              border: 'none',
+              borderRadius: 24,
+              fontSize: '0.95rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 229, 106, 0.3)',
+            }}
+          >
+            <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>+</span>
+            <span>{t('home.addSpot')}</span>
+          </button>
+        </div>
+      )}
+
+      {/* Footer */}
+      <footer
+        style={{
+          borderTop: '1px solid var(--border)',
+          backgroundColor: 'var(--surface)',
+          padding: '16px 20px',
+          textAlign: 'center',
+          marginTop: 'auto',
+        }}
+      >
+        <a
+          href="https://ko-fi.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            color: 'var(--accent)',
+            fontSize: '0.85rem',
+            fontWeight: 500,
+            textDecoration: 'none',
+          }}
+        >
+          <span>☕</span>
+          <span>{t('settings.donate')}</span>
+        </a>
+      </footer>
+
+      {/* Overlay SettingsScreen */}
+      {showSettings && (
+        <SettingsScreen onClose={() => setShowSettings(false)} />
+      )}
     </div>
   );
-}
+};
 
 export default Home;

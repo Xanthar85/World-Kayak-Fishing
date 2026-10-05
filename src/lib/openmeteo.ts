@@ -8,6 +8,10 @@ export type HourlyPoint = {
   windDirection: number | null;
   temperature: number | null;
   precipitation: number | null;
+  pressure: number | null;
+  seaLevelHeight: number | null;
+  currentVelocity: number | null;
+  currentDirection: number | null;
 };
 
 export type SpotWeather = {
@@ -30,6 +34,9 @@ type MarineResponse = {
     wave_height: (number | null)[];
     wave_period: (number | null)[];
     wave_direction: (number | null)[];
+    sea_level_height_msl: (number | null)[];
+    ocean_current_velocity: (number | null)[];
+    ocean_current_direction: (number | null)[];
   };
 };
 
@@ -42,6 +49,7 @@ type AtmosResponse = {
     wind_direction_10m: (number | null)[];
     temperature_2m: (number | null)[];
     precipitation: (number | null)[];
+    pressure_msl: (number | null)[];
   };
 };
 
@@ -49,7 +57,8 @@ export async function fetchSpotWeather(lat: number, lon: number): Promise<SpotWe
   const marineParams = new URLSearchParams({
     latitude: String(lat),
     longitude: String(lon),
-    hourly: 'wave_height,wave_period,wave_direction',
+    hourly:
+      'wave_height,wave_period,wave_direction,sea_level_height_msl,ocean_current_velocity,ocean_current_direction',
     forecast_days: '7',
     timezone: 'auto',
   });
@@ -57,7 +66,8 @@ export async function fetchSpotWeather(lat: number, lon: number): Promise<SpotWe
   const atmosParams = new URLSearchParams({
     latitude: String(lat),
     longitude: String(lon),
-    hourly: 'wind_speed_10m,wind_gusts_10m,wind_direction_10m,temperature_2m,precipitation',
+    hourly:
+      'wind_speed_10m,wind_gusts_10m,wind_direction_10m,temperature_2m,precipitation,pressure_msl',
     forecast_days: '7',
     timezone: 'auto',
   });
@@ -82,6 +92,10 @@ export async function fetchSpotWeather(lat: number, lon: number): Promise<SpotWe
 
   const hourly: HourlyPoint[] = marine.hourly.time.map((t, i) => {
     const ai = atmosByTime.get(t);
+    const rawVelocity = marine.hourly.ocean_current_velocity?.[i] ?? null;
+    const currentVelocity =
+      rawVelocity != null ? Math.round((rawVelocity / 1.852) * 100) / 100 : null;
+
     return {
       time: t,
       waveHeight: marine.hourly.wave_height[i] ?? null,
@@ -92,6 +106,10 @@ export async function fetchSpotWeather(lat: number, lon: number): Promise<SpotWe
       windDirection: ai !== undefined ? atmos.hourly.wind_direction_10m[ai] ?? null : null,
       temperature: ai !== undefined ? atmos.hourly.temperature_2m[ai] ?? null : null,
       precipitation: ai !== undefined ? atmos.hourly.precipitation[ai] ?? null : null,
+      pressure: ai !== undefined ? atmos.hourly.pressure_msl?.[ai] ?? null : null,
+      seaLevelHeight: marine.hourly.sea_level_height_msl?.[i] ?? null,
+      currentVelocity,
+      currentDirection: marine.hourly.ocean_current_direction?.[i] ?? null,
     };
   });
 
