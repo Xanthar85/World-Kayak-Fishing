@@ -15,7 +15,9 @@ import 'leaflet/dist/leaflet.css';
 import type { Spot } from '../state/store.ts';
 import type { Zona, TipoAcceso } from '../lib/verdict.ts';
 import { stringsEs } from '../i18n/strings.es.ts';
-import { obtenerProfundidad, proponerAcceso } from '../lib/batimetria.ts';
+import { obtenerProfundidad } from '../lib/batimetria.ts';
+import { detectarZona, centroideDeZona } from '../lib/zonas-geo.ts';
+import { parsearCoords } from '../lib/coords.ts';
 
 const SPAIN_CENTER: [number, number] = [39.5, -0.5];
 const INITIAL_ZOOM = 6;
@@ -40,8 +42,7 @@ function createPinIcon(color: string) {
 }
 
 const pinPescaIcon = createPinIcon('#00E56A'); // verde lima
-const pinAccesoNormalIcon = createPinIcon('#00B8FF'); // azul cian
-const pinAccesoPocoClaroIcon = createPinIcon('#E5E500'); // amarillo
+const pinAccesoIcon = createPinIcon('#00B8FF'); // azul cian
 
 const TODAS_ZONAS = Object.keys(stringsEs.zones) as Zona[];
 const TIPOS_ACCESO: TipoAcceso[] = ['playa', 'roca', 'puerto_escollera', 'otro'];
@@ -84,37 +85,34 @@ export const MapScreen: React.FC<MapScreenProps> = ({
   const { t, i18n } = useTranslation();
   const isEditing = !!initialSpot;
 
-  // Estado del mapa
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
 
-  // Estado de búsqueda
+  // Búsqueda
   const [busqueda, setBusqueda] = useState('');
   const [buscando, setBuscando] = useState(false);
   const [errorBusqueda, setErrorBusqueda] = useState<string | null>(null);
 
-  // Estado local del punto
+  // Punto de pesca
   const [puntoPesca, setPuntoPesca] = useState<{ lat: number; lon: number } | null>(
     initialSpot ? { lat: initialSpot.lat, lon: initialSpot.lon } : null
   );
+  const [profundidadPesca, setProfundidadPesca] = useState<number | null>(
+    initialSpot?.profundidad ?? null
+  );
 
+  // Punto de acceso (manual desde DP-070)
   const [puntoAcceso, setPuntoAcceso] = useState<{
     lat: number;
     lon: number;
     profundidad: number | null;
-    pocoClaro: boolean;
   } | null>(
     initialSpot?.accesoLat != null && initialSpot?.accesoLon != null
       ? {
           lat: initialSpot.accesoLat,
           lon: initialSpot.accesoLon,
           profundidad: initialSpot.accesoProfundidad ?? null,
-          pocoClaro: false,
         }
       : null
-  );
-
-  const [profundidadPesca, setProfundidadPesca] = useState<number | null>(
-    initialSpot?.profundidad ?? null
   );
 
   const [nombre, setNombre] = useState(initialSpot?.name ?? '');
@@ -130,9 +128,7 @@ export const MapScreen: React.FC<MapScreenProps> = ({
   );
 
   const [cargandoProfundidad, setCargandoProfundidad] = useState(false);
-  const [buscandoAcceso, setBuscandoAcceso] = useState(false);
 
-  // Zonas ordenadas alfabéticamente por su traducción
   const zonasOrdenadas = React.useMemo(() => {
     return [...TODAS_ZONAS].sort((a, b) => {
       const labelA = t(`zones.${a}`);
@@ -141,22 +137,28 @@ export const MapScreen: React.FC<MapScreenProps> = ({
     });
   }, [t]);
 
-  // Buscador por nombre
+  // ─── Buscador por nombre o por coordenadas ─────────────────────
   async function handleBuscar(e?: React.FormEvent) {
     if (e) e.preventDefault();
     const query = busqueda.trim();
     if (!query) return;
 
+    // 1. Intentar interpretar como coordenadas (DD, DMS, DDM).
+    const coords = parsearCoords(query);
+    if (coords && mapInstance) {
+      mapInstance.flyTo([coords.lat, coords.lon], 12);
+      return;
+    }
+
+    // 2. Buscador por nombre (Nominatim + fallback Open-Meteo).
     setBuscando(true);
     setErrorBusqueda(null);
-
     const lang = i18n.language && i18n.language.startsWith('en') ? 'en' : 'es';
 
     try {
       let lat: number | null = null;
       let lon: number | null = null;
 
-      // 1. Intentar Nominatim search
       try {
         const urlNominatim = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(
           query
@@ -175,10 +177,9 @@ export const MapScreen: React.FC<MapScreenProps> = ({
           }
         }
       } catch {
-        // Continuar al fallback
+        // fallback
       }
 
-      // 2. Si no hay resultados de Nominatim, intentar Open-Meteo Geocoding
       if (lat === null || lon === null || isNaN(lat) || isNaN(lon)) {
         try {
           const urlOpenMeteo = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
@@ -195,11 +196,10 @@ export const MapScreen: React.FC<MapScreenProps> = ({
             }
           }
         } catch {
-          // Fallback falló
+          // fallback falló
         }
       }
 
-      // 3. Evaluar resultado y recentrar
       if (lat !== null && lon !== null && !isNaN(lat) && !isNaN(lon)) {
         if (mapInstance) {
           mapInstance.flyTo([lat, lon], 11);
@@ -213,13 +213,17 @@ export const MapScreen: React.FC<MapScreenProps> = ({
     }
   }
 
-  // Selección de punto en el mapa (solo creación)
+  // ─── Clic en el mapa (solo al crear) ────────────────────────────
   async function handlePick(lat: number, lon: number) {
     setPuntoPesca({ lat, lon });
-    setCargandoProfundidad(true);
-    setBuscandoAcceso(true);
 
-    // 1. Obtener profundidad de pesca
+    // Autodetección de zona por coordenadas.
+    const zonaDetectada = detectarZona(lat, lon);
+    setZona(zonaDetectada);
+
+    setCargandoProfundidad(true);
+
+    // 1. Profundidad del punto de pesca.
     obtenerProfundidad(lat, lon)
       .then((prof) => {
         setProfundidadPesca(prof);
@@ -228,7 +232,7 @@ export const MapScreen: React.FC<MapScreenProps> = ({
         setCargandoProfundidad(false);
       });
 
-    // 2. Proponer nombre inverso vía Nominatim si no ha sido editado manualmente
+    // 2. Nombre sugerido vía Nominatim reverse.
     try {
       const lang = i18n.language && i18n.language.startsWith('en') ? 'en' : 'es';
       const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=12&accept-language=${lang}`;
@@ -241,6 +245,9 @@ export const MapScreen: React.FC<MapScreenProps> = ({
       if (res.ok) {
         const data = await res.json();
         const addr = data?.address;
+        // Cascada estricta. Nunca address.country salvo como
+        // último recurso si no hay nada más (evita dejar vacío
+        // en puntos de mar abierto).
         const suggested =
           addr?.city ||
           addr?.town ||
@@ -251,6 +258,7 @@ export const MapScreen: React.FC<MapScreenProps> = ({
           addr?.county ||
           addr?.state ||
           (data?.name && data?.name !== addr?.country ? data.name : '') ||
+          addr?.country ||
           '';
         if (suggested && !nombreEditadoManualmente) {
           setNombre(suggested);
@@ -259,22 +267,18 @@ export const MapScreen: React.FC<MapScreenProps> = ({
     } catch {
       // Ignorar fallo de geocodificación
     }
-
-    // 3. Proponer punto de acceso automáticamente
-    proponerAcceso(lat, lon)
-      .then((prop) => {
-        if (prop) {
-          setPuntoAcceso(prop);
-        } else {
-          setPuntoAcceso(null);
-        }
-      })
-      .finally(() => {
-        setBuscandoAcceso(false);
-      });
   }
 
-  // Guardar punto
+  // ─── Cambio de zona desde el desplegable ────────────────────────
+  function handleZonaChange(nuevaZona: Zona) {
+    setZona(nuevaZona);
+    const c = centroideDeZona(nuevaZona);
+    if (c && mapInstance) {
+      mapInstance.flyTo([c.lat, c.lon], 7);
+    }
+  }
+
+  // ─── Guardar ────────────────────────────────────────────────────
   function handleSave() {
     if (!puntoPesca) return;
     const trimmed = nombre.trim() || t('map.unnamed');
@@ -308,7 +312,6 @@ export const MapScreen: React.FC<MapScreenProps> = ({
         zIndex: 1000,
       }}
     >
-      {/* Cabecera */}
       <header
         style={{
           display: 'flex',
@@ -366,9 +369,8 @@ export const MapScreen: React.FC<MapScreenProps> = ({
         </button>
       </header>
 
-      {/* Mapa Leaflet */}
       <div style={{ flex: 1, position: 'relative' }}>
-        {/* Buscador flotante por nombre */}
+        {/* Buscador flotante */}
         <div
           style={{
             position: 'absolute',
@@ -467,7 +469,7 @@ export const MapScreen: React.FC<MapScreenProps> = ({
 
           <ClickHandler disabled={isEditing} onPick={handlePick} />
 
-          {/* Marcador de punto de pesca (verde lima) */}
+          {/* Pin de pesca (verde lima) */}
           {puntoPesca && (
             <Marker
               position={[puntoPesca.lat, puntoPesca.lon]}
@@ -475,15 +477,12 @@ export const MapScreen: React.FC<MapScreenProps> = ({
             />
           )}
 
-          {/* Marcador de punto de acceso (azul cian o amarillo) si tipoAcceso != null */}
+          {/* Pin de acceso manual (azul cian) si el usuario ya
+              eligió tipo de acceso */}
           {tipoAcceso != null && puntoAcceso && (
             <Marker
               position={[puntoAcceso.lat, puntoAcceso.lon]}
-              icon={
-                puntoAcceso.pocoClaro
-                  ? pinAccesoPocoClaroIcon
-                  : pinAccesoNormalIcon
-              }
+              icon={pinAccesoIcon}
               draggable={true}
               eventHandlers={{
                 dragend: async (e) => {
@@ -494,22 +493,19 @@ export const MapScreen: React.FC<MapScreenProps> = ({
                     lat: latlng.lat,
                     lon: latlng.lng,
                     profundidad: prof,
-                    pocoClaro: false,
                   });
                 },
               }}
             >
-              {puntoAcceso.pocoClaro && (
-                <Tooltip permanent direction="bottom" offset={[0, 10]}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>
-                    {t('access.proposed')} • {t('access.dragToAdjust')}
-                  </span>
-                </Tooltip>
-              )}
+              <Tooltip permanent direction="bottom" offset={[0, 10]}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                  {t('access.dragToAdjust')}
+                </span>
+              </Tooltip>
             </Marker>
           )}
 
-          {/* Línea discontinua entre pesca y acceso */}
+          {/* Línea discontinua pesca ↔ acceso */}
           {tipoAcceso != null && puntoPesca && puntoAcceso && (
             <Polyline
               positions={[
@@ -546,7 +542,6 @@ export const MapScreen: React.FC<MapScreenProps> = ({
               boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
             }}
           >
-            {/* Input nombre */}
             <div>
               <label
                 style={{
@@ -585,7 +580,6 @@ export const MapScreen: React.FC<MapScreenProps> = ({
               />
             </div>
 
-            {/* Selector de zona */}
             <div>
               <label
                 style={{
@@ -599,7 +593,7 @@ export const MapScreen: React.FC<MapScreenProps> = ({
               </label>
               <select
                 value={zona}
-                onChange={(e) => setZona(e.target.value as Zona)}
+                onChange={(e) => handleZonaChange(e.target.value as Zona)}
                 style={{
                   width: '100%',
                   padding: '8px 10px',
@@ -619,7 +613,6 @@ export const MapScreen: React.FC<MapScreenProps> = ({
               </select>
             </div>
 
-            {/* Selector de tipo de acceso: 4 botones segmentados */}
             <div>
               <label
                 style={{
@@ -638,9 +631,24 @@ export const MapScreen: React.FC<MapScreenProps> = ({
                     <button
                       key={tipo}
                       type="button"
-                      onClick={() =>
-                        setTipoAcceso(active ? null : tipo)
-                      }
+                      onClick={() => {
+                        const nuevoTipo = active ? null : tipo;
+                        setTipoAcceso(nuevoTipo);
+                        // Al elegir tipo por primera vez, colocar el
+                        // pin de acceso en el punto de pesca como
+                        // posición inicial. El usuario lo arrastra.
+                        if (nuevoTipo !== null && !puntoAcceso && puntoPesca) {
+                          setPuntoAcceso({
+                            lat: puntoPesca.lat,
+                            lon: puntoPesca.lon,
+                            profundidad: profundidadPesca,
+                          });
+                        }
+                        // Si el usuario quita el tipo, borrar el pin.
+                        if (nuevoTipo === null) {
+                          setPuntoAcceso(null);
+                        }
+                      }}
                       style={{
                         flex: 1,
                         padding: '6px 8px',
@@ -665,7 +673,6 @@ export const MapScreen: React.FC<MapScreenProps> = ({
               </div>
             </div>
 
-            {/* Bloque de acceso (solo si tipoAcceso != null) */}
             {tipoAcceso != null && (
               <div
                 style={{
@@ -677,20 +684,24 @@ export const MapScreen: React.FC<MapScreenProps> = ({
                   color: 'var(--text-dim)',
                 }}
               >
-                <div style={{ fontWeight: 600, color: 'var(--accent-2)', marginBottom: 2 }}>
-                  {t('access.proposed')}{' '}
-                  {buscandoAcceso && '⏳'}
-                </div>
-                <div>
+                <div
+                  style={{
+                    fontWeight: 600,
+                    color: 'var(--accent-2)',
+                    marginBottom: 2,
+                  }}
+                >
+                  {t('access.title')}{' '}
                   {puntoAcceso?.profundidad != null
-                    ? `${t('detalle.depth')}: ${puntoAcceso.profundidad.toFixed(1)} m`
-                    : t('detalle.noDepth')}{' '}
-                  • <span style={{ fontStyle: 'italic' }}>{t('access.dragToAdjust')}</span>
+                    ? `• ${puntoAcceso.profundidad.toFixed(1)} m`
+                    : `• ${t('detalle.noDepth')}`}
+                </div>
+                <div style={{ fontStyle: 'italic' }}>
+                  {t('access.dragToAdjust')}
                 </div>
               </div>
             )}
 
-            {/* Coordenadas + Profundidad de pesca */}
             <div
               style={{
                 display: 'flex',

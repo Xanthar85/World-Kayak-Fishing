@@ -1,5 +1,10 @@
-// WKF — Batimetría y propuesta de acceso automático.
-// Consulta a ERDDAP GEBCO 2024 para obtener profundidad y localizar acceso a costa.
+// WKF — Batimetría.
+// Consulta a ERDDAP GEBCO 2024 para obtener profundidad puntual.
+// Verificado en Apps Script el 2026-10-05: ERDDAP responde HTTP 200
+// en 200-570 ms por muestra. Devuelve CSV: header + units + fila.
+// Elevación negativa = agua, positiva = tierra.
+// DP-070: la propuesta automática de acceso se cancela. El usuario
+// coloca el punto de acceso a mano si quiere.
 
 export async function obtenerProfundidad(
   lat: number,
@@ -36,86 +41,4 @@ export async function obtenerProfundidad(
   } finally {
     clearTimeout(timeoutId);
   }
-}
-
-export async function profundidadEnMuestras(
-  latCentro: number,
-  lonCentro: number,
-  rumboGrados: number,
-  distanciaMn: number,
-  numMuestras: number
-): Promise<{ lat: number; lon: number; profundidad: number | null }[]> {
-  const rumboRad = (rumboGrados * Math.PI) / 180;
-  const latRad = (latCentro * Math.PI) / 180;
-
-  const puntos: { lat: number; lon: number }[] = [];
-  for (let i = 1; i <= numMuestras; i++) {
-    const d = distanciaMn * (i / numMuestras);
-    const dLat = (d / 60) * Math.cos(rumboRad);
-    const dLon = ((d / 60) * Math.sin(rumboRad)) / Math.cos(latRad);
-    puntos.push({
-      lat: latCentro + dLat,
-      lon: lonCentro + dLon,
-    });
-  }
-
-  const promesas = puntos.map(async (p) => {
-    const profundidad = await obtenerProfundidad(p.lat, p.lon);
-    return {
-      lat: p.lat,
-      lon: p.lon,
-      profundidad,
-    };
-  });
-
-  return Promise.all(promesas);
-}
-
-export async function proponerAcceso(
-  latPesca: number,
-  lonPesca: number
-): Promise<{
-  lat: number;
-  lon: number;
-  profundidad: number;
-  pocoClaro: boolean;
-} | null> {
-  const rumbos = Array.from({ length: 16 }, (_, i) => i * 22.5);
-
-  const resultadosPorRumbo = await Promise.all(
-    rumbos.map((rumbo) => profundidadEnMuestras(latPesca, lonPesca, rumbo, 2, 12))
-  );
-
-  const todasLasMuestras = resultadosPorRumbo.flat();
-
-  // Filtrar muestras con profundidad != null y profundidad > 0.5 m
-  const validas = todasLasMuestras.filter(
-    (m): m is { lat: number; lon: number; profundidad: number } =>
-      m.profundidad !== null && m.profundidad > 0.5
-  );
-
-  if (validas.length === 0) return null;
-
-  // Entre todas las muestras válidas, buscar las menores de 5 m
-  const menoresDe5 = validas.filter((m) => m.profundidad < 5);
-
-  if (menoresDe5.length > 0) {
-    // La más somera (menor profundidad)
-    menoresDe5.sort((a, b) => a.profundidad - b.profundidad);
-    return {
-      lat: menoresDe5[0].lat,
-      lon: menoresDe5[0].lon,
-      profundidad: menoresDe5[0].profundidad,
-      pocoClaro: false,
-    };
-  }
-
-  // Si no hay ninguna < 5 m, elegir la más somera de todas y marcar pocoClaro: true
-  validas.sort((a, b) => a.profundidad - b.profundidad);
-  return {
-    lat: validas[0].lat,
-    lon: validas[0].lon,
-    profundidad: validas[0].profundidad,
-    pocoClaro: true,
-  };
 }
