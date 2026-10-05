@@ -19,12 +19,12 @@ export interface Spot {
   lon: number;
   createdAt: number;
   // Ampliación DP-044: acceso integrado + zona + categoría.
-  zona: Zona;
-  tipoAcceso: TipoAcceso | null;
-  profundidad: number | null; // m, del punto de pesca
-  accesoLat: number | null;
-  accesoLon: number | null;
-  accesoProfundidad: number | null;
+  zona?: Zona;
+  tipoAcceso?: TipoAcceso | null;
+  profundidad?: number | null; // m, del punto de pesca
+  accesoLat?: number | null;
+  accesoLon?: number | null;
+  accesoProfundidad?: number | null;
 }
 
 export type FranjaUsuario = {
@@ -87,6 +87,10 @@ export interface AppState {
   setFranjas: (franjas: FranjaUsuario[]) => void;
   setFranjaActiva: (id: string | null) => void;
   toggleSubpestana: (id: string) => void;
+
+  resetAll: () => void;
+  exportState: () => Record<string, unknown>;
+  importState: (data: unknown) => boolean;
 }
 
 export const useAppStore = create<AppState>()(
@@ -119,6 +123,12 @@ export const useAppStore = create<AppState>()(
           spots: [
             ...state.spots,
             {
+              zona: 'mediterraneo_espanol',
+              tipoAcceso: null,
+              profundidad: null,
+              accesoLat: null,
+              accesoLon: null,
+              accesoProfundidad: null,
               ...spot,
               id:
                 typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -194,6 +204,53 @@ export const useAppStore = create<AppState>()(
             ajustes: { ...state.ajustes, subpestanasOcultas: nuevas },
           };
         }),
+
+      resetAll: () =>
+        set(() => ({
+          spots: [],
+          weather: {},
+          ajustes: {
+            formatoCoords: 'dd',
+            kayakIds: [],
+            categoriaKayak: 'K3',
+            perfil: PERFIL_DEFECTO,
+            franjas: FRANJAS_DEFECTO,
+            franjaActivaId: 'manana',
+            subpestanasOcultas: [],
+          },
+        })),
+
+      exportState: () => {
+        const s = get();
+        return {
+          version: 2,
+          spots: s.spots,
+          ajustes: s.ajustes,
+          language: s.language,
+          theme: s.theme,
+        };
+      },
+
+      importState: (data: unknown) => {
+        if (!data || typeof data !== 'object') return false;
+        const d = data as Record<string, any>;
+        if (!Array.isArray(d.spots) || !d.ajustes || typeof d.ajustes !== 'object') {
+          return false;
+        }
+        set((state) => ({
+          spots: d.spots,
+          ajustes: {
+            ...state.ajustes,
+            ...d.ajustes,
+          },
+          ...(d.language === 'es' || d.language === 'en' ? { language: d.language } : {}),
+          ...(d.theme === 'dark' || d.theme === 'light' ? { theme: d.theme } : {}),
+        }));
+        if (d.language === 'es' || d.language === 'en') {
+          void i18n.changeLanguage(d.language);
+        }
+        return true;
+      },
     }),
     {
       name: STORAGE_KEY,
