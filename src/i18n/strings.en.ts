@@ -221,8 +221,6 @@ export const stringsEn: StringsSchema = {
     ddm: 'Degrees, decimal minutes (DDM)',
   },
 
-  // ─── New extensions ────────────────────────────────────────────
-
   zones: {
     mediterraneo_espanol: 'Spanish Mediterranean',
     mediterraneo_frances: 'French Mediterranean',
