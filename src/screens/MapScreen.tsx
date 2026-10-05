@@ -1,100 +1,212 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Polyline,
+  Tooltip,
+  useMapEvents,
+} from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+
+import type { Spot } from '../state/store.ts';
+import type { Zona, TipoAcceso } from '../lib/verdict.ts';
+import { stringsEs } from '../i18n/strings.es.ts';
+import { obtenerProfundidad, proponerAcceso } from '../lib/batimetria.ts';
 
 const SPAIN_CENTER: [number, number] = [39.5, -0.5];
 const INITIAL_ZOOM = 6;
 
-const PIN_SVG = `
-<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" fill="none">
-  <circle cx="20" cy="16" r="11" stroke="#00E56A" stroke-width="2" fill="#0A0A0A"/>
-  <circle cx="20" cy="16" r="3.5" fill="#00E56A"/>
-  <line x1="20" y1="3" x2="20" y2="6" stroke="#00E56A" stroke-width="1.5"/>
-  <line x1="20" y1="26" x2="20" y2="29" stroke="#00E56A" stroke-width="1.5"/>
-  <line x1="7" y1="16" x2="10" y2="16" stroke="#00E56A" stroke-width="1.5"/>
-  <line x1="30" y1="16" x2="33" y2="16" stroke="#00E56A" stroke-width="1.5"/>
-  <path d="M20 29 L17 34 L20 33 L23 34 Z" fill="#00E56A"/>
-</svg>
-`;
+function createPinIcon(color: string) {
+  return L.divIcon({
+    className: 'wkf-pin',
+    html: `
+      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" fill="none">
+        <circle cx="20" cy="16" r="11" stroke="${color}" stroke-width="2" fill="#0A0A0A"/>
+        <circle cx="20" cy="16" r="3.5" fill="${color}"/>
+        <line x1="20" y1="3" x2="20" y2="6" stroke="${color}" stroke-width="1.5"/>
+        <line x1="20" y1="26" x2="20" y2="29" stroke="${color}" stroke-width="1.5"/>
+        <line x1="7" y1="16" x2="10" y2="16" stroke="${color}" stroke-width="1.5"/>
+        <line x1="30" y1="16" x2="33" y2="16" stroke="${color}" stroke-width="1.5"/>
+        <path d="M20 29 L17 34 L20 33 L23 34 Z" fill="${color}"/>
+      </svg>
+    `,
+    iconSize: [40, 40],
+    iconAnchor: [20, 34],
+  });
+}
 
-const pinIcon = L.divIcon({
-  className: 'wkf-pin',
-  html: PIN_SVG,
-  iconSize: [40, 40],
-  iconAnchor: [20, 34],
-});
+const pinPescaIcon = createPinIcon('#00E56A'); // verde lima
+const pinAccesoNormalIcon = createPinIcon('#00B8FF'); // azul cian
+const pinAccesoPocoClaroIcon = createPinIcon('#E5E500'); // amarillo
 
-type SpotDraft = {
-  name: string;
-  lat: number;
-  lon: number;
-};
+const TODAS_ZONAS = Object.keys(stringsEs.zones) as Zona[];
+const TIPOS_ACCESO: TipoAcceso[] = ['playa', 'roca', 'puerto_escollera', 'otro'];
 
-type Props = {
-  onCancel?: () => void;
-  onSave?: (spot: SpotDraft) => void;
-  initialSpot?: SpotDraft | null;
-};
+export interface MapScreenProps {
+  initialSpot?: Spot | null;
+  onCancel: () => void;
+  onSave: (draft: Omit<Spot, 'id' | 'createdAt'>) => void;
+}
 
-function ClickHandler({ onPick }: { onPick: (lat: number, lon: number) => void }) {
+function ClickHandler({
+  disabled,
+  onPick,
+}: {
+  disabled: boolean;
+  onPick: (lat: number, lon: number) => void;
+}) {
   useMapEvents({
     click(e) {
+      if (disabled) return;
       onPick(e.latlng.lat, e.latlng.lng);
     },
   });
   return null;
 }
 
-export default function MapScreen({ onCancel, onSave, initialSpot }: Props) {
+export const MapScreen: React.FC<MapScreenProps> = ({
+  initialSpot,
+  onCancel,
+  onSave,
+}) => {
   const { t, i18n } = useTranslation();
-  const [position, setPosition] = useState<[number, number] | null>(
-    initialSpot ? [initialSpot.lat, initialSpot.lon] : null
-  );
-  const [name, setName] = useState(initialSpot?.name ?? '');
-  const [busy, setBusy] = useState(false);
-
   const isEditing = !!initialSpot;
 
+  // Estado local
+  const [puntoPesca, setPuntoPesca] = useState<{ lat: number; lon: number } | null>(
+    initialSpot ? { lat: initialSpot.lat, lon: initialSpot.lon } : null
+  );
+
+  const [puntoAcceso, setPuntoAcceso] = useState<{
+    lat: number;
+    lon: number;
+    profundidad: number | null;
+    pocoClaro: boolean;
+  } | null>(
+    initialSpot?.accesoLat != null && initialSpot?.accesoLon != null
+      ? {
+          lat: initialSpot.accesoLat,
+          lon: initialSpot.accesoLon,
+          profundidad: initialSpot.accesoProfundidad ?? null,
+          pocoClaro: false,
+        }
+      : null
+  );
+
+  const [profundidadPesca, setProfundidadPesca] = useState<number | null>(
+    initialSpot?.profundidad ?? null
+  );
+
+  const [nombre, setNombre] = useState(initialSpot?.name ?? '');
+  const [zona, setZona] = useState<Zona>(
+    initialSpot?.zona ?? 'mediterraneo_espanol'
+  );
+  const [tipoAcceso, setTipoAcceso] = useState<TipoAcceso | null>(
+    initialSpot?.tipoAcceso ?? null
+  );
+
+  const [cargandoProfundidad, setCargandoProfundidad] = useState(false);
+  const [buscandoAcceso, setBuscandoAcceso] = useState(false);
+
+  // Zonas ordenadas alfabéticamente por su traducción
+  const zonasOrdenadas = React.useMemo(() => {
+    return [...TODAS_ZONAS].sort((a, b) => {
+      const labelA = t(`zones.${a}`);
+      const labelB = t(`zones.${b}`);
+      return labelA.localeCompare(labelB);
+    });
+  }, [t]);
+
+  // Selección de punto en el mapa (solo creación)
   async function handlePick(lat: number, lon: number) {
-    setPosition([lat, lon]);
-    if (!isEditing) setName('');
-    setBusy(true);
+    setPuntoPesca({ lat, lon });
+    setCargandoProfundidad(true);
+    setBuscandoAcceso(true);
+
+    // 1. Obtener profundidad de pesca
+    obtenerProfundidad(lat, lon)
+      .then((prof) => {
+        setProfundidadPesca(prof);
+      })
+      .finally(() => {
+        setCargandoProfundidad(false);
+      });
+
+    // 2. Proponer nombre inverso vía Nominatim si no hay nombre
     try {
       const lang = i18n.language && i18n.language.startsWith('en') ? 'en' : 'es';
-      const url =
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2` +
-        `&lat=${lat}&lon=${lon}&zoom=12&accept-language=${lang}`;
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=12&accept-language=${lang}`;
       const res = await fetch(url, { headers: { Accept: 'application/json' } });
-      if (!res.ok) throw new Error('nominatim failed');
-      const data = await res.json();
-      const suggested =
-        data?.address?.village ||
-        data?.address?.town ||
-        data?.address?.city ||
-        data?.address?.municipality ||
-        data?.address?.county ||
-        data?.name ||
-        '';
-      setName(suggested);
+      if (res.ok) {
+        const data = await res.json();
+        const suggested =
+          data?.address?.village ||
+          data?.address?.town ||
+          data?.address?.city ||
+          data?.address?.municipality ||
+          data?.address?.county ||
+          data?.name ||
+          '';
+        if (suggested && !nombre) {
+          setNombre(suggested);
+        }
+      }
     } catch {
-      setName('');
-    } finally {
-      setBusy(false);
+      // Ignorar fallo de geocodificación
     }
+
+    // 3. Proponer punto de acceso automáticamente
+    proponerAcceso(lat, lon)
+      .then((prop) => {
+        if (prop) {
+          setPuntoAcceso(prop);
+        } else {
+          setPuntoAcceso(null);
+        }
+      })
+      .finally(() => {
+        setBuscandoAcceso(false);
+      });
   }
 
+  // Guardar punto
   function handleSave() {
-    if (!position || !onSave) return;
-    const trimmed = name.trim() || t('map.unnamed');
-    onSave({ name: trimmed, lat: position[0], lon: position[1] });
+    if (!puntoPesca) return;
+    const trimmed = nombre.trim() || t('map.unnamed');
+    onSave({
+      name: trimmed,
+      lat: puntoPesca.lat,
+      lon: puntoPesca.lon,
+      zona,
+      tipoAcceso,
+      profundidad: profundidadPesca,
+      accesoLat: puntoAcceso?.lat ?? null,
+      accesoLon: puntoAcceso?.lon ?? null,
+      accesoProfundidad: puntoAcceso?.profundidad ?? null,
+    });
   }
 
-  const canSave = !!position && !busy;
+  const mapCenter: [number, number] = puntoPesca
+    ? [puntoPesca.lat, puntoPesca.lon]
+    : SPAIN_CENTER;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column' }}>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: 'var(--bg)',
+        color: 'var(--text)',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        zIndex: 1000,
+      }}
+    >
+      {/* Cabecera */}
       <header
         style={{
           display: 'flex',
@@ -102,92 +214,318 @@ export default function MapScreen({ onCancel, onSave, initialSpot }: Props) {
           justifyContent: 'space-between',
           padding: '12px 16px',
           borderBottom: '1px solid var(--border)',
-          background: 'var(--surface)',
-          gap: 12,
+          backgroundColor: 'var(--surface)',
+          zIndex: 10,
         }}
       >
-        <button type="button" className="btn-ghost" onClick={onCancel}>
-          {t('common.cancel')}
-        </button>
-        <span style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }}>
-          {isEditing ? t('map.editSpot') : t('map.newSpot')}
-        </span>
         <button
           type="button"
-          className="btn-primary"
-          disabled={!canSave}
+          onClick={onCancel}
+          style={{
+            padding: '6px 12px',
+            backgroundColor: 'transparent',
+            border: '1px solid var(--border)',
+            borderRadius: 6,
+            color: 'var(--text)',
+            fontSize: '0.85rem',
+            cursor: 'pointer',
+          }}
+        >
+          {t('common.cancel')}
+        </button>
+
+        <span
+          style={{
+            fontFamily: 'var(--font-mono, Fira Code, monospace)',
+            fontWeight: 600,
+            fontSize: '0.95rem',
+            letterSpacing: '0.04em',
+          }}
+        >
+          {isEditing ? t('map.editSpot') : t('map.newSpot')}
+        </span>
+
+        <button
+          type="button"
+          disabled={!puntoPesca}
           onClick={handleSave}
+          style={{
+            padding: '6px 16px',
+            backgroundColor: puntoPesca ? 'var(--accent)' : 'var(--border)',
+            color: puntoPesca ? '#000' : 'var(--text-dim)',
+            border: 'none',
+            borderRadius: 6,
+            fontWeight: 600,
+            fontSize: '0.85rem',
+            cursor: puntoPesca ? 'pointer' : 'not-allowed',
+          }}
         >
           {t('common.save')}
         </button>
       </header>
 
+      {/* Mapa Leaflet */}
       <div style={{ flex: 1, position: 'relative' }}>
         <MapContainer
-          center={position ?? SPAIN_CENTER}
-          zoom={position ? 12 : INITIAL_ZOOM}
+          center={mapCenter}
+          zoom={puntoPesca ? 12 : INITIAL_ZOOM}
           style={{ width: '100%', height: '100%' }}
         >
           <TileLayer
             attribution="&copy; OpenStreetMap &copy; CARTO"
             url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           />
-          <ClickHandler onPick={handlePick} />
-          {position && <Marker position={position} icon={pinIcon} />}
+
+          <ClickHandler disabled={isEditing} onPick={handlePick} />
+
+          {/* Marcador de punto de pesca (verde lima) */}
+          {puntoPesca && (
+            <Marker
+              position={[puntoPesca.lat, puntoPesca.lon]}
+              icon={pinPescaIcon}
+            />
+          )}
+
+          {/* Marcador de punto de acceso (azul cian o amarillo) si tipoAcceso != null */}
+          {tipoAcceso != null && puntoAcceso && (
+            <Marker
+              position={[puntoAcceso.lat, puntoAcceso.lon]}
+              icon={
+                puntoAcceso.pocoClaro
+                  ? pinAccesoPocoClaroIcon
+                  : pinAccesoNormalIcon
+              }
+              draggable={true}
+              eventHandlers={{
+                dragend: async (e) => {
+                  const marker = e.target as L.Marker;
+                  const latlng = marker.getLatLng();
+                  const prof = await obtenerProfundidad(latlng.lat, latlng.lng);
+                  setPuntoAcceso({
+                    lat: latlng.lat,
+                    lon: latlng.lng,
+                    profundidad: prof,
+                    pocoClaro: false,
+                  });
+                },
+              }}
+            >
+              {puntoAcceso.pocoClaro && (
+                <Tooltip permanent direction="bottom" offset={[0, 10]}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                    {t('access.proposed')} • {t('access.dragToAdjust')}
+                  </span>
+                </Tooltip>
+              )}
+            </Marker>
+          )}
+
+          {/* Línea discontinua entre pesca y acceso */}
+          {tipoAcceso != null && puntoPesca && puntoAcceso && (
+            <Polyline
+              positions={[
+                [puntoPesca.lat, puntoPesca.lon],
+                [puntoAcceso.lat, puntoAcceso.lon],
+              ]}
+              pathOptions={{
+                color: '#00B8FF',
+                dashArray: '4 4',
+                weight: 2,
+              }}
+            />
+          )}
         </MapContainer>
 
-        {position && (
+        {/* Panel inferior */}
+        {puntoPesca && (
           <div
             style={{
               position: 'absolute',
               left: 12,
               right: 12,
-              bottom: 12,
+              bottom: 16,
+              maxHeight: '45vh',
+              overflowY: 'auto',
               padding: 12,
-              background: 'var(--surface)',
+              backgroundColor: 'var(--surface)',
               border: '1px solid var(--border)',
               borderRadius: 8,
               zIndex: 1000,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
             }}
           >
-            <label
-              style={{
-                display: 'block',
-                fontSize: 12,
-                color: 'var(--text-secondary)',
-                marginBottom: 4,
-              }}
-            >
-              {t('map.spotName')}
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={busy ? t('map.searching') : t('map.spotNamePlaceholder')}
-              style={{
-                width: '100%',
-                padding: '8px 10px',
-                background: '#0A0A0A',
-                border: '1px solid var(--border)',
-                color: 'var(--text-primary)',
-                fontFamily: 'var(--font-mono)',
-                borderRadius: 4,
-              }}
-            />
+            {/* Input nombre */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.75rem',
+                  color: 'var(--text-dim)',
+                  marginBottom: 4,
+                }}
+              >
+                {t('map.spotName')}
+              </label>
+              <input
+                type="text"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                placeholder={t('map.spotNamePlaceholder')}
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  backgroundColor: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text)',
+                  fontFamily: 'Inter, system-ui, sans-serif',
+                  borderRadius: 6,
+                  fontSize: '0.85rem',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            {/* Selector de zona */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.75rem',
+                  color: 'var(--text-dim)',
+                  marginBottom: 4,
+                }}
+              >
+                {t('settings.zones')}
+              </label>
+              <select
+                value={zona}
+                onChange={(e) => setZona(e.target.value as Zona)}
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  backgroundColor: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text)',
+                  borderRadius: 6,
+                  fontSize: '0.85rem',
+                  boxSizing: 'border-box',
+                }}
+              >
+                {zonasOrdenadas.map((z) => (
+                  <option key={z} value={z}>
+                    {t(`zones.${z}`)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Selector de tipo de acceso: 4 botones segmentados */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.75rem',
+                  color: 'var(--text-dim)',
+                  marginBottom: 4,
+                }}
+              >
+                {t('access.title')}
+              </label>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {TIPOS_ACCESO.map((tipo) => {
+                  const active = tipoAcceso === tipo;
+                  return (
+                    <button
+                      key={tipo}
+                      type="button"
+                      onClick={() =>
+                        setTipoAcceso(active ? null : tipo)
+                      }
+                      style={{
+                        flex: 1,
+                        padding: '6px 8px',
+                        borderRadius: 6,
+                        border: `1px solid ${
+                          active ? 'var(--accent-2)' : 'var(--border)'
+                        }`,
+                        backgroundColor: active
+                          ? 'rgba(0, 184, 255, 0.15)'
+                          : 'var(--bg)',
+                        color: active ? 'var(--accent-2)' : 'var(--text-dim)',
+                        fontSize: '0.75rem',
+                        fontWeight: active ? 600 : 400,
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                      }}
+                    >
+                      {t(`access.${tipo}`)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Bloque de acceso (solo si tipoAcceso != null) */}
+            {tipoAcceso != null && (
+              <div
+                style={{
+                  padding: '8px 10px',
+                  backgroundColor: 'var(--bg)',
+                  borderRadius: 6,
+                  border: '1px solid var(--border)',
+                  fontSize: '0.75rem',
+                  color: 'var(--text-dim)',
+                }}
+              >
+                <div style={{ fontWeight: 600, color: 'var(--accent-2)', marginBottom: 2 }}>
+                  {t('access.proposed')}{' '}
+                  {buscandoAcceso && '⏳'}
+                </div>
+                <div>
+                  {puntoAcceso?.profundidad != null
+                    ? `${t('detalle.depth')}: ${puntoAcceso.profundidad.toFixed(1)} m`
+                    : t('detalle.noDepth')}{' '}
+                  • <span style={{ fontStyle: 'italic' }}>{t('access.dragToAdjust')}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Coordenadas + Profundidad de pesca */}
             <div
               style={{
-                marginTop: 6,
-                fontSize: 11,
-                color: 'var(--text-secondary)',
-                fontFamily: 'var(--font-mono)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                fontFamily: 'var(--font-mono, Fira Code, monospace)',
+                fontSize: '0.75rem',
+                color: 'var(--text-dim)',
+                borderTop: '1px solid var(--border)',
+                paddingTop: 6,
               }}
             >
-              {position[0].toFixed(5)}, {position[1].toFixed(5)}
+              <span>
+                {puntoPesca.lat.toFixed(5)}, {puntoPesca.lon.toFixed(5)}
+              </span>
+              <span>
+                {cargandoProfundidad ? (
+                  t('common.loading')
+                ) : profundidadPesca != null ? (
+                  `${profundidadPesca.toFixed(1)} m`
+                ) : (
+                  <span style={{ color: '#ef4444' }}>
+                    {t('errores.noAccess')}
+                  </span>
+                )}
+              </span>
             </div>
           </div>
         )}
       </div>
     </div>
   );
-}
+};
+
+export default MapScreen;
