@@ -2,6 +2,15 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import i18n, { detectInitialLanguage, STORAGE_KEY } from '../i18n/index.ts';
 import type { SpotWeather } from '../lib/openmeteo.ts';
+import type {
+  CategoriaKayak,
+  FranjaDia,
+  NivelExperiencia,
+  TipoAcceso,
+  Zona,
+  PerfilKayakista,
+} from '../lib/verdict.ts';
+import type { FormatoCoords } from '../lib/coords.ts';
 
 export interface Spot {
   id: string;
@@ -9,9 +18,47 @@ export interface Spot {
   lat: number;
   lon: number;
   createdAt: number;
+  // Ampliación DP-044: acceso integrado + zona + categoría.
+  zona: Zona;
+  tipoAcceso: TipoAcceso | null;
+  profundidad: number | null; // m, del punto de pesca
+  accesoLat: number | null;
+  accesoLon: number | null;
+  accesoProfundidad: number | null;
+}
+
+export type FranjaUsuario = {
+  id: string;
+  nombre: string;
+  inicio: number; // hora 0-23
+  fin: number; // hora 0-23
+};
+
+export interface AjustesApp {
+  formatoCoords: FormatoCoords;
+  kayakIds: string[]; // hasta 2
+  categoriaKayak: CategoriaKayak;
+  perfil: PerfilKayakista;
+  franjas: FranjaUsuario[];
+  franjaActivaId: string | null;
+  subpestanasOcultas: string[];
 }
 
 const WEATHER_TTL_MS = 30 * 60 * 1000;
+
+const FRANJAS_DEFECTO: FranjaUsuario[] = [
+  { id: 'manana', nombre: 'Mañana', inicio: 6, fin: 12 },
+  { id: 'tarde', nombre: 'Tarde', inicio: 12, fin: 20 },
+  { id: 'noche', nombre: 'Noche', inicio: 20, fin: 6 },
+];
+
+const PERFIL_DEFECTO: PerfilKayakista = {
+  experiencia: 'intermedio',
+  vhf: false,
+  remoRepuesto: false,
+  ropaSeca: false,
+  compartimentosEstancos: false,
+};
 
 export interface AppState {
   language: 'es' | 'en';
@@ -19,15 +66,27 @@ export interface AppState {
   firstRunDone: boolean;
   spots: Spot[];
   weather: Record<string, SpotWeather>;
+  ajustes: AjustesApp;
+
   setLanguage: (lang: 'es' | 'en') => void;
   setTheme: (theme: 'dark' | 'light') => void;
   markFirstRunDone: () => void;
+
   addSpot: (spot: Omit<Spot, 'id' | 'createdAt'>) => void;
   updateSpot: (id: string, patch: Partial<Omit<Spot, 'id' | 'createdAt'>>) => void;
   removeSpot: (id: string) => void;
+
   setWeather: (spotId: string, data: SpotWeather) => void;
   clearWeather: (spotId: string) => void;
   getFreshWeather: (spotId: string) => SpotWeather | null;
+
+  setFormatoCoords: (f: FormatoCoords) => void;
+  setKayakIds: (ids: string[]) => void;
+  setCategoriaKayak: (c: CategoriaKayak) => void;
+  setPerfil: (patch: Partial<PerfilKayakista>) => void;
+  setFranjas: (franjas: FranjaUsuario[]) => void;
+  setFranjaActiva: (id: string | null) => void;
+  toggleSubpestana: (id: string) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -38,12 +97,23 @@ export const useAppStore = create<AppState>()(
       firstRunDone: false,
       spots: [],
       weather: {},
-      setLanguage: (lang: 'es' | 'en') => {
+      ajustes: {
+        formatoCoords: 'dd',
+        kayakIds: [],
+        categoriaKayak: 'K3',
+        perfil: PERFIL_DEFECTO,
+        franjas: FRANJAS_DEFECTO,
+        franjaActivaId: 'manana',
+        subpestanasOcultas: [],
+      },
+
+      setLanguage: (lang) => {
         void i18n.changeLanguage(lang);
         set({ language: lang });
       },
-      setTheme: (theme: 'dark' | 'light') => set({ theme }),
+      setTheme: (theme) => set({ theme }),
       markFirstRunDone: () => set({ firstRunDone: true }),
+
       addSpot: (spot) =>
         set((state) => ({
           spots: [
@@ -70,6 +140,7 @@ export const useAppStore = create<AppState>()(
             weather: rest,
           };
         }),
+
       setWeather: (spotId, data) =>
         set((state) => ({
           weather: { ...state.weather, [spotId]: data },
@@ -85,9 +156,48 @@ export const useAppStore = create<AppState>()(
         if (Date.now() - entry.fetchedAt > WEATHER_TTL_MS) return null;
         return entry;
       },
+
+      setFormatoCoords: (f) =>
+        set((state) => ({
+          ajustes: { ...state.ajustes, formatoCoords: f },
+        })),
+      setKayakIds: (ids) =>
+        set((state) => ({
+          ajustes: { ...state.ajustes, kayakIds: ids.slice(0, 2) },
+        })),
+      setCategoriaKayak: (c) =>
+        set((state) => ({
+          ajustes: { ...state.ajustes, categoriaKayak: c },
+        })),
+      setPerfil: (patch) =>
+        set((state) => ({
+          ajustes: {
+            ...state.ajustes,
+            perfil: { ...state.ajustes.perfil, ...patch },
+          },
+        })),
+      setFranjas: (franjas) =>
+        set((state) => ({
+          ajustes: { ...state.ajustes, franjas },
+        })),
+      setFranjaActiva: (id) =>
+        set((state) => ({
+          ajustes: { ...state.ajustes, franjaActivaId: id },
+        })),
+      toggleSubpestana: (id) =>
+        set((state) => {
+          const ocultas = state.ajustes.subpestanasOcultas;
+          const nuevas = ocultas.includes(id)
+            ? ocultas.filter((x) => x !== id)
+            : [...ocultas, id];
+          return {
+            ajustes: { ...state.ajustes, subpestanasOcultas: nuevas },
+          };
+        }),
     }),
     {
       name: STORAGE_KEY,
+      version: 2,
     }
   )
 );

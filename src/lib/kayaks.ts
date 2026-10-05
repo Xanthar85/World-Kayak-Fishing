@@ -1,203 +1,498 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import i18n, { detectInitialLanguage, STORAGE_KEY } from '../i18n/index.ts';
-import type { SpotWeather } from '../lib/openmeteo.ts';
-import type {
-  CategoriaKayak,
-  FranjaDia,
-  NivelExperiencia,
-  TipoAcceso,
-  Zona,
-  PerfilKayakista,
-} from '../lib/verdict.ts';
-import type { FormatoCoords } from '../lib/coords.ts';
+// WKF — Catálogo de kayaks.
+// DP-041 / DP-044 / DP-045 / DP-046 / DP-047.
+// Datos puros. Sin lógica de veredicto.
 
-export interface Spot {
+import type { CategoriaKayak } from './verdict.ts';
+
+export type Propulsion = 'pala' | 'pedal_aletas' | 'pedal_helice';
+export type CategoriaDirectiva = 'A' | 'B' | 'C' | 'D' | 'no_certificado';
+export type TipoCasco = 'V' | 'U' | 'plano';
+
+export interface Kayak {
   id: string;
-  name: string;
-  lat: number;
-  lon: number;
-  createdAt: number;
-  // Ampliación DP-044: acceso integrado + zona + categoría.
-  zona: Zona;
-  tipoAcceso: TipoAcceso | null;
-  profundidad: number | null; // m, del punto de pesca
-  accesoLat: number | null;
-  accesoLon: number | null;
-  accesoProfundidad: number | null;
+  marca: string;
+  modelo: string;
+  eslora: number; // m
+  manga: number; // m
+  volumen: number; // L
+  tipoCasco: TipoCasco;
+  autovaciable: boolean;
+  timon: boolean;
+  compartimentosEstancos: boolean;
+  capacidadCarga: number; // kg
+  propulsion: Propulsion;
+  categoriaWKF: CategoriaKayak;
+  categoriaDirectiva: CategoriaDirectiva;
+  certificado: boolean;
+  verificado: boolean;
 }
 
-export type FranjaUsuario = {
-  id: string;
-  nombre: string;
-  inicio: number; // hora 0-23
-  fin: number; // hora 0-23
-};
-
-export interface AjustesApp {
-  formatoCoords: FormatoCoords;
-  kayakIds: string[]; // hasta 2
-  categoriaKayak: CategoriaKayak;
-  perfil: PerfilKayakista;
-  franjas: FranjaUsuario[];
-  franjaActivaId: string | null;
-  subpestanasOcultas: string[];
-}
-
-const WEATHER_TTL_MS = 30 * 60 * 1000;
-
-const FRANJAS_DEFECTO: FranjaUsuario[] = [
-  { id: 'manana', nombre: 'Mañana', inicio: 6, fin: 12 },
-  { id: 'tarde', nombre: 'Tarde', inicio: 12, fin: 20 },
-  { id: 'noche', nombre: 'Noche', inicio: 20, fin: 6 },
+// Catálogo de kayaks conocidos.
+// Los modelos del usuario (Dolphin Propel 12, Fisher Pro 12) están
+// como entradas más del catálogo, sin ningún destacado.
+export const CATALOGO_KAYAKS: Kayak[] = [
+  {
+    id: 'hobie-mirage-outback',
+    marca: 'Hobie',
+    modelo: 'Mirage Outback',
+    eslora: 3.66,
+    manga: 0.86,
+    volumen: 350,
+    tipoCasco: 'U',
+    autovaciable: true,
+    timon: true,
+    compartimentosEstancos: false,
+    capacidadCarga: 180,
+    propulsion: 'pedal_aletas',
+    categoriaWKF: 'K3',
+    categoriaDirectiva: 'D',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'hobie-mirage-pro-angler-14',
+    marca: 'Hobie',
+    modelo: 'Mirage Pro Angler 14',
+    eslora: 4.17,
+    manga: 0.96,
+    volumen: 450,
+    tipoCasco: 'U',
+    autovaciable: true,
+    timon: true,
+    compartimentosEstancos: false,
+    capacidadCarga: 250,
+    propulsion: 'pedal_aletas',
+    categoriaWKF: 'K4',
+    categoriaDirectiva: 'D',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'hobie-mirage-revolution-13',
+    marca: 'Hobie',
+    modelo: 'Mirage Revolution 13',
+    eslora: 4.01,
+    manga: 0.71,
+    volumen: 300,
+    tipoCasco: 'V',
+    autovaciable: true,
+    timon: true,
+    compartimentosEstancos: false,
+    capacidadCarga: 150,
+    propulsion: 'pedal_aletas',
+    categoriaWKF: 'K3',
+    categoriaDirectiva: 'D',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'native-slayer-propel-13',
+    marca: 'Native Watercraft',
+    modelo: 'Slayer Propel 13',
+    eslora: 3.96,
+    manga: 0.81,
+    volumen: 380,
+    tipoCasco: 'U',
+    autovaciable: true,
+    timon: true,
+    compartimentosEstancos: false,
+    capacidadCarga: 200,
+    propulsion: 'pedal_helice',
+    categoriaWKF: 'K3',
+    categoriaDirectiva: 'D',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'native-titan-13-5',
+    marca: 'Native Watercraft',
+    modelo: 'Titan 13.5',
+    eslora: 4.11,
+    manga: 0.91,
+    volumen: 420,
+    tipoCasco: 'U',
+    autovaciable: true,
+    timon: true,
+    compartimentosEstancos: false,
+    capacidadCarga: 250,
+    propulsion: 'pedal_helice',
+    categoriaWKF: 'K4',
+    categoriaDirectiva: 'D',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'wilderness-radar-135',
+    marca: 'Wilderness Systems',
+    modelo: 'Radar 135',
+    eslora: 4.11,
+    manga: 0.81,
+    volumen: 400,
+    tipoCasco: 'U',
+    autovaciable: true,
+    timon: true,
+    compartimentosEstancos: false,
+    capacidadCarga: 200,
+    propulsion: 'pedal_helice',
+    categoriaWKF: 'K4',
+    categoriaDirectiva: 'D',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'wilderness-thresher-140',
+    marca: 'Wilderness Systems',
+    modelo: 'Thresher 140',
+    eslora: 4.27,
+    manga: 0.71,
+    volumen: 350,
+    tipoCasco: 'V',
+    autovaciable: true,
+    timon: true,
+    compartimentosEstancos: false,
+    capacidadCarga: 180,
+    propulsion: 'pala',
+    categoriaWKF: 'K4',
+    categoriaDirectiva: 'D',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'jackson-big-rig-hd',
+    marca: 'Jackson Kayak',
+    modelo: 'Big Rig HD',
+    eslora: 3.96,
+    manga: 0.91,
+    volumen: 400,
+    tipoCasco: 'U',
+    autovaciable: true,
+    timon: true,
+    compartimentosEstancos: false,
+    capacidadCarga: 250,
+    propulsion: 'pala',
+    categoriaWKF: 'K3',
+    categoriaDirectiva: 'D',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'jackson-kraken-13-5',
+    marca: 'Jackson Kayak',
+    modelo: 'Kraken 13.5',
+    eslora: 4.11,
+    manga: 0.76,
+    volumen: 350,
+    tipoCasco: 'V',
+    autovaciable: true,
+    timon: true,
+    compartimentosEstancos: false,
+    capacidadCarga: 200,
+    propulsion: 'pala',
+    categoriaWKF: 'K4',
+    categoriaDirectiva: 'D',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'old-town-predator-pdl',
+    marca: 'Old Town',
+    modelo: 'Predator PDL',
+    eslora: 4.11,
+    manga: 0.86,
+    volumen: 420,
+    tipoCasco: 'U',
+    autovaciable: true,
+    timon: true,
+    compartimentosEstancos: false,
+    capacidadCarga: 250,
+    propulsion: 'pedal_helice',
+    categoriaWKF: 'K4',
+    categoriaDirectiva: 'D',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'old-town-sportsman-120',
+    marca: 'Old Town',
+    modelo: 'Sportsman 120',
+    eslora: 3.66,
+    manga: 0.81,
+    volumen: 350,
+    tipoCasco: 'U',
+    autovaciable: true,
+    timon: true,
+    compartimentosEstancos: false,
+    capacidadCarga: 200,
+    propulsion: 'pala',
+    categoriaWKF: 'K3',
+    categoriaDirectiva: 'D',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'ocean-kayak-trident-13',
+    marca: 'Ocean Kayak',
+    modelo: 'Trident 13',
+    eslora: 3.96,
+    manga: 0.71,
+    volumen: 300,
+    tipoCasco: 'V',
+    autovaciable: true,
+    timon: true,
+    compartimentosEstancos: false,
+    capacidadCarga: 150,
+    propulsion: 'pala',
+    categoriaWKF: 'K3',
+    categoriaDirectiva: 'D',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'ocean-kayak-prowler-13',
+    marca: 'Ocean Kayak',
+    modelo: 'Prowler 13',
+    eslora: 3.96,
+    manga: 0.71,
+    volumen: 300,
+    tipoCasco: 'V',
+    autovaciable: true,
+    timon: false,
+    compartimentosEstancos: false,
+    capacidadCarga: 150,
+    propulsion: 'pala',
+    categoriaWKF: 'K3',
+    categoriaDirectiva: 'D',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'perception-pescador-pro-12',
+    marca: 'Perception',
+    modelo: 'Pescador Pro 12',
+    eslora: 3.66,
+    manga: 0.81,
+    volumen: 350,
+    tipoCasco: 'U',
+    autovaciable: true,
+    timon: false,
+    compartimentosEstancos: false,
+    capacidadCarga: 180,
+    propulsion: 'pala',
+    categoriaWKF: 'K3',
+    categoriaDirectiva: 'D',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'feelfree-lure-11-5',
+    marca: 'FeelFree',
+    modelo: 'Lure 11.5',
+    eslora: 3.51,
+    manga: 0.86,
+    volumen: 350,
+    tipoCasco: 'U',
+    autovaciable: true,
+    timon: false,
+    compartimentosEstancos: false,
+    capacidadCarga: 180,
+    propulsion: 'pala',
+    categoriaWKF: 'K3',
+    categoriaDirectiva: 'D',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'riot-escape-12',
+    marca: 'Riot Kayaks',
+    modelo: 'Escape 12',
+    eslora: 3.66,
+    manga: 0.76,
+    volumen: 300,
+    tipoCasco: 'U',
+    autovaciable: true,
+    timon: false,
+    compartimentosEstancos: false,
+    capacidadCarga: 150,
+    propulsion: 'pala',
+    categoriaWKF: 'K3',
+    categoriaDirectiva: 'D',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'viking-profish-reload',
+    marca: 'Viking Kayaks',
+    modelo: 'Profish Reload',
+    eslora: 4.27,
+    manga: 0.76,
+    volumen: 350,
+    tipoCasco: 'V',
+    autovaciable: true,
+    timon: true,
+    compartimentosEstancos: false,
+    capacidadCarga: 200,
+    propulsion: 'pala',
+    categoriaWKF: 'K4',
+    categoriaDirectiva: 'D',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'viking-profish-gt',
+    marca: 'Viking Kayaks',
+    modelo: 'Profish GT',
+    eslora: 3.96,
+    manga: 0.76,
+    volumen: 300,
+    tipoCasco: 'V',
+    autovaciable: true,
+    timon: true,
+    compartimentosEstancos: false,
+    capacidadCarga: 150,
+    propulsion: 'pala',
+    categoriaWKF: 'K3',
+    categoriaDirectiva: 'D',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'stealth-profisha-525',
+    marca: 'Stealth Kayaks',
+    modelo: 'Profisha 525',
+    eslora: 5.25,
+    manga: 0.66,
+    volumen: 400,
+    tipoCasco: 'V',
+    autovaciable: false,
+    timon: true,
+    compartimentosEstancos: true,
+    capacidadCarga: 200,
+    propulsion: 'pala',
+    categoriaWKF: 'K5',
+    categoriaDirectiva: 'C',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'stealth-profisha-475',
+    marca: 'Stealth Kayaks',
+    modelo: 'Profisha 475',
+    eslora: 4.75,
+    manga: 0.66,
+    volumen: 350,
+    tipoCasco: 'V',
+    autovaciable: false,
+    timon: true,
+    compartimentosEstancos: true,
+    capacidadCarga: 180,
+    propulsion: 'pala',
+    categoriaWKF: 'K5',
+    categoriaDirectiva: 'C',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'epic-v5',
+    marca: 'Epic Kayaks',
+    modelo: 'V5',
+    eslora: 5.20,
+    manga: 0.51,
+    volumen: 300,
+    tipoCasco: 'V',
+    autovaciable: false,
+    timon: true,
+    compartimentosEstancos: true,
+    capacidadCarga: 150,
+    propulsion: 'pala',
+    categoriaWKF: 'K5',
+    categoriaDirectiva: 'C',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'epic-v6',
+    marca: 'Epic Kayaks',
+    modelo: 'V6',
+    eslora: 6.10,
+    manga: 0.51,
+    volumen: 350,
+    tipoCasco: 'V',
+    autovaciable: false,
+    timon: true,
+    compartimentosEstancos: true,
+    capacidadCarga: 180,
+    propulsion: 'pala',
+    categoriaWKF: 'K5',
+    categoriaDirectiva: 'C',
+    certificado: true,
+    verificado: true,
+  },
+  {
+    id: 'dolphin-propel-12',
+    marca: 'Dolphin',
+    modelo: 'Propel 12',
+    eslora: 3.66,
+    manga: 0.81,
+    volumen: 350,
+    tipoCasco: 'U',
+    autovaciable: true,
+    timon: true,
+    compartimentosEstancos: false,
+    capacidadCarga: 180,
+    propulsion: 'pedal_helice',
+    categoriaWKF: 'K3',
+    categoriaDirectiva: 'D',
+    certificado: false,
+    verificado: false,
+  },
+  {
+    id: 'fisher-pro-12-aletas',
+    marca: 'Fisher',
+    modelo: 'Pro 12',
+    eslora: 3.66,
+    manga: 0.80,
+    volumen: 330,
+    tipoCasco: 'U',
+    autovaciable: true,
+    timon: true,
+    compartimentosEstancos: false,
+    capacidadCarga: 180,
+    propulsion: 'pedal_aletas',
+    categoriaWKF: 'K3',
+    categoriaDirectiva: 'D',
+    certificado: false,
+    verificado: false,
+  },
+  {
+    id: 'fisher-pro-12-helice',
+    marca: 'Fisher',
+    modelo: 'Pro 12',
+    eslora: 3.66,
+    manga: 0.80,
+    volumen: 330,
+    tipoCasco: 'U',
+    autovaciable: true,
+    timon: true,
+    compartimentosEstancos: false,
+    capacidadCarga: 180,
+    propulsion: 'pedal_helice',
+    categoriaWKF: 'K3',
+    categoriaDirectiva: 'D',
+    certificado: false,
+    verificado: false,
+  },
 ];
 
-const PERFIL_DEFECTO: PerfilKayakista = {
-  experiencia: 'intermedio',
-  vhf: false,
-  remoRepuesto: false,
-  ropaSeca: false,
-  compartimentosEstancos: false,
-};
-
-export interface AppState {
-  language: 'es' | 'en';
-  theme: 'dark' | 'light';
-  firstRunDone: boolean;
-  spots: Spot[];
-  weather: Record<string, SpotWeather>;
-  ajustes: AjustesApp;
-
-  setLanguage: (lang: 'es' | 'en') => void;
-  setTheme: (theme: 'dark' | 'light') => void;
-  markFirstRunDone: () => void;
-
-  addSpot: (spot: Omit<Spot, 'id' | 'createdAt'>) => void;
-  updateSpot: (id: string, patch: Partial<Omit<Spot, 'id' | 'createdAt'>>) => void;
-  removeSpot: (id: string) => void;
-
-  setWeather: (spotId: string, data: SpotWeather) => void;
-  clearWeather: (spotId: string) => void;
-  getFreshWeather: (spotId: string) => SpotWeather | null;
-
-  setFormatoCoords: (f: FormatoCoords) => void;
-  setKayakIds: (ids: string[]) => void;
-  setCategoriaKayak: (c: CategoriaKayak) => void;
-  setPerfil: (patch: Partial<PerfilKayakista>) => void;
-  setFranjas: (franjas: FranjaUsuario[]) => void;
-  setFranjaActiva: (id: string | null) => void;
-  toggleSubpestana: (id: string) => void;
+// Busca un kayak por id.
+export function buscarKayakPorId(id: string): Kayak | undefined {
+  return CATALOGO_KAYAKS.find((k) => k.id === id);
 }
 
-export const useAppStore = create<AppState>()(
-  persist(
-    (set, get) => ({
-      language: detectInitialLanguage(),
-      theme: 'dark',
-      firstRunDone: false,
-      spots: [],
-      weather: {},
-      ajustes: {
-        formatoCoords: 'dd',
-        kayakIds: [],
-        categoriaKayak: 'K3',
-        perfil: PERFIL_DEFECTO,
-        franjas: FRANJAS_DEFECTO,
-        franjaActivaId: 'manana',
-        subpestanasOcultas: [],
-      },
-
-      setLanguage: (lang) => {
-        void i18n.changeLanguage(lang);
-        set({ language: lang });
-      },
-      setTheme: (theme) => set({ theme }),
-      markFirstRunDone: () => set({ firstRunDone: true }),
-
-      addSpot: (spot) =>
-        set((state) => ({
-          spots: [
-            ...state.spots,
-            {
-              ...spot,
-              id:
-                typeof crypto !== 'undefined' && 'randomUUID' in crypto
-                  ? crypto.randomUUID()
-                  : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-              createdAt: Date.now(),
-            },
-          ],
-        })),
-      updateSpot: (id, patch) =>
-        set((state) => ({
-          spots: state.spots.map((s) => (s.id === id ? { ...s, ...patch } : s)),
-        })),
-      removeSpot: (id) =>
-        set((state) => {
-          const { [id]: _removed, ...rest } = state.weather;
-          return {
-            spots: state.spots.filter((s) => s.id !== id),
-            weather: rest,
-          };
-        }),
-
-      setWeather: (spotId, data) =>
-        set((state) => ({
-          weather: { ...state.weather, [spotId]: data },
-        })),
-      clearWeather: (spotId) =>
-        set((state) => {
-          const { [spotId]: _removed, ...rest } = state.weather;
-          return { weather: rest };
-        }),
-      getFreshWeather: (spotId) => {
-        const entry = get().weather[spotId];
-        if (!entry) return null;
-        if (Date.now() - entry.fetchedAt > WEATHER_TTL_MS) return null;
-        return entry;
-      },
-
-      setFormatoCoords: (f) =>
-        set((state) => ({
-          ajustes: { ...state.ajustes, formatoCoords: f },
-        })),
-      setKayakIds: (ids) =>
-        set((state) => ({
-          ajustes: { ...state.ajustes, kayakIds: ids.slice(0, 2) },
-        })),
-      setCategoriaKayak: (c) =>
-        set((state) => ({
-          ajustes: { ...state.ajustes, categoriaKayak: c },
-        })),
-      setPerfil: (patch) =>
-        set((state) => ({
-          ajustes: {
-            ...state.ajustes,
-            perfil: { ...state.ajustes.perfil, ...patch },
-          },
-        })),
-      setFranjas: (franjas) =>
-        set((state) => ({
-          ajustes: { ...state.ajustes, franjas },
-        })),
-      setFranjaActiva: (id) =>
-        set((state) => ({
-          ajustes: { ...state.ajustes, franjaActivaId: id },
-        })),
-      toggleSubpestana: (id) =>
-        set((state) => {
-          const ocultas = state.ajustes.subpestanasOcultas;
-          const nuevas = ocultas.includes(id)
-            ? ocultas.filter((x) => x !== id)
-            : [...ocultas, id];
-          return {
-            ajustes: { ...state.ajustes, subpestanasOcultas: nuevas },
-          };
-        }),
-    }),
-    {
-      name: STORAGE_KEY,
-      version: 2,
-    }
-  )
-);
+// Busca kayaks por nombre (marca + modelo). Case-insensitive.
+export function buscarKayaksPorNombre(texto: string): Kayak[] {
+  const q = texto.trim().toLowerCase();
+  if (!q) return [];
+  return CATALOGO_KAYAKS.filter((k) =>
+    `${k.marca} ${k.modelo}`.toLowerCase().includes(q)
+  );
+}
