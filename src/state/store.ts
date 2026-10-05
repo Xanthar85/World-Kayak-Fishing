@@ -19,8 +19,6 @@ import type {
 } from '../lib/verdict.ts';
 import type { FormatoCoords } from '../lib/coords.ts';
 
-// ─── Tipos públicos ────────────────────────────────────────────────
-
 export interface Spot {
   id: string;
   name: string;
@@ -50,7 +48,6 @@ export interface AjustesApp {
   franjas: FranjaUsuario[];
   franjaActivaId: string | null;
   subpestanasOcultas: string[];
-  // Nuevo v1.009.4:
   colorTabla: NivelColorTabla;
   filtroFranja: boolean;
 }
@@ -73,8 +70,6 @@ export interface WeatherEntry {
   stale: boolean;
   ageMin: number;
 }
-
-// ─── Constantes ────────────────────────────────────────────────────
 
 const WEATHER_TTL_MS = 30 * 60 * 1000;
 export const PERSIST_VERSION = 2;
@@ -115,8 +110,6 @@ const COLORES_TABLA_VALIDOS: NivelColorTabla[] = [
   'rna',
   'todo',
 ];
-
-// ─── Validadores ───────────────────────────────────────────────────
 
 function esObjeto(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -191,8 +184,6 @@ function validarAjustes(raw: unknown): raw is AjustesApp {
   if (raw.franjaActivaId !== null && typeof raw.franjaActivaId !== 'string') return false;
   if (!Array.isArray(raw.subpestanasOcultas)) return false;
   if (!raw.subpestanasOcultas.every((id) => typeof id === 'string')) return false;
-  // Campos nuevos: si vienen, deben ser válidos. Si no vienen (backup
-  // de v1.009 anterior), los rellenamos con defaults al importar.
   if (
     raw.colorTabla !== undefined &&
     (typeof raw.colorTabla !== 'string' ||
@@ -201,8 +192,6 @@ function validarAjustes(raw: unknown): raw is AjustesApp {
   if (raw.filtroFranja !== undefined && typeof raw.filtroFranja !== 'boolean') return false;
   return true;
 }
-
-// ─── Estado ────────────────────────────────────────────────────────
 
 export interface AppState {
   language: 'es' | 'en';
@@ -406,7 +395,6 @@ export const useAppStore = create<AppState>()(
         const theme =
           data.theme === 'dark' || data.theme === 'light' ? data.theme : undefined;
 
-        // Relleno de campos nuevos si vienen de un backup antiguo.
         const ajustesImportados = data.ajustes as AjustesApp;
         const ajustesConDefaults: AjustesApp = {
           ...ajustesImportados,

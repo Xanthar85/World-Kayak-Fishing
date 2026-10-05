@@ -164,8 +164,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         return;
       }
       const result = importState(parsed);
-      if (result.ok) setFeedbackImport({ tipo: 'ok', spots: result.spotsImportados });
-      else setFeedbackImport({ tipo: 'error', motivo: result.motivo });
+      if ('motivo' in result) {
+        setFeedbackImport({ tipo: 'error', motivo: result.motivo as ImportFailReason });
+      } else {
+        setFeedbackImport({ tipo: 'ok', spots: result.spotsImportados });
+      }
       if (fileInputRef.current) fileInputRef.current.value = '';
     };
     reader.readAsText(file);
@@ -241,7 +244,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           boxSizing: 'border-box',
         }}
       >
-        {/* Idioma */}
         <div style={cardStyle}>
           <div style={sectionTitleStyle}>{t('settings.language')}</div>
           <div style={segmentedContainerStyle}>
@@ -254,7 +256,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </div>
         </div>
 
-        {/* Tema */}
         <div style={cardStyle}>
           <div style={sectionTitleStyle}>{t('settings.theme')}</div>
           <div style={segmentedContainerStyle}>
@@ -267,7 +268,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </div>
         </div>
 
-        {/* Formato de coordenadas */}
         <div style={cardStyle}>
           <div style={sectionTitleStyle}>{t('coords.format')}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -283,7 +283,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </div>
         </div>
 
-        {/* Kayak */}
         <div style={cardStyle}>
           <div style={sectionTitleStyle}>{t('kayak.myKayaks')}</div>
           {[0, 1].map((slotIndex) => {
@@ -436,7 +435,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           )}
         </div>
 
-        {/* Categoría de kayak */}
         <div style={cardStyle}>
           <div style={sectionTitleStyle}>{t('settings.kayakCategory')}</div>
           {!ajustes.categoriaKayak && (
@@ -457,7 +455,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </div>
         </div>
 
-        {/* Perfil */}
         <div style={cardStyle}>
           <div style={sectionTitleStyle}>{t('perfil.title')}</div>
           <div style={{ marginBottom: '14px' }}>
@@ -525,7 +522,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </div>
         </div>
 
-        {/* Franjas */}
         <div style={cardStyle}>
           <div
             style={{
@@ -614,7 +610,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </div>
         </div>
 
-        {/* Color de tabla */}
         <div style={cardStyle}>
           <div style={sectionTitleStyle}>{t('settings.colorTabla')}</div>
           <p
@@ -653,7 +648,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </div>
         </div>
 
-        {/* Subpestañas */}
         <div style={cardStyle}>
           <div style={sectionTitleStyle}>{t('settings.tabsVisibility')}</div>
           <div
@@ -702,7 +696,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </div>
         </div>
 
-        {/* Tutorial */}
         <div style={cardStyle}>
           <div style={sectionTitleStyle}>{t('settings.tutorial')}</div>
           <button
@@ -718,7 +711,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </button>
         </div>
 
-        {/* Datos */}
         <div style={cardStyle}>
           <div style={sectionTitleStyle}>{t('settings.data')}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -792,7 +784,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </div>
         </div>
 
-        {/* Acerca de */}
         <div style={{ ...cardStyle, marginBottom: '32px' }}>
           <div style={sectionTitleStyle}>{t('settings.about')}</div>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, margin: '0 0 12px 0' }}>
@@ -828,7 +819,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </div>
       </div>
 
-      {/* Modal ficha técnica */}
       {fichaTecnicaKayak && (
         <div
           onClick={() => setFichaTecnicaKayak(null)}
