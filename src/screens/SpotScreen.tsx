@@ -28,6 +28,7 @@ import { calcularLuna, type FaseLunar } from '../lib/moon.ts';
 export interface SpotScreenProps {
   spotId: string;
   onClose: () => void;
+  onAddAccess?: (spotId: string) => void;
 }
 
 type TabId =
@@ -121,7 +122,11 @@ const MiniChart: React.FC<{ valores: (number | null)[]; color: string }> = ({
   );
 };
 
-export const SpotScreen: React.FC<SpotScreenProps> = ({ spotId, onClose }) => {
+export const SpotScreen: React.FC<SpotScreenProps> = ({
+  spotId,
+  onClose,
+  onAddAccess,
+}) => {
   const { t, i18n } = useTranslation();
 
   // Store
@@ -593,17 +598,18 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({ spotId, onClose }) => {
                 {t('access.none')}
               </span>
               <button
-                disabled
+                type="button"
+                onClick={() => onAddAccess && onAddAccess(spot.id)}
                 title={t('access.add')}
                 style={{
                   padding: '2px 8px',
                   borderRadius: 4,
-                  border: '1px solid var(--border)',
+                  border: '1px solid var(--accent)',
                   backgroundColor: 'transparent',
-                  color: 'var(--text-dim)',
+                  color: 'var(--accent)',
                   fontSize: '0.75rem',
-                  cursor: 'not-allowed',
-                  opacity: 0.6,
+                  cursor: 'pointer',
+                  fontWeight: 500,
                 }}
               >
                 + {t('access.add')}

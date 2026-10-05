@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAppStore } from '../state/store.ts';
+import { useAppStore, type Spot } from '../state/store.ts';
 import { Logo } from '../components/Logo.tsx';
 import { SettingsScreen } from './SettingsScreen.tsx';
 import { SpotScreen } from './SpotScreen.tsx';
+import { MapScreen } from './MapScreen.tsx';
 import { SpotCard } from '../components/SpotCard.tsx';
 import { fetchSpotWeather } from '../lib/openmeteo.ts';
 
 export const Home: React.FC = () => {
   const { t } = useTranslation();
 
-  // State
+  // Estados locales
   const [showSettings, setShowSettings] = useState(false);
   const [viewingSpotId, setViewingSpotId] = useState<string | null>(null);
+  const [mapMode, setMapMode] = useState<'new' | 'edit' | null>(null);
+  const [editSpot, setEditSpot] = useState<Spot | null>(null);
   const [refreshingMap, setRefreshingMap] = useState<Record<string, boolean>>({});
 
   // Store
@@ -20,6 +23,8 @@ export const Home: React.FC = () => {
   const ajustes = useAppStore((s) => s.ajustes);
   const getFreshWeather = useAppStore((s) => s.getFreshWeather);
   const setWeather = useAppStore((s) => s.setWeather);
+  const addSpot = useAppStore((s) => s.addSpot);
+  const updateSpot = useAppStore((s) => s.updateSpot);
   const removeSpot = useAppStore((s) => s.removeSpot);
 
   const handleRefreshSpot = async (spotId: string, lat: number, lon: number) => {
@@ -36,19 +41,50 @@ export const Home: React.FC = () => {
   };
 
   const handleAddSpotClick = () => {
-    alert('TODO MapScreen v1.007 bloque 5');
+    setEditSpot(null);
+    setMapMode('new');
   };
 
-  // Si viewingSpotId no es null, renderizar SpotScreen
+  // 1. Prioridad de render: MapScreen (crear o editar)
+  if (mapMode != null) {
+    return (
+      <MapScreen
+        initialSpot={editSpot}
+        onCancel={() => {
+          setMapMode(null);
+          setEditSpot(null);
+        }}
+        onSave={(draft) => {
+          if (editSpot) {
+            updateSpot(editSpot.id, draft);
+          } else {
+            addSpot(draft);
+          }
+          setMapMode(null);
+          setEditSpot(null);
+        }}
+      />
+    );
+  }
+
+  // 2. Prioridad de render: SpotScreen (detalle de punto)
   if (viewingSpotId != null) {
     return (
       <SpotScreen
         spotId={viewingSpotId}
         onClose={() => setViewingSpotId(null)}
+        onAddAccess={(spotId) => {
+          const s = spots.find((x) => x.id === spotId);
+          if (s) {
+            setEditSpot(s);
+            setMapMode('edit');
+          }
+        }}
       />
     );
   }
 
+  // 3. Render normal de Home
   return (
     <div
       style={{
