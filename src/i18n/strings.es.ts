@@ -341,6 +341,7 @@ export const stringsEs = {
     select: 'Seleccionar kayak',
     search: 'Buscar kayak',
     searchPlaceholder: 'Marca o modelo',
+    viewSpec: 'Ver ficha técnica',
     notFound: 'No encontrado en el catálogo',
     addCustom: 'Añadir kayak manualmente',
     certificado: 'Certificado',

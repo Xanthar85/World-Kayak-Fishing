@@ -30,7 +30,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Store state
   const language = useAppStore((s) => s.language);
   const setLanguage = useAppStore((s) => s.setLanguage);
   const theme = useAppStore((s) => s.theme);
@@ -47,11 +46,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
   const exportState = useAppStore((s) => s.exportState);
   const importState = useAppStore((s) => s.importState);
 
-  // Local state for kayak picker modal/dropdown
   const [activeSlotPicker, setActiveSlotPicker] = useState<number | null>(null);
   const [kayakSearchQuery, setKayakSearchQuery] = useState('');
+  const [fichaTecnicaKayak, setFichaTecnicaKayak] = useState<Kayak | null>(null);
 
-  // Kayak slot selection
   const kayakSlot1 = ajustes.kayakIds[0] ? buscarKayakPorId(ajustes.kayakIds[0]) : null;
   const kayakSlot2 = ajustes.kayakIds[1] ? buscarKayakPorId(ajustes.kayakIds[1]) : null;
 
@@ -59,7 +57,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
     const current = [...ajustes.kayakIds];
     current[slotIndex] = kayak.id;
     setKayakIds(current.slice(0, 2));
-    // Also auto-suggest category from kayak if not already set or updated
     setCategoriaKayak(kayak.categoriaWKF);
     setActiveSlotPicker(null);
     setKayakSearchQuery('');
@@ -76,7 +73,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
     return text.includes(kayakSearchQuery.toLowerCase());
   });
 
-  // Franjas editing
   const handleFranjaChange = (
     index: number,
     field: keyof FranjaUsuario,
@@ -105,7 +101,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
     setFranjas(ajustes.franjas.filter((_, i) => i !== index));
   };
 
-  // Data import/export
   const handleExportJson = () => {
     const data = exportState();
     const jsonStr = JSON.stringify(data, null, 2);
@@ -160,7 +155,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
     }
   };
 
-  // Common styles
   const cardStyle: React.CSSProperties = {
     backgroundColor: 'var(--surface)',
     border: '1px solid var(--border)',
@@ -197,6 +191,25 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
     transition: 'all 0.15s ease',
   });
 
+  const fichaRowStyle: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '8px 0',
+    borderBottom: '1px solid var(--border)',
+    fontSize: '0.85rem',
+  };
+
+  const fichaLabelStyle: React.CSSProperties = {
+    color: 'var(--text-muted)',
+  };
+
+  const fichaValorStyle: React.CSSProperties = {
+    fontFamily: 'Fira Code, monospace',
+    color: 'var(--text)',
+    fontWeight: 500,
+  };
+
   return (
     <div
       style={{
@@ -210,7 +223,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
         flexDirection: 'column',
       }}
     >
-      {/* Header fijo */}
       <header
         style={{
           display: 'flex',
@@ -249,7 +261,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
         </button>
       </header>
 
-      {/* Contenido con scroll vertical */}
       <div
         style={{
           flex: 1,
@@ -322,152 +333,109 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
         <div style={cardStyle}>
           <div style={sectionTitleStyle}>{t('kayak.myKayaks')}</div>
 
-          {/* Slot 1 */}
-          <div
-            style={{
-              padding: '12px',
-              backgroundColor: 'var(--bg)',
-              borderRadius: 8,
-              border: '1px solid var(--border)',
-              marginBottom: '10px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Slot 1
-              </div>
-              {kayakSlot1 ? (
-                <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
-                  {kayakSlot1.marca} {kayakSlot1.modelo}{' '}
-                  <span
-                    style={{
-                      fontFamily: 'Fira Code, monospace',
-                      fontSize: '0.85rem',
-                      color: 'var(--accent)',
-                    }}
-                  >
-                    ({kayakSlot1.categoriaWKF})
-                  </span>
-                </div>
-              ) : (
-                <div style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>
-                  {t('kayak.notFound')}
-                </div>
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                onClick={() => {
-                  setActiveSlotPicker(0);
-                  setKayakSearchQuery('');
-                }}
+          {[0, 1].map((slotIndex) => {
+            const kayak = slotIndex === 0 ? kayakSlot1 : kayakSlot2;
+            return (
+              <div
+                key={slotIndex}
                 style={{
-                  padding: '6px 12px',
-                  borderRadius: 6,
+                  padding: '12px',
+                  backgroundColor: 'var(--bg)',
+                  borderRadius: 8,
                   border: '1px solid var(--border)',
-                  backgroundColor: 'var(--surface)',
-                  color: 'var(--text)',
-                  fontSize: '0.8rem',
-                  cursor: 'pointer',
+                  marginBottom: slotIndex === 0 ? '10px' : 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px',
                 }}
               >
-                {t('kayak.select')}
-              </button>
-              {kayakSlot1 && (
-                <button
-                  onClick={() => handleRemoveKayakSlot(0)}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: 6,
-                    border: '1px solid var(--border)',
-                    backgroundColor: 'transparent',
-                    color: 'var(--text-muted)',
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {t('common.delete')}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Slot 2 */}
-          <div
-            style={{
-              padding: '12px',
-              backgroundColor: 'var(--bg)',
-              borderRadius: 8,
-              border: '1px solid var(--border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Slot 2
-              </div>
-              {kayakSlot2 ? (
-                <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>
-                  {kayakSlot2.marca} {kayakSlot2.modelo}{' '}
-                  <span
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    Slot {slotIndex + 1}
+                  </div>
+                  {kayak ? (
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        fontSize: '0.95rem',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {kayak.marca} {kayak.modelo}{' '}
+                      <span
+                        style={{
+                          fontFamily: 'Fira Code, monospace',
+                          fontSize: '0.85rem',
+                          color: 'var(--accent)',
+                        }}
+                      >
+                        ({kayak.categoriaWKF})
+                      </span>
+                    </div>
+                  ) : (
+                    <div style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>
+                      {t('kayak.notFound')}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                  {kayak && (
+                    <button
+                      onClick={() => setFichaTecnicaKayak(kayak)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 6,
+                        border: '1px solid var(--border)',
+                        backgroundColor: 'transparent',
+                        color: 'var(--accent-2)',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {t('kayak.viewSpec')}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setActiveSlotPicker(slotIndex);
+                      setKayakSearchQuery('');
+                    }}
                     style={{
-                      fontFamily: 'Fira Code, monospace',
-                      fontSize: '0.85rem',
-                      color: 'var(--accent)',
+                      padding: '6px 12px',
+                      borderRadius: 6,
+                      border: '1px solid var(--border)',
+                      backgroundColor: 'var(--surface)',
+                      color: 'var(--text)',
+                      fontSize: '0.8rem',
+                      cursor: 'pointer',
                     }}
                   >
-                    ({kayakSlot2.categoriaWKF})
-                  </span>
+                    {t('kayak.select')}
+                  </button>
+                  {kayak && (
+                    <button
+                      onClick={() => handleRemoveKayakSlot(slotIndex)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 6,
+                        border: '1px solid var(--border)',
+                        backgroundColor: 'transparent',
+                        color: 'var(--text-muted)',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {t('common.delete')}
+                    </button>
+                  )}
                 </div>
-              ) : (
-                <div style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>
-                  {t('kayak.notFound')}
-                </div>
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                onClick={() => {
-                  setActiveSlotPicker(1);
-                  setKayakSearchQuery('');
-                }}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: 6,
-                  border: '1px solid var(--border)',
-                  backgroundColor: 'var(--surface)',
-                  color: 'var(--text)',
-                  fontSize: '0.8rem',
-                  cursor: 'pointer',
-                }}
-              >
-                {t('kayak.select')}
-              </button>
-              {kayakSlot2 && (
-                <button
-                  onClick={() => handleRemoveKayakSlot(1)}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: 6,
-                    border: '1px solid var(--border)',
-                    backgroundColor: 'transparent',
-                    color: 'var(--text-muted)',
-                    fontSize: '0.8rem',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {t('common.delete')}
-                </button>
-              )}
-            </div>
-          </div>
+              </div>
+            );
+          })}
 
-          {/* Modal / Panel buscador de kayaks */}
           {activeSlotPicker !== null && (
             <div
               style={{
@@ -598,7 +566,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
         <div style={cardStyle}>
           <div style={sectionTitleStyle}>{t('perfil.title')}</div>
 
-          {/* Experiencia */}
           <div style={{ marginBottom: '14px' }}>
             <div
               style={{
@@ -612,7 +579,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {NIVELES_EXPERIENCIA.map((lvl) => {
                 const active = ajustes.perfil.experiencia === lvl;
-                // Capitalizar primera letra para mapear a clave i18n
                 const keySuffix = lvl.charAt(0).toUpperCase() + lvl.slice(1);
                 return (
                   <button
@@ -634,7 +600,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
             </div>
           </div>
 
-          {/* Equipo */}
           <div style={{ marginBottom: '12px' }}>
             <div
               style={{
@@ -691,7 +656,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
             </div>
           </div>
 
-          {/* Disclaimer */}
           <div
             style={{
               fontSize: '0.75rem',
@@ -845,7 +809,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
           </div>
         </div>
 
-        {/* 8. Subpestañas visibles (9 toggles) */}
+        {/* 8. Subpestañas visibles */}
         <div style={cardStyle}>
           <div style={sectionTitleStyle}>{t('settings.tabsVisibility')}</div>
           <div
@@ -916,7 +880,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
           <div style={sectionTitleStyle}>{t('settings.tutorial')}</div>
           <button
             onClick={() => {
-              // TODO v1.008: integración tutorial completo
               window.alert('TODO v1.008');
             }}
             style={{
@@ -1036,7 +999,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
                 fontWeight: 600,
               }}
             >
-              v1.007
+              v1.008
             </span>
           </div>
 
@@ -1061,6 +1024,131 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
           </a>
         </div>
       </div>
+
+      {/* Modal ficha técnica del kayak */}
+      {fichaTecnicaKayak && (
+        <div
+          onClick={() => setFichaTecnicaKayak(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            zIndex: 2000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: 'var(--surface)',
+              border: '1px solid var(--accent-2)',
+              borderRadius: 12,
+              padding: '20px',
+              maxWidth: '520px',
+              width: '100%',
+              maxHeight: '85vh',
+              overflowY: 'auto',
+              boxShadow: '0 12px 40px rgba(0, 0, 0, 0.6)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '14px',
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: '1.1rem',
+                    fontWeight: 700,
+                    color: 'var(--accent-2)',
+                  }}
+                >
+                  {fichaTecnicaKayak.marca} {fichaTecnicaKayak.modelo}
+                </div>
+                <div
+                  style={{
+                    fontSize: '0.75rem',
+                    color: 'var(--text-muted)',
+                    marginTop: 2,
+                  }}
+                >
+                  {t('kayak.title')} — {t('kayak.category')}{' '}
+                  {fichaTecnicaKayak.categoriaWKF}
+                </div>
+              </div>
+              <button
+                onClick={() => setFichaTecnicaKayak(null)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  fontSize: '1.2rem',
+                  padding: '4px 8px',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {[
+              { label: t('kayak.length'), val: `${fichaTecnicaKayak.eslora.toFixed(2)} m` },
+              { label: t('kayak.beam'), val: `${fichaTecnicaKayak.manga.toFixed(2)} m` },
+              { label: t('kayak.volume'), val: `${fichaTecnicaKayak.volumen} L` },
+              { label: t('kayak.hull'), val: fichaTecnicaKayak.tipoCasco },
+              { label: t('kayak.sitOnTop'), val: fichaTecnicaKayak.autovaciable ? '✓' : '—' },
+              { label: t('kayak.rudder'), val: fichaTecnicaKayak.timon ? '✓' : '—' },
+              {
+                label: t('kayak.bulkheads'),
+                val: fichaTecnicaKayak.compartimentosEstancos ? '✓' : '—',
+              },
+              { label: t('kayak.capacity'), val: `${fichaTecnicaKayak.capacidadCarga} kg` },
+              { label: t('kayak.propulsion'), val: fichaTecnicaKayak.propulsion },
+              { label: t('kayak.category'), val: fichaTecnicaKayak.categoriaWKF },
+              {
+                label: t('kayak.directiveCategory'),
+                val: fichaTecnicaKayak.categoriaDirectiva,
+              },
+              {
+                label: t('kayak.certificado'),
+                val: fichaTecnicaKayak.certificado ? '✓' : '—',
+              },
+              {
+                label: t('kayak.verificado'),
+                val: fichaTecnicaKayak.verificado ? '✓' : '—',
+              },
+            ].map(({ label, val }) => (
+              <div key={label} style={fichaRowStyle}>
+                <span style={fichaLabelStyle}>{label}</span>
+                <span style={fichaValorStyle}>{val}</span>
+              </div>
+            ))}
+
+            {!fichaTecnicaKayak.certificado && (
+              <div
+                style={{
+                  marginTop: '12px',
+                  padding: '8px 10px',
+                  backgroundColor: 'rgba(229, 229, 0, 0.1)',
+                  border: '1px solid var(--verdict-aceptable)',
+                  borderRadius: 6,
+                  fontSize: '0.8rem',
+                  color: 'var(--verdict-aceptable)',
+                }}
+              >
+                {t('kayak.noCertNote')}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

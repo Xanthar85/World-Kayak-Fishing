@@ -341,6 +341,7 @@ export const stringsEn: StringsSchema = {
     select: 'Select kayak',
     search: 'Search kayak',
     searchPlaceholder: 'Brand or model',
+    viewSpec: 'View spec sheet',
     notFound: 'Not found in catalogue',
     addCustom: 'Add kayak manually',
     certificado: 'Certified',

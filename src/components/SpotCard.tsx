@@ -4,7 +4,6 @@ import { formatearCoords, type FormatoCoords } from '../lib/coords.ts';
 import {
   calcularVeredictoPorFranja,
   veredictoAColor,
-  veredictoAClaveI18n,
   miniGraficoOlaViento,
 } from '../lib/verdict-ui.ts';
 import type { Spot, FranjaUsuario } from '../state/store.ts';
@@ -53,7 +52,6 @@ export const SpotCard: React.FC<SpotCardProps> = ({
   return (
     <div
       onClick={(e) => {
-        // Al hacer clic en el cuerpo de la tarjeta, abre editor si no es un botón
         const target = e.target as HTMLElement;
         if (target.closest('button')) return;
         onEdit();
@@ -69,7 +67,7 @@ export const SpotCard: React.FC<SpotCardProps> = ({
         transition: 'border-color 0.15s ease',
       }}
     >
-      {/* Fila 1: Nombre + Botón Borrar (o Confirmación de borrado) */}
+      {/* Fila 1: Nombre + Borrar */}
       <div
         style={{
           display: 'flex',
@@ -170,45 +168,48 @@ export const SpotCard: React.FC<SpotCardProps> = ({
         {coordsFormateadas}
       </div>
 
-      {/* Fila 3: Veredicto por franja (chips en línea) */}
+      {/* Fila 3: Franjas — una sola línea, color sobre el nombre (DP-073) */}
       <div
         style={{
           display: 'flex',
-          flexWrap: 'wrap',
           gap: '6px',
           marginBottom: '12px',
+          overflow: 'hidden',
         }}
       >
         {franjas.map((franja) => {
           const v = veredictos[franja.id];
           const color = v ? veredictoAColor(v) : 'var(--text-dim)';
-          const texto = v ? t(veredictoAClaveI18n(v)) : t('home.card.noData');
+          const sinDatos = !v;
 
           return (
             <div
               key={franja.id}
               style={{
-                display: 'inline-flex',
+                flex: 1,
+                minWidth: 0,
+                display: 'flex',
                 alignItems: 'center',
-                gap: '5px',
-                padding: '4px 8px',
+                justifyContent: 'center',
+                padding: '5px 4px',
                 borderRadius: 6,
-                backgroundColor: 'var(--bg)',
+                backgroundColor: sinDatos ? 'var(--bg)' : `${color}1A`,
                 border: `1px solid ${color}`,
                 fontSize: '0.75rem',
-                fontFamily: 'Inter, system-ui, sans-serif',
+                fontWeight: 600,
+                color: color,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
               }}
             >
-              <span style={{ color: 'var(--text-dim)', fontSize: '0.7rem' }}>
-                {franja.nombre}:
-              </span>
-              <span style={{ color, fontWeight: 600 }}>{texto}</span>
+              {franja.nombre}
             </div>
           );
         })}
       </div>
 
-      {/* Fila 4: Mini-gráfico SVG */}
+      {/* Fila 4: Mini-gráfico */}
       <div
         style={{
           width: '100%',
@@ -229,7 +230,6 @@ export const SpotCard: React.FC<SpotCardProps> = ({
             preserveAspectRatio="none"
             style={{ width: '100%', height: '30px', display: 'block' }}
           >
-            {/* Ola en var(--accent) */}
             <path
               d={graficos.ola}
               fill="none"
@@ -238,7 +238,6 @@ export const SpotCard: React.FC<SpotCardProps> = ({
               strokeLinecap="round"
               strokeLinejoin="round"
             />
-            {/* Viento en var(--accent-2) */}
             <path
               d={graficos.viento}
               fill="none"
@@ -261,7 +260,7 @@ export const SpotCard: React.FC<SpotCardProps> = ({
         )}
       </div>
 
-      {/* Fila 5: Botón Editar + Botón Refrescar */}
+      {/* Fila 5: Botones */}
       <div
         style={{
           display: 'flex',

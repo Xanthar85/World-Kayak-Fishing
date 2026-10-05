@@ -66,37 +66,26 @@ const NOMBRES_FASE_LUNAR: Record<FaseLunar, string> = {
   menguante: 'Menguante',
 };
 
-// ─── Icono de clima ────────────────────────────────────────────
-// Decide el icono a partir de precipitación y nubosidad.
 function iconoClima(h: HourlyPoint): string {
   const precip = h.precipitation ?? 0;
   const cloud = h.cloudCover ?? 0;
-
-  // Lluvia fuerte
   if (precip >= 2) return '🌧️';
-  // Lluvia ligera
   if (precip >= 0.2) return '🌦️';
-  // Nublado / cubierto
   if (cloud >= 75) return '☁️';
-  // Parcialmente nublado
   if (cloud >= 40) return '⛅';
-  // Despejado
   return '☀️';
 }
 
-// ─── MiniChart SVG ─────────────────────────────────────────────
 const MiniChart: React.FC<{ valores: (number | null)[]; color: string }> = ({
   valores,
   color,
 }) => {
   const validos = valores.filter((v): v is number => v !== null && !isNaN(v));
   if (validos.length < 2) return null;
-
   const min = Math.min(...validos);
   const max = Math.max(...validos);
   const diff = max - min === 0 ? 1 : max - min;
   const N = valores.length;
-
   const points: string[] = [];
   for (let i = 0; i < N; i++) {
     const val = valores[i];
@@ -106,7 +95,6 @@ const MiniChart: React.FC<{ valores: (number | null)[]; color: string }> = ({
     const prefix = points.length === 0 ? 'M' : 'L';
     points.push(`${prefix} ${x.toFixed(1)},${y.toFixed(1)}`);
   }
-
   return (
     <div
       style={{
@@ -138,7 +126,6 @@ const MiniChart: React.FC<{ valores: (number | null)[]; color: string }> = ({
   );
 };
 
-// ─── Tabla vertical (DP-072) ───────────────────────────────────
 interface FilaTablaVertical {
   hora: string;
   valores: (string | React.ReactNode)[];
