@@ -240,13 +240,17 @@ export const MapScreen: React.FC<MapScreenProps> = ({
       });
       if (res.ok) {
         const data = await res.json();
+        const addr = data?.address;
         const suggested =
-          data?.address?.village ||
-          data?.address?.town ||
-          data?.address?.city ||
-          data?.address?.municipality ||
-          data?.address?.county ||
-          data?.name ||
+          addr?.city ||
+          addr?.town ||
+          addr?.village ||
+          addr?.hamlet ||
+          addr?.municipality ||
+          addr?.suburb ||
+          addr?.county ||
+          addr?.state ||
+          (data?.name && data?.name !== addr?.country ? data.name : '') ||
           '';
         if (suggested && !nombreEditadoManualmente) {
           setNombre(suggested);
@@ -371,7 +375,8 @@ export const MapScreen: React.FC<MapScreenProps> = ({
             top: 12,
             left: 12,
             right: 12,
-            zIndex: 1000,
+            marginLeft: 56,
+            zIndex: 1100,
             display: 'flex',
             flexDirection: 'column',
             gap: 6,
