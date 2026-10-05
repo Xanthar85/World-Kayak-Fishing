@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../state/store.ts';
 import { Logo } from '../components/Logo.tsx';
 import { SettingsScreen } from './SettingsScreen.tsx';
+import { SpotScreen } from './SpotScreen.tsx';
 import { SpotCard } from '../components/SpotCard.tsx';
 import { fetchSpotWeather } from '../lib/openmeteo.ts';
 
@@ -11,7 +12,7 @@ export const Home: React.FC = () => {
 
   // State
   const [showSettings, setShowSettings] = useState(false);
-  const [_editingSpotId, setEditingSpotId] = useState<string | null>(null);
+  const [viewingSpotId, setViewingSpotId] = useState<string | null>(null);
   const [refreshingMap, setRefreshingMap] = useState<Record<string, boolean>>({});
 
   // Store
@@ -38,10 +39,15 @@ export const Home: React.FC = () => {
     alert('TODO MapScreen v1.007 bloque 5');
   };
 
-  const handleEditSpotClick = (spotId: string) => {
-    setEditingSpotId(spotId);
-    alert('TODO SpotScreen v1.007 bloque 3');
-  };
+  // Si viewingSpotId no es null, renderizar SpotScreen
+  if (viewingSpotId != null) {
+    return (
+      <SpotScreen
+        spotId={viewingSpotId}
+        onClose={() => setViewingSpotId(null)}
+      />
+    );
+  }
 
   return (
     <div
@@ -194,7 +200,7 @@ export const Home: React.FC = () => {
                 formatoCoords={ajustes.formatoCoords}
                 refreshing={!!refreshingMap[spot.id]}
                 onRefresh={() => handleRefreshSpot(spot.id, spot.lat, spot.lon)}
-                onEdit={() => handleEditSpotClick(spot.id)}
+                onEdit={() => setViewingSpotId(spot.id)}
                 onDelete={() => removeSpot(spot.id)}
               />
             ))}
