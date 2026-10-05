@@ -1,7 +1,15 @@
 import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAppStore, type FranjaUsuario } from '../state/store.ts';
-import { CATALOGO_KAYAKS, buscarKayakPorId, type Kayak } from '../lib/kayaks.ts';
+import {
+  useAppStore,
+  type FranjaUsuario,
+  type ImportFailReason,
+} from '../state/store.ts';
+import {
+  CATALOGO_KAYAKS,
+  buscarKayakPorId,
+  type Kayak,
+} from '../lib/kayaks.ts';
 import {
   CATEGORIAS_KAYAK,
   NIVELES_EXPERIENCIA,
@@ -14,6 +22,11 @@ interface SettingsScreenProps {
   onClose: () => void;
 }
 
+type FeedbackImport =
+  | { tipo: 'ok'; spots: number }
+  | { tipo: 'error'; motivo: ImportFailReason }
+  | null;
+
 const SUBPESTANAS: Array<{ id: string; labelKey: string; locked?: boolean }> = [
   { id: 'waves', labelKey: 'tabs.waves', locked: true },
   { id: 'wind', labelKey: 'tabs.wind', locked: true },
@@ -25,6 +38,16 @@ const SUBPESTANAS: Array<{ id: string; labelKey: string; locked?: boolean }> = [
   { id: 'moon', labelKey: 'tabs.moon' },
   { id: 'tides', labelKey: 'tabs.tides' },
 ];
+
+const MAPA_MOTIVO_A_CLAVE_I18N: Record<ImportFailReason, string> = {
+  no_es_objeto: 'import.errors.notObject',
+  version_incorrecta: 'import.errors.wrongVersion',
+  spots_no_array: 'import.errors.spotsNotArray',
+  spot_mal_formado: 'import.errors.spotMalformed',
+  ajustes_mal_formados: 'import.errors.settingsMalformed',
+  franjas_mal_formadas: 'import.errors.slotsMalformed',
+  perfil_mal_formado: 'import.errors.profileMalformed',
+};
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
   const { t } = useTranslation();
@@ -49,6 +72,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
   const [activeSlotPicker, setActiveSlotPicker] = useState<number | null>(null);
   const [kayakSearchQuery, setKayakSearchQuery] = useState('');
   const [fichaTecnicaKayak, setFichaTecnicaKayak] = useState<Kayak | null>(null);
+  const [feedbackImport, setFeedbackImport] = useState<FeedbackImport>(null);
 
   const kayakSlot1 = ajustes.kayakIds[0] ? buscarKayakPorId(ajustes.kayakIds[0]) : null;
   const kayakSlot2 = ajustes.kayakIds[1] ? buscarKayakPorId(ajustes.kayakIds[1]) : null;
@@ -127,25 +151,32 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
 
     const reader = new FileReader();
     reader.onload = (event) => {
+      let parsed: unknown = null;
       try {
-        const parsed = JSON.parse(event.target?.result as string);
-        const confirmed = window.confirm(t('settings.clearAllConfirm'));
-        if (confirmed) {
-          const success = importState(parsed);
-          if (success) {
-            window.alert(t('common.ok'));
-          } else {
-            window.alert(t('common.error'));
-          }
-        }
+        parsed = JSON.parse(event.target?.result as string);
       } catch {
-        window.alert(t('common.error'));
+        setFeedbackImport({ tipo: 'error', motivo: 'no_es_objeto' });
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
       }
+
+      // Confirmación explícita: importar sustituye todos los datos.
+      const confirmed = window.confirm(t('import.confirmReplace'));
+      if (!confirmed) {
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+
+      const result = importState(parsed);
+      if (result.ok) {
+        setFeedbackImport({ tipo: 'ok', spots: result.spotsImportados });
+      } else {
+        setFeedbackImport({ tipo: 'error', motivo: result.motivo });
+      }
+
+      if (fileInputRef.current) fileInputRef.current.value = '';
     };
     reader.readAsText(file);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
   };
 
   const handleClearAll = () => {
@@ -880,7 +911,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
           <div style={sectionTitleStyle}>{t('settings.tutorial')}</div>
           <button
             onClick={() => {
-              window.alert('TODO v1.008');
+              window.alert('TODO v1.009');
             }}
             style={{
               width: '100%',
@@ -938,10 +969,45 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".json"
+              accept=".json,application/json"
               onChange={handleFileChange}
               style={{ display: 'none' }}
             />
+
+            {feedbackImport && feedbackImport.tipo === 'ok' && (
+              <div
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 6,
+                  border: '1px solid var(--verdict-favorable)',
+                  backgroundColor: 'rgba(0, 229, 106, 0.1)',
+                  color: 'var(--verdict-favorable)',
+                  fontSize: '0.85rem',
+                  lineHeight: 1.4,
+                }}
+              >
+                ✓ {t('import.success', { count: feedbackImport.spots })}
+              </div>
+            )}
+
+            {feedbackImport && feedbackImport.tipo === 'error' && (
+              <div
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 6,
+                  border: '1px solid var(--verdict-desaconsejado)',
+                  backgroundColor: 'rgba(255, 45, 85, 0.1)',
+                  color: 'var(--verdict-desaconsejado)',
+                  fontSize: '0.85rem',
+                  lineHeight: 1.4,
+                }}
+              >
+                ✕ {t('import.error')}{' '}
+                <span style={{ opacity: 0.85 }}>
+                  {t(MAPA_MOTIVO_A_CLAVE_I18N[feedbackImport.motivo])}
+                </span>
+              </div>
+            )}
 
             <button
               onClick={handleClearAll}
@@ -999,7 +1065,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
                 fontWeight: 600,
               }}
             >
-              v1.008
+              v1.009
             </span>
           </div>
 

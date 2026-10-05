@@ -146,6 +146,23 @@ export const stringsEs = {
     version: 'Versión',
   },
 
+  import: {
+    confirmReplace:
+      'Vas a importar un archivo de datos. Esto sustituirá TODOS tus puntos y ajustes actuales. ¿Continuar?',
+    success: 'Importación correcta. {{count}} puntos cargados.',
+    error: 'No se ha podido importar el archivo:',
+    errors: {
+      notObject: 'el archivo no tiene el formato esperado.',
+      wrongVersion:
+        'la versión del archivo no es compatible con esta versión de WKF.',
+      spotsNotArray: 'la lista de puntos está dañada o tiene demasiados puntos.',
+      spotMalformed: 'algún punto tiene datos incoherentes.',
+      settingsMalformed: 'los ajustes tienen un formato no reconocido.',
+      slotsMalformed: 'las franjas horarias del archivo no son válidas.',
+      profileMalformed: 'el perfil de kayakista del archivo no es válido.',
+    },
+  },
+
   tutorial: {
     title: 'Tutorial',
     intro:
@@ -171,8 +188,6 @@ export const stringsEs = {
   },
 
   winds: {
-    // Rosa mediterránea de 16 rumbos. Se aplica solo en fachada
-    // mediterránea española e italiana/francesa (DP-034).
     med: {
       N: 'Tramontana',
       NNE: 'Greco-Tramontana',
@@ -191,7 +206,6 @@ export const stringsEs = {
       NO: 'Mistral',
       NNO: 'Tramontana-Mistral',
     },
-    // Nombres genéricos en el resto del mundo.
     generic: {
       N: 'N',
       NNE: 'NNE',
@@ -218,8 +232,6 @@ export const stringsEs = {
     dms: 'Grados, minutos, segundos (DMS)',
     ddm: 'Grados, minutos decimales (DDM)',
   },
-
-  // ─── Ampliaciones nuevas ───────────────────────────────────────
 
   zones: {
     mediterraneo_espanol: 'Mediterráneo español',
@@ -347,7 +359,6 @@ export const stringsEs = {
     certificado: 'Certificado',
     verificado: 'Verificado',
     noCertificado: 'Sin certificar',
-    // Campos del kayak.
     brand: 'Marca',
     model: 'Modelo',
     length: 'Eslora (m)',
@@ -364,7 +375,6 @@ export const stringsEs = {
     propulsionProp: 'Pedal de hélice',
     category: 'Categoría WKF',
     directiveCategory: 'Categoría Directiva 2013/53/UE',
-    // Notas.
     noCertNote: 'Modelo no certificado. WKF aplica conservadurismo.',
     assumptionNote: 'Categoría asumida por defecto: {{cat}}.',
   },

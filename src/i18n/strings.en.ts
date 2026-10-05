@@ -148,6 +148,22 @@ export const stringsEn: StringsSchema = {
     version: 'Version',
   },
 
+  import: {
+    confirmReplace:
+      'You are about to import a data file. This will REPLACE all your current spots and settings. Continue?',
+    success: 'Import successful. {{count}} spots loaded.',
+    error: 'The file could not be imported:',
+    errors: {
+      notObject: 'the file is not in the expected format.',
+      wrongVersion: 'the file version is not compatible with this WKF version.',
+      spotsNotArray: 'the spot list is damaged or has too many spots.',
+      spotMalformed: 'one or more spots have inconsistent data.',
+      settingsMalformed: 'the settings have an unrecognised format.',
+      slotsMalformed: 'the time slots in the file are not valid.',
+      profileMalformed: 'the kayaker profile in the file is not valid.',
+    },
+  },
+
   tutorial: {
     title: 'Tutorial',
     intro:
@@ -173,8 +189,6 @@ export const stringsEn: StringsSchema = {
   },
 
   winds: {
-    // Mediterranean rose of 16 points. Applied only on the Spanish
-    // and French/Italian Mediterranean coast (DP-034).
     med: {
       N: 'Tramontana (Northerly)',
       NNE: 'Greco-Tramontana (NNE)',
@@ -193,7 +207,6 @@ export const stringsEn: StringsSchema = {
       NO: 'Mistral (Northwesterly)',
       NNO: 'Tramontana-Mistral (NNW)',
     },
-    // Generic names everywhere else.
     generic: {
       N: 'N',
       NNE: 'NNE',
