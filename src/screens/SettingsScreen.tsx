@@ -20,6 +20,7 @@ import type { FormatoCoords } from '../lib/coords.ts';
 
 interface SettingsScreenProps {
   onClose: () => void;
+  onOpenTutorial: () => void;
 }
 
 type FeedbackImport =
@@ -49,7 +50,10 @@ const MAPA_MOTIVO_A_CLAVE_I18N: Record<ImportFailReason, string> = {
   perfil_mal_formado: 'import.errors.profileMalformed',
 };
 
-export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({
+  onClose,
+  onOpenTutorial,
+}) => {
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -160,7 +164,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
         return;
       }
 
-      // Confirmación explícita: importar sustituye todos los datos.
       const confirmed = window.confirm(t('import.confirmReplace'));
       if (!confirmed) {
         if (fileInputRef.current) fileInputRef.current.value = '';
@@ -909,24 +912,25 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onClose }) => {
         {/* 9. Tutorial */}
         <div style={cardStyle}>
           <div style={sectionTitleStyle}>{t('settings.tutorial')}</div>
-          <button
-            onClick={() => {
-              window.alert('TODO v1.009');
-            }}
-            style={{
-              width: '100%',
-              padding: '10px 16px',
-              borderRadius: 8,
-              border: '1px solid var(--border)',
-              backgroundColor: 'var(--bg)',
-              color: 'var(--text)',
-              fontSize: '0.9rem',
-              cursor: 'pointer',
-              textAlign: 'center',
-            }}
-          >
-            {t('settings.tutorialRestart')}
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button
+              onClick={onOpenTutorial}
+              style={{
+                width: '100%',
+                padding: '10px 16px',
+                borderRadius: 8,
+                border: '1px solid var(--accent)',
+                backgroundColor: 'transparent',
+                color: 'var(--accent)',
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                textAlign: 'center',
+              }}
+            >
+              📖 {t('settings.tutorialExtended')}
+            </button>
+          </div>
         </div>
 
         {/* 10. Datos */}

@@ -6,6 +6,7 @@ import { Logo } from '../components/Logo.tsx';
 import { SettingsScreen } from './SettingsScreen.tsx';
 import { SpotScreen } from './SpotScreen.tsx';
 import { MapScreen } from './MapScreen.tsx';
+import { TutorialScreen } from './TutorialScreen.tsx';
 import { SpotCard } from '../components/SpotCard.tsx';
 import { fetchSpotWeather } from '../lib/openmeteo.ts';
 
@@ -13,6 +14,7 @@ export const Home: React.FC = () => {
   const { t } = useTranslation();
 
   const [showSettings, setShowSettings] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
   const [viewingSpotId, setViewingSpotId] = useState<string | null>(null);
   const [mapMode, setMapMode] = useState<'new' | 'edit' | null>(null);
   const [editSpot, setEditSpot] = useState<Spot | null>(null);
@@ -39,7 +41,6 @@ export const Home: React.FC = () => {
     }
   };
 
-  // Cierra toda la navegación interna y vuelve a la lista de Home.
   const volverAHome = () => {
     setMapMode(null);
     setEditSpot(null);
@@ -73,14 +74,14 @@ export const Home: React.FC = () => {
           if (s) {
             setEditSpot(s);
             setMapMode('edit');
-            // Mantenemos viewingSpotId como estaba: si el usuario
-            // cancela el MapScreen, volverAHome lo limpia igual.
-            // Pero como queremos volver a Home tras guardar/cancelar,
-            // volverAHome se encarga de ambos casos.
           }
         }}
       />
     );
+  }
+
+  if (showTutorial) {
+    return <TutorialScreen onClose={() => setShowTutorial(false)} />;
   }
 
   return (
@@ -312,7 +313,13 @@ export const Home: React.FC = () => {
       </footer>
 
       {showSettings && (
-        <SettingsScreen onClose={() => setShowSettings(false)} />
+        <SettingsScreen
+          onClose={() => setShowSettings(false)}
+          onOpenTutorial={() => {
+            setShowSettings(false);
+            setShowTutorial(true);
+          }}
+        />
       )}
     </div>
   );
