@@ -75,7 +75,7 @@ export const MiniGrafico: React.FC<MiniGraficoProps> = ({
       <div
         style={{
           width: '100%',
-          height: '56px',
+          height: '90px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -95,11 +95,11 @@ export const MiniGrafico: React.FC<MiniGraficoProps> = ({
   // y preserveAspectRatio=none para estirar el eje X. Los iconos
   // se pintan fuera del SVG en HTML para no deformarse.
   const W = 480;
-  const H = 56;
+  const H = 90;
   const paddingLeft = 20;
   const paddingRight = 20;
-  const paddingTop = 4;
-  const paddingBottom = 12;
+  const paddingTop = 14;
+  const paddingBottom = 16;
   const plotW = W - paddingLeft - paddingRight;
   const plotH = H - paddingTop - paddingBottom;
 
@@ -118,26 +118,42 @@ export const MiniGrafico: React.FC<MiniGraficoProps> = ({
   const yViento = (k: number) =>
     paddingTop + plotH - (Math.min(k, vientoMax) / vientoMax) * plotH;
 
-  // Paths de ola y viento.
-  const olaPath = puntos
-    .map((p, i) => {
-      if (p.olaM == null) return null;
-      const x = xHora(p.hora);
-      const y = yOla(p.olaM);
-      return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .filter((s): s is string => s !== null)
+  // Paths de ola (línea y área).
+  const puntosOla = puntos.filter((p): p is Punto & { olaM: number } => p.olaM != null);
+  const olaPath = puntosOla
+    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${xHora(p.hora).toFixed(1)},${yOla(p.olaM).toFixed(1)}`)
     .join(' ');
+  const olaAreaPath =
+    puntosOla.length > 0
+      ? [
+          olaPath,
+          `L ${xHora(puntosOla[puntosOla.length - 1].hora).toFixed(1)},${(paddingTop + plotH).toFixed(1)}`,
+          `L ${xHora(puntosOla[0].hora).toFixed(1)},${(paddingTop + plotH).toFixed(1)}`,
+          'Z',
+        ].join(' ')
+      : '';
 
-  const vientoPath = puntos
-    .map((p, i) => {
-      if (p.vientoKmh == null) return null;
-      const x = xHora(p.hora);
-      const y = yViento(p.vientoKmh);
-      return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .filter((s): s is string => s !== null)
+  // Paths de viento (línea y área).
+  const puntosViento = puntos.filter(
+    (p): p is Punto & { vientoKmh: number } => p.vientoKmh != null
+  );
+  const vientoPath = puntosViento
+    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${xHora(p.hora).toFixed(1)},${yViento(p.vientoKmh).toFixed(1)}`)
     .join(' ');
+  const vientoAreaPath =
+    puntosViento.length > 0
+      ? [
+          vientoPath,
+          `L ${xHora(puntosViento[puntosViento.length - 1].hora).toFixed(1)},${(paddingTop + plotH).toFixed(1)}`,
+          `L ${xHora(puntosViento[0].hora).toFixed(1)},${(paddingTop + plotH).toFixed(1)}`,
+          'Z',
+        ].join(' ')
+      : '';
+
+  // Línea y marca de ahora
+  const ahora = new Date().getHours() + new Date().getMinutes() / 60;
+  const xAhora = xHora(ahora);
+  const mostrarTextoAhora = xAhora >= paddingLeft + 12 && xAhora <= paddingLeft + plotW - 12;
 
   // Etiquetas del eje X (cada 6 h).
   const marcasX = [0, 6, 12, 18, 23];
@@ -161,7 +177,7 @@ export const MiniGrafico: React.FC<MiniGraficoProps> = ({
           preserveAspectRatio={fullWidth ? 'none' : 'xMidYMid meet'}
           style={{
             width: '100%',
-            height: '56px',
+            height: '90px',
             display: 'block',
           }}
         >
@@ -208,29 +224,127 @@ export const MiniGrafico: React.FC<MiniGraficoProps> = ({
             strokeWidth={0.5}
           />
 
-          {/* Línea de ola (color acento verde lima). */}
+          {/* Eje Y izquierdo: Ola (máx, mitad, 0) */}
+          {[
+            { y: paddingTop, label: olaMax.toFixed(1) },
+            { y: paddingTop + plotH / 2, label: (olaMax / 2).toFixed(1) },
+            { y: paddingTop + plotH, label: '0' },
+          ].map((m, idx) => (
+            <g key={`y-ola-${idx}`}>
+              <line
+                x1={paddingLeft - 4}
+                y1={m.y}
+                x2={paddingLeft}
+                y2={m.y}
+                stroke="var(--border)"
+                strokeWidth={0.5}
+              />
+              <text
+                x={paddingLeft - 5}
+                y={m.y + 2}
+                fontSize={6}
+                fill="var(--text-dim)"
+                textAnchor="end"
+                fontFamily="Fira Code, monospace"
+              >
+                {m.label}
+              </text>
+            </g>
+          ))}
+
+          {/* Eje Y derecho: Viento (máx, mitad, 0) */}
+          {[
+            { y: paddingTop, label: `${Math.round(vientoMax)}` },
+            { y: paddingTop + plotH / 2, label: `${Math.round(vientoMax / 2)}` },
+            { y: paddingTop + plotH, label: '0' },
+          ].map((m, idx) => (
+            <g key={`y-viento-${idx}`}>
+              <line
+                x1={paddingLeft + plotW}
+                y1={m.y}
+                x2={paddingLeft + plotW + 4}
+                y2={m.y}
+                stroke="var(--border)"
+                strokeWidth={0.5}
+              />
+              <text
+                x={paddingLeft + plotW + 5}
+                y={m.y + 2}
+                fontSize={6}
+                fill="var(--text-dim)"
+                textAnchor="start"
+                fontFamily="Fira Code, monospace"
+              >
+                {m.label}
+              </text>
+            </g>
+          ))}
+
+          {/* Área y línea de ola (verde neón) */}
+          {olaAreaPath && (
+            <path
+              d={olaAreaPath}
+              fill="var(--accent)"
+              opacity={0.15}
+            />
+          )}
           {olaPath && (
             <path
               d={olaPath}
               fill="none"
               stroke="var(--accent)"
-              strokeWidth={1.4}
+              strokeWidth={1.6}
               strokeLinecap="round"
               strokeLinejoin="round"
             />
           )}
 
-          {/* Línea de viento (color acento azul cian). */}
+          {/* Área y línea de viento (azul cian) */}
+          {vientoAreaPath && (
+            <path
+              d={vientoAreaPath}
+              fill="var(--accent-2)"
+              opacity={0.12}
+            />
+          )}
           {vientoPath && (
             <path
               d={vientoPath}
               fill="none"
               stroke="var(--accent-2)"
-              strokeWidth={1.4}
+              strokeWidth={1.2}
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeDasharray="3 2"
             />
+          )}
+
+          {/* Línea vertical de ahora */}
+          {ahora >= 0 && ahora <= 23 && (
+            <g>
+              <line
+                x1={xAhora}
+                y1={paddingTop}
+                x2={xAhora}
+                y2={paddingTop + plotH}
+                stroke="var(--accent)"
+                strokeWidth={1}
+                strokeDasharray="2 2"
+                opacity={0.4}
+              />
+              {mostrarTextoAhora && (
+                <text
+                  x={xAhora}
+                  y={paddingTop - 2}
+                  fontSize={5}
+                  fill="var(--accent)"
+                  textAnchor="middle"
+                  fontFamily="Fira Code, monospace"
+                >
+                  Ahora
+                </text>
+              )}
+            </g>
           )}
 
           {/* Marcas del eje X */}
@@ -278,9 +392,9 @@ export const MiniGrafico: React.FC<MiniGraficoProps> = ({
                   style={{
                     position: 'absolute',
                     left: `${leftPct}%`,
-                    top: 0,
+                    top: '2px',
                     transform: 'translateX(-50%)',
-                    fontSize: '0.65rem',
+                    fontSize: '0.75rem',
                     color: 'var(--text-dim)',
                     lineHeight: 1,
                   }}
@@ -292,11 +406,12 @@ export const MiniGrafico: React.FC<MiniGraficoProps> = ({
         </div>
       </div>
 
-      {/* Leyenda compacta: máximos y unidades. */}
+      {/* Leyenda compacta: máximos y unidades */}
       <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
+          alignItems: 'center',
           fontSize: '0.6rem',
           fontFamily: 'var(--font-mono, Fira Code, monospace)',
           color: 'var(--text-dim)',
@@ -304,6 +419,7 @@ export const MiniGrafico: React.FC<MiniGraficoProps> = ({
         }}
       >
         <span style={{ color: 'var(--accent)' }}>— Ola (máx {olaMax.toFixed(1)} m)</span>
+        <span style={{ color: 'var(--accent)' }}>— Ahora</span>
         <span style={{ color: 'var(--accent-2)' }}>
           ┄ Viento (máx {Math.round(vientoMax)} km/h)
         </span>
