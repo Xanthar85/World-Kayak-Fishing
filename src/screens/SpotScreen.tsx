@@ -127,6 +127,19 @@ function TablaDatos<T extends { time: string }>({
 }) {
   if (horas.length === 0) return null;
 
+  const gruposPorDia = useMemo(() => {
+    const mapa = new Map<string, { fecha: Date; horas: T[] }>();
+    for (const h of horas) {
+      const d = new Date(h.time);
+      const key = localDateKey(d);
+      if (!mapa.has(key)) {
+        mapa.set(key, { fecha: d, horas: [] });
+      }
+      mapa.get(key)!.horas.push(h);
+    }
+    return Array.from(mapa.entries());
+  }, [horas]);
+
   return (
     <div
       style={{
@@ -157,52 +170,77 @@ function TablaDatos<T extends { time: string }>({
         ))}
       </div>
 
-      {horas.map((h, i) => {
-        const hora = new Date(h.time).toLocaleTimeString(
-          lang === 'en' ? 'en-GB' : 'es-ES',
-          { hour: '2-digit', minute: '2-digit' }
-        );
-        return (
+      {gruposPorDia.map(([key, { fecha, horas: horasDelDia }], diaIndex) => (
+        <React.Fragment key={key}>
           <div
-            key={h.time}
             style={{
-              display: 'grid',
-              gridTemplateColumns: `minmax(54px, auto) repeat(${columnas.length}, 1fr)`,
-              borderTop: i > 0 ? '1px solid var(--border)' : 'none',
+              gridColumn: '1 / -1',
+              backgroundColor: 'var(--bg)',
+              color: 'var(--accent)',
+              fontFamily: 'var(--font-mono, Fira Code, monospace)',
+              fontSize: '0.68rem',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              padding: '4px 8px',
+              borderTop: diaIndex > 0 ? '1px solid var(--border)' : 'none',
+              borderBottom: '1px solid var(--border)',
             }}
           >
-            <div
-              style={{
-                padding: '5px 6px',
-                textAlign: 'left',
-                fontFamily: 'var(--font-mono, Fira Code, monospace)',
-                color: 'var(--text-dim)',
-                fontWeight: 500,
-              }}
-            >
-              {hora}
-            </div>
-            {columnas.map((c) => {
-              const v = c.veredicto?.(h) ?? null;
-              const color = colorNumero(v, colorNivel);
-              return (
-                <div
-                  key={c.key}
-                  style={{
-                    padding: '5px 4px',
-                    textAlign: 'center',
-                    fontFamily: 'var(--font-mono, Fira Code, monospace)',
-                    color: color ?? 'var(--text)',
-                    fontWeight: color ? 600 : 400,
-                  }}
-                >
-                  {c.render(h)}
-                </div>
-              );
+            {fecha.toLocaleDateString(lang === 'en' ? 'en-GB' : 'es-ES', {
+              weekday: 'short',
+              day: '2-digit',
+              month: '2-digit',
             })}
           </div>
-        );
-      })}
+
+          {horasDelDia.map((h, i) => {
+            const hora = new Date(h.time).toLocaleTimeString(
+              lang === 'en' ? 'en-GB' : 'es-ES',
+              { hour: '2-digit', minute: '2-digit' }
+            );
+            return (
+              <div
+                key={h.time}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: `minmax(54px, auto) repeat(${columnas.length}, 1fr)`,
+                  borderTop: i > 0 ? '1px solid var(--border)' : 'none',
+                }}
+              >
+                <div
+                  style={{
+                    padding: '5px 6px',
+                    textAlign: 'left',
+                    fontFamily: 'var(--font-mono, Fira Code, monospace)',
+                    color: 'var(--text-dim)',
+                    fontWeight: 500,
+                  }}
+                >
+                  {hora}
+                </div>
+                {columnas.map((c) => {
+                  const v = c.veredicto?.(h) ?? null;
+                  const color = colorNumero(v, colorNivel);
+                  return (
+                    <div
+                      key={c.key}
+                      style={{
+                        padding: '5px 4px',
+                        textAlign: 'center',
+                        fontFamily: 'var(--font-mono, Fira Code, monospace)',
+                        color: color ?? 'var(--text)',
+                        fontWeight: color ? 600 : 400,
+                      }}
+                    >
+                      {c.render(h)}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </React.Fragment>
+      ))}
     </div>
   );
 }
