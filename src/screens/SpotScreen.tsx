@@ -245,6 +245,60 @@ function TablaDatos<T extends { time: string }>({
   );
 }
 
+interface TablaAyudaProps {
+  tabId: string;
+}
+
+const TablaAyuda: React.FC<TablaAyudaProps> = ({ tabId }) => {
+  const { t } = useTranslation();
+  const [abierto, setAbierto] = useState(false);
+  return (
+    <div
+      style={{
+        marginTop: 14,
+        border: '1px solid var(--border)',
+        borderRadius: 8,
+        backgroundColor: 'var(--surface)',
+        overflow: 'hidden',
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => setAbierto(!abierto)}
+        style={{
+          width: '100%',
+          padding: '10px 14px',
+          border: 'none',
+          backgroundColor: 'transparent',
+          color: 'var(--text-dim)',
+          fontSize: '0.8rem',
+          fontWeight: 600,
+          textAlign: 'left',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <span>ℹ️ {t('tabsHelp.show')}</span>
+        <span style={{ fontSize: '0.9rem' }}>{abierto ? '▾' : '▸'}</span>
+      </button>
+      {abierto && (
+        <div
+          style={{
+            padding: '0 14px 14px',
+            fontSize: '0.85rem',
+            lineHeight: 1.55,
+            color: 'var(--text)',
+          }}
+        >
+          {t(`tabsHelp.${tabId}`)}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── SpotScreen ───────────────────────────────────────────────────
 
 export const SpotScreen: React.FC<SpotScreenProps> = ({
@@ -997,6 +1051,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                 },
               ]}
             />
+            <TablaAyuda tabId="waves" />
           </div>
         )}
 
@@ -1088,6 +1143,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                 },
               ]}
             />
+            <TablaAyuda tabId="wind" />
           </div>
         )}
 
@@ -1164,6 +1220,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                 },
               ]}
             />
+            <TablaAyuda tabId="weather" />
           </div>
         )}
 
@@ -1199,6 +1256,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                 },
               ]}
             />
+            <TablaAyuda tabId="air" />
           </div>
         )}
 
@@ -1261,6 +1319,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                 },
               ]}
             />
+            <TablaAyuda tabId="barometer" />
           </div>
         )}
 
@@ -1336,6 +1395,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                 },
               ]}
             />
+            <TablaAyuda tabId="activity" />
           </div>
         )}
 
@@ -1343,6 +1403,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {tabActiva === 'sun' && (
           <div>
             <TablaSol lang={lang} lat={spot.lat} lon={spot.lon} />
+            <TablaAyuda tabId="sun" />
           </div>
         )}
 
@@ -1350,6 +1411,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {tabActiva === 'moon' && (
           <div>
             <TablaLuna lang={lang} lat={spot.lat} lon={spot.lon} />
+            <TablaAyuda tabId="moon" />
           </div>
         )}
 
@@ -1420,6 +1482,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                 },
               ]}
             />
+            <TablaAyuda tabId="tides" />
           </div>
         )}
       </main>

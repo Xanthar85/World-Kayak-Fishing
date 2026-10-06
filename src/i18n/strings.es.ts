@@ -165,6 +165,28 @@ export const stringsEs = {
     tides: 'Mareas',
   },
 
+  tabsHelp: {
+    show: 'Cómo leer esta tabla',
+    waves:
+      'ALT. TOTAL es la altura significativa de la ola (media del tercio más alto). ALT. VIENTO es la parte generada por el viento local, corta y empinada. ALT. FONDO es la parte generada por tormentas lejanas, larga y tendida. El PERIODO es el tiempo entre olas: menos de 5 s son olas empinadas y rompen fácil, más de 8 s son olas tendidas y navegables. La DIRECCIÓN indica desde dónde viene la ola. Mar de viento y mar de fondo pueden venir de direcciones distintas y sumarse en olas cruzadas, lo más incómodo para un kayak.',
+    wind:
+      'El viento se muestra en nudos (kt) y en km/h (km/h). Los nudos son la unidad marina estándar. Las RACHAS son subidas puntuales del viento, pueden ser un 50 % más fuertes que la media y son las que vuelcan kayaks. Cuando una racha supera 30 km/h aparece marcada en rojo neón. La DIRECCIÓN es de dónde sopla el viento, no hacia dónde va. Un viento de tierra (offshore) empuja mar adentro y es el más peligroso. Un viento de mar (onshore) empuja hacia la costa. Un viento paralelo a la costa (cross-shore) dificulta la navegación lateral.',
+    weather:
+      'El icono resume el estado del cielo según el código WMO. La NUBOSIDAD es el porcentaje de cielo cubierto. La PRECIPITACIÓN es lluvia en mm por hora y la PROBABILIDAD es el porcentaje de que llueva. La VISIBILIDAD es la distancia a la que se ve un objeto: por debajo de 2 km es niebla, se pierde orientación y rescate. Por debajo de 0,5 km no se debe salir.',
+    air:
+      'La TEMPERATURA es la del aire a 2 m. La SENSACIÓN es la temperatura que siente el cuerpo sumando viento y humedad: con viento fuerte puede ser muchos grados menos. La TEMPERATURA DEL AGUA (SST) es la que determina el tiempo de supervivencia en caso de vuelco. Por debajo de 15 °C la hipotermia es un riesgo real en menos de una hora. Por debajo de 10 °C hace falta traje seco.',
+    barometer:
+      'La PRESIÓN atmosférica en hPa mide el peso del aire. Los valores normales al nivel del mar están entre 1013 y 1020 hPa. La TENDENCIA es la variación de las últimas 3 h. Una caída brusca (más de 2.5 hPa en 3 h) se marca en rojo y suele anunciar borrasca rápida, viento fuerte y lluvia. Una subida rápida anuncia mejora. Presión estable y alta es buena señal.',
+    activity:
+      'La CORRIENTE es la velocidad del agua en nudos y su dirección. Con menos de 0,4 kn el agua está casi parada y los peces se mueven menos. Entre 0,4 y 1,4 kn hay un rango correcto para pescar a deriva o al curricán. Por encima de 1,4 kn la deriva es rápida y complica mantener la posición. La ACTIVIDAD DE PECES va de 0 a 10 y combina luna, orto/ocaso y presión: valores altos indican franjas horarias con más probabilidad de picada.',
+    sun:
+      'El ORTO es la salida del sol y el OCASO la puesta. El MEDIODÍA SOLAR es el momento en que el sol está más alto, no coincide con las 12:00 del reloj. Los CREPÚSCULOS son los periodos de luz tenue antes del orto y tras el ocaso. El civil va hasta -6° del sol: todavía hay luz. El náutico hasta -12°: se ve el horizonte. El astronómico hasta -18°: oscuridad completa. Los crepúsculos son franjas de actividad alta para muchas especies.',
+    moon:
+      'La FASE indica la forma visible de la luna. La EDAD es el número de días desde la luna nueva. La ILUMINACIÓN es el porcentaje de disco iluminado. Luna nueva y luna llena producen las mareas más grandes (mareas vivas) y suelen coincidir con más actividad de peces. El ORTO y el OCASO lunar marcan cuándo aparece y desaparece, y el TRÁNSITO es el momento en que está más alta. Estos momentos son franjas solunares importantes.',
+    tides:
+      'La MAREA es la variación del nivel del mar. En el Mediterráneo el rango es de 20-40 cm y casi no se nota. En el Atlántico y el Cantábrico puede ser de 3-4 m, y en Bretaña de 6-12 m. La TENDENCIA indica cuánto sube o baja la marea en una hora. Una variación de más de 0,08 m en una hora se marca en rojo porque indica corriente de marea notable, que puede afectar a la deriva del kayak. En zonas de marea grande la corriente de marea puede superar los 3 nudos.',
+  },
+
   settings: {
     title: 'Ajustes',
     language: 'Idioma',
