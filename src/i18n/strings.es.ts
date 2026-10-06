@@ -68,6 +68,13 @@ export const stringsEs = {
     },
   },
 
+  prevision: {
+    noSpots: 'Añade un punto para ver la previsión.',
+    maxWave: 'Ola máx.',
+    maxWind: 'Viento máx.',
+    windDir: 'Viento dominante',
+  },
+
   map: {
     newSpot: 'NUEVO PUNTO',
     editSpot: 'EDITAR PUNTO',

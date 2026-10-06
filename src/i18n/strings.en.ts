@@ -63,6 +63,13 @@ export const stringsEn: StringsSchema = {
     },
   },
 
+  prevision: {
+    noSpots: 'Add a spot to see the forecast.',
+    maxWave: 'Max wave',
+    maxWind: 'Max wind',
+    windDir: 'Dominant wind',
+  },
+
   map: {
     newSpot: 'NEW SPOT',
     editSpot: 'EDIT SPOT',

@@ -208,7 +208,10 @@ export const MiniGrafico: React.FC<MiniGraficoProps> = ({
                   width={w}
                   height={plotH}
                   fill={color}
-                  opacity={0.08}
+                  fillOpacity={0.06}
+                  stroke={color}
+                  strokeWidth={1.5}
+                  strokeOpacity={0.85}
                 />
               );
             });
