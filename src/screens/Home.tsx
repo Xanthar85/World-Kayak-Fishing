@@ -19,6 +19,7 @@ import { MapScreen } from './MapScreen.tsx';
 import { TutorialScreen } from './TutorialScreen.tsx';
 import { SpotCard } from '../components/SpotCard.tsx';
 import { PWAInstallButton } from '../components/PWAInstallButton.tsx';
+import { PantallaDeslizante } from '../components/PantallaDeslizante.tsx';
 import { fetchSpotWeather } from '../lib/openmeteo.ts';
 
 const PrevisionPlaceholder: React.FC = () => {
@@ -40,6 +41,7 @@ export const Home: React.FC = () => {
   const { t } = useTranslation();
 
   const [pestanaActiva, setPestanaActiva] = useState<'puntos' | 'prevision' | 'ajustes'>('puntos');
+  const [cerrando, setCerrando] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [viewingSpotId, setViewingSpotId] = useState<string | null>(null);
   const [mapMode, setMapMode] = useState<'new' | 'edit' | null>(null);
@@ -94,6 +96,7 @@ export const Home: React.FC = () => {
     setMapMode(null);
     setEditSpot(null);
     setViewingSpotId(null);
+    setCerrando(false);
   };
 
   // Abrir un punto en concreto y, si aplica, activar una franja
@@ -105,36 +108,56 @@ export const Home: React.FC = () => {
 
   if (mapMode !== null) {
     return (
-      <MapScreen
-        initialSpot={editSpot}
-        onCancel={volverAHome}
-        onSave={(draft) => {
-          if (editSpot) updateSpot(editSpot.id, draft);
-          else addSpot(draft);
-          volverAHome();
-        }}
-      />
+      <PantallaDeslizante activa={!cerrando} onClose={volverAHome}>
+        <MapScreen
+          initialSpot={editSpot}
+          onCancel={() => setCerrando(true)}
+          onSave={(draft) => {
+            if (editSpot) updateSpot(editSpot.id, draft);
+            else addSpot(draft);
+            setCerrando(true);
+          }}
+        />
+      </PantallaDeslizante>
     );
   }
 
   if (viewingSpotId !== null) {
     return (
-      <SpotScreen
-        spotId={viewingSpotId}
-        onClose={() => setViewingSpotId(null)}
-        onAddAccess={(spotId) => {
-          const s = spots.find((x) => x.id === spotId);
-          if (s) {
-            setEditSpot(s);
-            setMapMode('edit');
-          }
+      <PantallaDeslizante
+        activa={!cerrando}
+        onClose={() => {
+          setViewingSpotId(null);
+          setCerrando(false);
         }}
-      />
+      >
+        <SpotScreen
+          spotId={viewingSpotId}
+          onClose={() => setCerrando(true)}
+          onAddAccess={(spotId) => {
+            const s = spots.find((x) => x.id === spotId);
+            if (s) {
+              setEditSpot(s);
+              setMapMode('edit');
+            }
+          }}
+        />
+      </PantallaDeslizante>
     );
   }
 
   if (showTutorial) {
-    return <TutorialScreen onClose={() => setShowTutorial(false)} />;
+    return (
+      <PantallaDeslizante
+        activa={!cerrando}
+        onClose={() => {
+          setShowTutorial(false);
+          setCerrando(false);
+        }}
+      >
+        <TutorialScreen onClose={() => setCerrando(true)} />
+      </PantallaDeslizante>
+    );
   }
 
   // Manejadores de drag and drop para reordenar.
