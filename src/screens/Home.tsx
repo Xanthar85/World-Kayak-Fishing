@@ -21,10 +21,25 @@ import { SpotCard } from '../components/SpotCard.tsx';
 import { PWAInstallButton } from '../components/PWAInstallButton.tsx';
 import { fetchSpotWeather } from '../lib/openmeteo.ts';
 
+const PrevisionPlaceholder: React.FC = () => {
+  return (
+    <div
+      style={{
+        padding: '40px',
+        textAlign: 'center',
+        color: 'var(--text-dim)',
+        fontSize: '0.9rem',
+      }}
+    >
+      Previsión meteorológica — próximamente
+    </div>
+  );
+};
+
 export const Home: React.FC = () => {
   const { t } = useTranslation();
 
-  const [showSettings, setShowSettings] = useState(false);
+  const [pestanaActiva, setPestanaActiva] = useState<'puntos' | 'prevision' | 'ajustes'>('puntos');
   const [showTutorial, setShowTutorial] = useState(false);
   const [viewingSpotId, setViewingSpotId] = useState<string | null>(null);
   const [mapMode, setMapMode] = useState<'new' | 'edit' | null>(null);
@@ -213,26 +228,6 @@ export const Home: React.FC = () => {
           >
             <span style={{ fontSize: '1rem', lineHeight: 1 }}>☕</span>
           </a>
-          <button
-            onClick={() => setShowSettings(true)}
-            title={t('settings.title')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '8px 12px',
-              backgroundColor: 'var(--bg)',
-              border: '1px solid var(--border)',
-              borderRadius: 8,
-              color: 'var(--text)',
-              fontSize: '0.85rem',
-              fontWeight: 500,
-              cursor: 'pointer',
-            }}
-          >
-            <span style={{ fontSize: '1rem', lineHeight: 1 }}>⚙</span>
-            <span>{t('settings.title')}</span>
-          </button>
         </div>
       </header>
 
@@ -244,97 +239,110 @@ export const Home: React.FC = () => {
           margin: '0 auto',
           padding: '20px',
           boxSizing: 'border-box',
-          paddingBottom: spots.length > 0 && spots.length < 6 ? '90px' : '40px',
+          paddingBottom: '80px',
         }}
       >
-        {spots.length === 0 ? (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '60px 20px',
-              textAlign: 'center',
-              backgroundColor: 'var(--surface)',
-              borderRadius: 8,
-              border: '1px solid var(--border)',
-              marginTop: 20,
-            }}
-          >
-            <div style={{ fontSize: '2rem', marginBottom: 12, opacity: 0.7 }}>📍</div>
-            <h3
+        {pestanaActiva === 'puntos' &&
+          (spots.length === 0 ? (
+            <div
               style={{
-                margin: '0 0 8px 0',
-                fontSize: '1.1rem',
-                fontWeight: 600,
-                color: 'var(--text)',
-              }}
-            >
-              {t('home.noSpots')}
-            </h3>
-            <p
-              style={{
-                margin: '0 0 20px 0',
-                fontSize: '0.9rem',
-                color: 'var(--text-dim)',
-                maxWidth: 360,
-              }}
-            >
-              {t('home.empty.subtitle')}
-            </p>
-            <button
-              onClick={() => {
-                setEditSpot(null);
-                setMapMode('new');
-              }}
-              style={{
-                padding: '12px 24px',
-                backgroundColor: 'var(--accent)',
-                color: '#000',
-                border: 'none',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '60px 20px',
+                textAlign: 'center',
+                backgroundColor: 'var(--surface)',
                 borderRadius: 8,
-                fontSize: '0.95rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(0, 229, 106, 0.25)',
+                border: '1px solid var(--border)',
+                marginTop: 20,
               }}
             >
-              + {t('home.addSpot')}
-            </button>
-          </div>
-        ) : (
-          <div>
-            {spots.map((spot) => (
-              <SpotCard
-                key={spot.id}
-                spot={spot}
-                weather={getFreshWeather(spot.id)}
-                franjas={ajustes.franjas}
-                categoria={ajustes.categoriaKayak}
-                perfil={ajustes.perfil}
-                formatoCoords={ajustes.formatoCoords}
-                refreshing={!!refreshingMap[spot.id]}
-                onRefresh={() => handleRefreshSpot(spot.id, spot.lat, spot.lon)}
-                onEdit={() => setViewingSpotId(spot.id)}
-                onDelete={() => removeSpot(spot.id)}
-                onOpenFranja={(franjaId) => abrirPunto(spot.id, franjaId)}
-                draggable
-                isDragging={draggingId === spot.id}
-                onDragStart={handleDragStart(spot.id)}
-                onDragOver={handleDragOver(spot.id)}
-                onDrop={handleDrop(spot.id)}
-              />
-            ))}
-          </div>
+              <div style={{ fontSize: '2rem', marginBottom: 12, opacity: 0.7 }}>📍</div>
+              <h3
+                style={{
+                  margin: '0 0 8px 0',
+                  fontSize: '1.1rem',
+                  fontWeight: 600,
+                  color: 'var(--text)',
+                }}
+              >
+                {t('home.noSpots')}
+              </h3>
+              <p
+                style={{
+                  margin: '0 0 20px 0',
+                  fontSize: '0.9rem',
+                  color: 'var(--text-dim)',
+                  maxWidth: 360,
+                }}
+              >
+                {t('home.empty.subtitle')}
+              </p>
+              <button
+                onClick={() => {
+                  setEditSpot(null);
+                  setMapMode('new');
+                }}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: 'var(--accent)',
+                  color: '#000',
+                  border: 'none',
+                  borderRadius: 8,
+                  fontSize: '0.95rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0, 229, 106, 0.25)',
+                }}
+              >
+                + {t('home.addSpot')}
+              </button>
+            </div>
+          ) : (
+            <div>
+              {spots.map((spot) => (
+                <SpotCard
+                  key={spot.id}
+                  spot={spot}
+                  weather={getFreshWeather(spot.id)}
+                  franjas={ajustes.franjas}
+                  categoria={ajustes.categoriaKayak}
+                  perfil={ajustes.perfil}
+                  formatoCoords={ajustes.formatoCoords}
+                  refreshing={!!refreshingMap[spot.id]}
+                  onRefresh={() => handleRefreshSpot(spot.id, spot.lat, spot.lon)}
+                  onEdit={() => setViewingSpotId(spot.id)}
+                  onDelete={() => removeSpot(spot.id)}
+                  onOpenFranja={(franjaId) => abrirPunto(spot.id, franjaId)}
+                  draggable
+                  isDragging={draggingId === spot.id}
+                  onDragStart={handleDragStart(spot.id)}
+                  onDragOver={handleDragOver(spot.id)}
+                  onDrop={handleDrop(spot.id)}
+                />
+              ))}
+            </div>
+          ))}
+
+        {pestanaActiva === 'prevision' && <PrevisionPlaceholder />}
+
+        {pestanaActiva === 'ajustes' && (
+          <SettingsScreen
+            onClose={() => setPestanaActiva('puntos')}
+            onOpenTutorial={() => {
+              setPestanaActiva('puntos');
+              setShowTutorial(true);
+            }}
+          />
         )}
       </main>
 
-      {spots.length > 0 && spots.length < 6 && (
+      {pestanaActiva === 'puntos' && spots.length > 0 && spots.length < 6 && (
         <div
           style={{
             position: 'fixed',
-            bottom: 20,
+            bottom: 80,
             left: 0,
             right: 0,
             display: 'flex',
@@ -371,15 +379,85 @@ export const Home: React.FC = () => {
         </div>
       )}
 
-      {showSettings && (
-        <SettingsScreen
-          onClose={() => setShowSettings(false)}
-          onOpenTutorial={() => {
-            setShowSettings(false);
-            setShowTutorial(true);
+      {/* Barra inferior fija */}
+      <nav
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: 60,
+          backgroundColor: 'var(--surface)',
+          borderTop: '1px solid var(--border)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-around',
+          zIndex: 100,
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setPestanaActiva('puntos')}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 2,
+            padding: '8px 16px',
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            color: pestanaActiva === 'puntos' ? 'var(--accent)' : 'var(--text-dim)',
+            fontWeight: pestanaActiva === 'puntos' ? 600 : 400,
+            fontSize: '0.75rem',
           }}
-        />
-      )}
+        >
+          <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>📍</span>
+          <span>Puntos</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setPestanaActiva('prevision')}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 2,
+            padding: '8px 16px',
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            color: pestanaActiva === 'prevision' ? 'var(--accent)' : 'var(--text-dim)',
+            fontWeight: pestanaActiva === 'prevision' ? 600 : 400,
+            fontSize: '0.75rem',
+          }}
+        >
+          <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>🌊</span>
+          <span>Previsión</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setPestanaActiva('ajustes')}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 2,
+            padding: '8px 16px',
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            color: pestanaActiva === 'ajustes' ? 'var(--accent)' : 'var(--text-dim)',
+            fontWeight: pestanaActiva === 'ajustes' ? 600 : 400,
+            fontSize: '0.75rem',
+          }}
+        >
+          <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>⚙</span>
+          <span>Ajustes</span>
+        </button>
+      </nav>
     </div>
   );
 };
