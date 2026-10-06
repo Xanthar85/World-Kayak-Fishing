@@ -1,5 +1,13 @@
+// src/lib/verdict-ui.ts
 // WKF — Utilidades de UI y visualización de veredictos.
 // Funciones puras, sin JSX, sin React.
+// v1.010: bug 14. miniGraficoOlaViento devuelve también los
+// puntos individuales para que MiniGrafico.tsx pueda pintar
+// ejes, iconos y franjas. Se mantienen las claves `ola` y
+// `viento` con el path SVG por compatibilidad, y se añaden:
+//   - horas: lista de strings ISO, 24 h.
+//   - olaPuntos / vientoPuntos: {x,y,valor} para ejes e iconos.
+//   - olaMax / vientoMax: máximo usado para escalar.
 
 import type { SpotWeather } from './openmeteo.ts';
 import {
@@ -98,7 +106,6 @@ export function calcularVeredictoPorFranja(
   }
 
   for (const franja of franjas) {
-    // Mapeo por hora de inicio: 0-11 -> manana, 12-19 -> tarde, resto -> noche
     const inicio = franja.inicio;
     const franjaDia: FranjaDia =
       inicio >= 0 && inicio < 12
@@ -124,7 +131,6 @@ export function calcularVeredictoPorFranja(
       if (!dentro) continue;
       if (h.waveHeight == null || h.windSpeed == null) continue;
 
-      // Beaufort: round(pow(v / 0.836, 2/3))
       const bf = Math.round(Math.pow(h.windSpeed / 0.836, 2 / 3));
       const condiciones: Condiciones = {
         viento: bf,
@@ -151,22 +157,87 @@ export function calcularVeredictoPorFranja(
   return res;
 }
 
-// 6. Mini-gráfico SVG de ola y viento (viewBox 0 0 100 30)
+// Veredicto por franja para un día concreto (usado por la Home).
+// Calcula el peor veredicto de las horas del día que caen en la
+// franja. Se apoya en calcularVeredictoPorFranja filtrando el
+// weather a ese día.
+export function calcularVeredictoFranjaDia(
+  spot: Spot,
+  weather: SpotWeather | null,
+  franja: FranjaUsuario,
+  fechaBase: Date,
+  categoria: CategoriaKayak,
+  perfil: PerfilKayakista
+): Veredicto | null {
+  if (!weather) return null;
+  const y = fechaBase.getFullYear();
+  const m = String(fechaBase.getMonth() + 1).padStart(2, '0');
+  const d = String(fechaBase.getDate()).padStart(2, '0');
+  const key = `${y}-${m}-${d}`;
+  const horas = weather.hourly.filter((h) => {
+    const hd = new Date(h.time);
+    const hy = hd.getFullYear();
+    const hm = String(hd.getMonth() + 1).padStart(2, '0');
+    const hdd = String(hd.getDate()).padStart(2, '0');
+    return `${hy}-${hm}-${hdd}` === key;
+  });
+  if (horas.length === 0) return null;
+
+  const sub: SpotWeather = { ...weather, hourly: horas };
+  const r = calcularVeredictoPorFranja(spot, sub, [franja], categoria, perfil);
+  return r[franja.id] ?? null;
+}
+
+// 6. Datos para el mini-gráfico.
+// Devuelve el path SVG de ola y viento, además de los puntos
+// individuales para pintar ejes, iconos y franjas.
+// viewBox base: 0 0 100 30 (mantenido por compatibilidad).
+export interface MiniGraficoData {
+  ola: string;
+  viento: string;
+  horas: string[];
+  olaPuntos: { x: number; y: number; valor: number | null }[];
+  vientoPuntos: { x: number; y: number; valor: number | null }[];
+  olaMax: number;
+  vientoMax: number;
+}
+
 export function miniGraficoOlaViento(
   weather: SpotWeather | null,
   _franjaId?: string,
   _franjas?: FranjaUsuario[]
-): { ola: string; viento: string } {
-  if (!weather || !weather.hourly || weather.hourly.length === 0) {
-    return { ola: '', viento: '' };
-  }
+): MiniGraficoData {
+  const vacio: MiniGraficoData = {
+    ola: '',
+    viento: '',
+    horas: [],
+    olaPuntos: [],
+    vientoPuntos: [],
+    olaMax: 3,
+    vientoMax: 20,
+  };
+  if (!weather || !weather.hourly || weather.hourly.length === 0) return vacio;
 
   const puntos = weather.hourly.slice(0, 24);
-  if (puntos.length < 2) {
-    return { ola: '', viento: '' };
-  }
+  if (puntos.length < 2) return vacio;
 
   const N = puntos.length;
+
+  // Calcular máximos reales (con suelo para no dividir por cero).
+  let olaMax = 0.5;
+  let vientoMax = 5;
+  for (const p of puntos) {
+    const o = p.waveHeight ?? 0;
+    const v = p.windSpeed ?? 0;
+    if (o > olaMax) olaMax = o;
+    if (v > vientoMax) vientoMax = v;
+  }
+  // Redondear hacia arriba con margen del 10 %.
+  olaMax = Math.ceil((olaMax * 1.1) * 10) / 10;
+  vientoMax = Math.ceil((vientoMax * 1.1));
+
+  const olaPuntos: MiniGraficoData['olaPuntos'] = [];
+  const vientoPuntos: MiniGraficoData['vientoPuntos'] = [];
   const olaCoords: string[] = [];
   const vientoCoords: string[] = [];
 
@@ -174,21 +245,30 @@ export function miniGraficoOlaViento(
     const x = (i / (N - 1)) * 100;
     const p = puntos[i];
 
-    // Ola: normalizada a 3 m max
-    const olaVal = Math.max(0, Math.min(3, p.waveHeight ?? 0));
-    const yOla = 28 - (olaVal / 3) * 26;
+    const oVal = p.waveHeight;
+    const vVal = p.windSpeed;
 
-    // Viento: normalizado a 20 m/s max
-    const vientoVal = Math.max(0, Math.min(20, p.windSpeed ?? 0));
-    const yViento = 28 - (vientoVal / 20) * 26;
+    const oNorm = oVal != null ? Math.max(0, Math.min(1, oVal / olaMax)) : 0;
+    const vNorm = vVal != null ? Math.max(0, Math.min(1, vVal / vientoMax)) : 0;
+
+    const yOla = 28 - oNorm * 26;
+    const yViento = 28 - vNorm * 26;
 
     const prefix = i === 0 ? 'M' : 'L';
-    olaCoords.push(`${prefix} ${x.toFixed(1)},${yOla.toFixed(1)}`);
-    vientoCoords.push(`${prefix} ${x.toFixed(1)},${yViento.toFixed(1)}`);
+    olaCoords.push(`${prefix} ${x.toFixed(2)},${yOla.toFixed(2)}`);
+    vientoCoords.push(`${prefix} ${x.toFixed(2)},${yViento.toFixed(2)}`);
+
+    olaPuntos.push({ x, y: yOla, valor: oVal });
+    vientoPuntos.push({ x, y: yViento, valor: vVal });
   }
 
   return {
     ola: olaCoords.join(' '),
     viento: vientoCoords.join(' '),
+    horas: puntos.map((p) => p.time),
+    olaPuntos,
+    vientoPuntos,
+    olaMax,
+    vientoMax,
   };
 }

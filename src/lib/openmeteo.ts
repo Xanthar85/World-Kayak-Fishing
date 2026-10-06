@@ -1,5 +1,6 @@
+// src/lib/openmeteo.ts
 // WKF — Cliente Open-Meteo (Marine + Forecast).
-// v1.009.4: 7 días completos, todas las variables útiles.
+// v1.010: 7 días completos, todas las variables útiles.
 // Variables marinas: wave_height (total), wind_wave_height,
 // swell_wave_height, wave_period, wind_wave_period,
 // swell_wave_period, wave_direction, wind_wave_direction,
@@ -10,6 +11,9 @@
 // wind_direction_10m, temperature_2m, apparent_temperature,
 // precipitation, precipitation_probability, cloud_cover,
 // pressure_msl, visibility, weather_code.
+// v1.010: fetchSpotWeather acepta opcionalmente un flag para
+// reducir forecast_days y ahorrar ancho de banda cuando solo
+// se necesita hoy.
 
 export type HourlyPoint = {
   time: string;
@@ -96,7 +100,13 @@ type AtmosResponse = {
   };
 };
 
-export async function fetchSpotWeather(lat: number, lon: number): Promise<SpotWeather> {
+export async function fetchSpotWeather(
+  lat: number,
+  lon: number,
+  days = 7
+): Promise<SpotWeather> {
+  const forecastDays = String(Math.max(1, Math.min(16, days)));
+
   const marineParams = new URLSearchParams({
     latitude: String(lat),
     longitude: String(lon),
@@ -115,7 +125,7 @@ export async function fetchSpotWeather(lat: number, lon: number): Promise<SpotWe
       'ocean_current_velocity',
       'ocean_current_direction',
     ].join(','),
-    forecast_days: '7',
+    forecast_days: forecastDays,
     timezone: 'auto',
   });
 
@@ -135,7 +145,7 @@ export async function fetchSpotWeather(lat: number, lon: number): Promise<SpotWe
       'visibility',
       'pressure_msl',
     ].join(','),
-    forecast_days: '7',
+    forecast_days: forecastDays,
     timezone: 'auto',
   });
 
@@ -257,4 +267,18 @@ export function weatherCodeAIcono(code: number | null, isNight = false): string 
   if (code >= 85 && code <= 86) return '🌨️';
   if (code >= 95 && code <= 99) return '⛈️';
   return '—';
+}
+
+// Icono para el mini-gráfico (24 h). Mismo que arriba pero sin
+// distinguir noche para no complicar: el eje X ya marca la hora.
+export function weatherCodeAIconoGrafico(code: number | null): string {
+  if (code == null) return '·';
+  if (code === 0) return '☀';
+  if (code <= 2) return '⛅';
+  if (code === 3) return '☁';
+  if (code >= 45 && code <= 48) return '≡';
+  if (code >= 51 && code <= 67) return '☂';
+  if (code >= 71 && code <= 86) return '❄';
+  if (code >= 95) return '⚡';
+  return '·';
 }

@@ -1,20 +1,13 @@
-// WKF — Factor de shoaling.
-// DP-032: corrección de ola al acercarse a la costa.
-// Fórmula: Green's law + límite de rotura H/h ≈ 0.78.
-
-// Ley de Green: la altura de ola es inversamente proporcional a la
-// raíz cuarta de la profundidad.
-// H2 = H1 * (h1 / h2) ^ (1/4)
-//
-// Pero la ola rompe cuando H/h ≈ 0.78. A partir de ahí, la altura
-// se limita a 0.78 * h.
+// src/lib/shoaling.ts
+// WKF — Factor de shoaling. Sin cambios funcionales en v1.010.
+// DP-032.
 
 const LIMITE_ROTURA = 0.78;
 
 export interface ResultadoShoaling {
-  alturaCorregida: number; // metros
+  alturaCorregida: number;
   rompe: boolean;
-  factor: number; // multiplicador aplicado
+  factor: number;
 }
 
 export function calcularShoaling(
@@ -34,8 +27,6 @@ export function calcularShoaling(
     };
   }
 
-  // Si la profundidad somera es mayor o igual a la profunda, no hay
-  // shoaling. Devolvemos la altura tal cual.
   if (profundidadSomeras >= profundidadProfunda) {
     return {
       alturaCorregida: alturaAguasProfundas,
@@ -44,11 +35,9 @@ export function calcularShoaling(
     };
   }
 
-  // Ley de Green.
   const factor = Math.pow(profundidadProfunda / profundidadSomeras, 0.25);
   let alturaCorregida = alturaAguasProfundas * factor;
 
-  // Límite de rotura.
   const alturaMaxima = LIMITE_ROTURA * profundidadSomeras;
   let rompe = false;
   if (alturaCorregida > alturaMaxima) {
@@ -63,7 +52,5 @@ export function calcularShoaling(
   };
 }
 
-// Profundidad por defecto cuando no tenemos dato batimétrico.
-// 5 m es un valor conservador para aguas costeras típicas.
-export const PROFUNDIDAD_PROFUNDA_DEFECTO = 20; // m
-export const PROFUNDIDAD_SOMERA_DEFECTO = 5; // m
+export const PROFUNDIDAD_PROFUNDA_DEFECTO = 20;
+export const PROFUNDIDAD_SOMERA_DEFECTO = 5;

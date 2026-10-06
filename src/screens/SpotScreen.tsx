@@ -1,3 +1,24 @@
+// src/screens/SpotScreen.tsx — completo
+// v1.010:
+//   - Bug 2: al clicar una franja se filtra la tabla por esa franja
+//     y por el día (si aplica). Se guarda el día elegido.
+//   - Bug 4: rachas en rojo neón cuando superan umbral.
+//   - Bug 12: "Ver todos los factores" desaparece. Todos visibles.
+//   - Bug 13: "Sin dato" indica profundidad no obtenida.
+//   - Bug 18: colores de tabla = color del número (colorNumero),
+//     sin recuadros.
+//   - Bug 19: barómetro marca variación brusca en rojo neón.
+//   - Bug 21: estructura de la hoja reordenada. Umbral aplicado
+//     con letras del color del veredicto.
+//   - Bug 21b: lenguaje cercano para factores. Sin copiar
+//     umbrales del ejemplo.
+//   - Bug 22: mareas marcan cambios inusuales con color de zona.
+//   - Bug 24a: pestaña Actividad con columna Corriente (dir +
+//     velocidad + indicador).
+//   - Bug 24b: coeficiente de actividad de peces 0-10 por hora.
+//   - Botón "Ver todos los factores" eliminado.
+//   - Los factores se muestran siempre, en tarjetas.
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../state/store.ts';
@@ -28,12 +49,12 @@ import {
   fetchSpotWeather,
   msAKn,
   msAKmh,
-  gradosACardinal16,
   weatherCodeAIcono,
   type HourlyPoint,
 } from '../lib/openmeteo.ts';
 import { nombreViento } from '../lib/wind.ts';
-import { colorCelda, type NivelColorTabla } from '../lib/verdict-color.ts';
+import { colorNumero, type NivelColorTabla } from '../lib/verdict-color.ts';
+import { calcularActividadPorHora, type ActividadHora } from '../lib/actividad.ts';
 import type { FranjaUsuario } from '../state/store.ts';
 
 export interface SpotScreenProps {
@@ -64,24 +85,31 @@ function fechaLarga(d: Date, lang: string): string {
   });
 }
 
-// Filtra las horas según la franja activa. Si filtroFranja es false
-// o franjaActiva es null, devuelve todas.
-function filtrarPorFranja(
+// Filtra las horas según la franja activa y el día elegido.
+function filtrarHoras(
   horas: HourlyPoint[],
   franja: FranjaUsuario | null,
-  filtroActivo: boolean
+  filtroActivo: boolean,
+  diaISO: string | null
 ): HourlyPoint[] {
-  if (!filtroActivo || !franja) return horas;
-  return horas.filter((h) => {
-    const hora = new Date(h.time).getHours();
-    if (franja.inicio < franja.fin) {
-      return hora >= franja.inicio && hora < franja.fin;
-    }
-    return hora >= franja.inicio || hora < franja.fin;
-  });
+  let out = horas;
+  if (diaISO) {
+    const key = localDateKey(new Date(diaISO));
+    out = out.filter((h) => localDateKey(new Date(h.time)) === key);
+  }
+  if (filtroActivo && franja) {
+    out = out.filter((h) => {
+      const hora = new Date(h.time).getHours();
+      if (franja.inicio < franja.fin) {
+        return hora >= franja.inicio && hora < franja.fin;
+      }
+      return hora >= franja.inicio || hora < franja.fin;
+    });
+  }
+  return out;
 }
 
-// ─── Componentes de tabla ─────────────────────────────────────────
+// ─── Tabla reutilizable ──────────────────────────────────────────
 
 interface ColumnaTabla<T> {
   key: string;
@@ -90,48 +118,38 @@ interface ColumnaTabla<T> {
   veredicto?: (h: T) => Veredicto | null;
 }
 
-// Tabla de 7 días con colores por celda, agrupación por día, y
-// opción de filtrar por franja.
 function TablaDatos<T extends { time: string }>({
   horas,
   columnas,
   colorNivel,
   lang,
-  mostrarSeparadorDia = true,
 }: {
   horas: T[];
   columnas: ColumnaTabla<T>[];
   colorNivel: NivelColorTabla;
   lang: string;
-  mostrarSeparadorDia?: boolean;
 }) {
-  if (horas.length === 0) {
-    return null;
-  }
-
-  const porDia = new Map<string, T[]>();
-  for (const h of horas) {
-    const key = localDateKey(new Date(h.time));
-    if (!porDia.has(key)) porDia.set(key, []);
-    porDia.get(key)!.push(h);
-  }
+  if (horas.length === 0) return null;
 
   return (
     <div
       style={{
-        borderRadius: 8, border: '1px solid var(--border)',
-        overflow: 'hidden', fontSize: '0.72rem',
+        borderRadius: 8,
+        border: '1px solid var(--border)',
+        overflow: 'hidden',
+        fontSize: '0.72rem',
       }}
     >
-      {/* Cabecera */}
       <div
         style={{
           display: 'grid',
           gridTemplateColumns: `minmax(54px, auto) repeat(${columnas.length}, 1fr)`,
           backgroundColor: 'var(--surface)',
           borderBottom: '1px solid var(--border)',
-          fontSize: '0.68rem', color: 'var(--text-dim)',
-          fontWeight: 700, textTransform: 'uppercase',
+          fontSize: '0.68rem',
+          color: 'var(--text-dim)',
+          fontWeight: 700,
+          textTransform: 'uppercase',
           letterSpacing: '0.04em',
         }}
       >
@@ -143,73 +161,50 @@ function TablaDatos<T extends { time: string }>({
         ))}
       </div>
 
-      {/* Filas agrupadas por día */}
-      {[...porDia.entries()].map(([key, filasDia], idxDia) => {
-        const fechaDia = new Date(filasDia[0].time);
+      {horas.map((h, i) => {
+        const hora = new Date(h.time).toLocaleTimeString(
+          lang === 'en' ? 'en-GB' : 'es-ES',
+          { hour: '2-digit', minute: '2-digit' }
+        );
         return (
-          <React.Fragment key={key}>
-            {mostrarSeparadorDia && (
-              <div
-                style={{
-                  gridColumn: `1 / -1`,
-                  padding: '4px 8px',
-                  backgroundColor: 'var(--bg)',
-                  color: 'var(--accent)',
-                  fontFamily: 'var(--font-mono, Fira Code, monospace)',
-                  fontSize: '0.68rem', fontWeight: 700,
-                  textTransform: 'uppercase',
-                  borderTop: idxDia > 0 ? '1px solid var(--border)' : 'none',
-                  borderBottom: '1px solid var(--border)',
-                }}
-              >
-                {fechaLarga(fechaDia, lang)}
-              </div>
-            )}
-            {filasDia.map((h, i) => {
-              const hora = new Date(h.time).toLocaleTimeString(
-                lang === 'en' ? 'en-GB' : 'es-ES',
-                { hour: '2-digit', minute: '2-digit' }
-              );
+          <div
+            key={h.time}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: `minmax(54px, auto) repeat(${columnas.length}, 1fr)`,
+              borderTop: i > 0 ? '1px solid var(--border)' : 'none',
+            }}
+          >
+            <div
+              style={{
+                padding: '5px 6px',
+                textAlign: 'left',
+                fontFamily: 'var(--font-mono, Fira Code, monospace)',
+                color: 'var(--text-dim)',
+                fontWeight: 500,
+              }}
+            >
+              {hora}
+            </div>
+            {columnas.map((c) => {
+              const v = c.veredicto?.(h) ?? null;
+              const color = colorNumero(v, colorNivel);
               return (
                 <div
-                  key={h.time}
+                  key={c.key}
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns: `minmax(54px, auto) repeat(${columnas.length}, 1fr)`,
-                    borderTop: i > 0 ? '1px solid var(--border)' : 'none',
-                    fontSize: '0.72rem',
+                    padding: '5px 4px',
+                    textAlign: 'center',
+                    fontFamily: 'var(--font-mono, Fira Code, monospace)',
+                    color: color ?? 'var(--text)',
+                    fontWeight: color ? 600 : 400,
                   }}
                 >
-                  <div
-                    style={{
-                      padding: '5px 6px', textAlign: 'left',
-                      fontFamily: 'var(--font-mono, Fira Code, monospace)',
-                      color: 'var(--text-dim)', fontWeight: 500,
-                    }}
-                  >
-                    {hora}
-                  </div>
-                  {columnas.map((c) => {
-                    const v = c.veredicto?.(h) ?? null;
-                    const bg = colorCelda(v, colorNivel);
-                    return (
-                      <div
-                        key={c.key}
-                        style={{
-                          padding: '5px 4px', textAlign: 'center',
-                          fontFamily: 'var(--font-mono, Fira Code, monospace)',
-                          color: 'var(--text)',
-                          backgroundColor: bg ?? 'transparent',
-                        }}
-                      >
-                        {c.render(h)}
-                      </div>
-                    );
-                  })}
+                  {c.render(h)}
                 </div>
               );
             })}
-          </React.Fragment>
+          </div>
         );
       })}
     </div>
@@ -234,7 +229,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 
   const [tabActiva, setTabActiva] = useState<TabId>('waves');
   const [coordsCopiedFeedback, setCoordsCopiedFeedback] = useState(false);
-  const [expandFactors, setExpandFactors] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const [loading, setLoading] = useState(false);
@@ -247,7 +241,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 
   const lang = i18n.language?.startsWith('en') ? 'en' : 'es';
 
-  // Auto-fetch al abrir si no hay datos.
   useEffect(() => {
     if (!spot) return;
     if (fetchTriggeredRef.current) return;
@@ -258,7 +251,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
       .then((data) => setWeather(spot.id, data))
       .catch((err) => console.error('fetch spot weather', err))
       .finally(() => setLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spot?.id]);
 
   const franjaActiva = ajustes.franjas.find((f) => f.id === ajustes.franjaActivaId)
@@ -277,7 +270,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 
   const veredictoFranjaActiva = franjaActiva ? veredictos[franjaActiva.id] : null;
 
-  // Detalle del veredicto para la franja activa (para factor disparador).
+  // Detalle del veredicto de la franja activa.
   let detalleFranjaActiva: ResultadoVeredicto | null = null;
   if (weather && weather.hourly.length > 0 && franjaActiva) {
     const inicio = franjaActiva.inicio;
@@ -309,7 +302,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     }
   }
 
-  // Aviso de salida
+  // Aviso de salida.
   let colorSalida = 'var(--text-dim)';
   let textoSalida = '';
   if (spot.tipoAcceso != null) {
@@ -340,11 +333,25 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     return !ajustes.subpestanasOcultas.includes(tab);
   });
 
-  // Filtro de horas según franja activa.
   const horasFiltradas = useMemo(() => {
     if (!weather?.hourly) return [];
-    return filtrarPorFranja(weather.hourly, franjaActiva, ajustes.filtroFranja);
+    return filtrarHoras(weather.hourly, franjaActiva, ajustes.filtroFranja, null);
   }, [weather, franjaActiva, ajustes.filtroFranja]);
+
+  // Actividad: mapa fecha → orto/ocaso para no recalcular.
+  const actividad: ActividadHora[] = useMemo(() => {
+    if (!weather?.hourly) return [];
+    const mapa = new Map<string, { orto: Date | null; ocaso: Date | null }>();
+    for (const h of weather.hourly) {
+      const d = new Date(h.time);
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      if (!mapa.has(key)) {
+        const sol = calcularSol(d, spot.lat, spot.lon);
+        mapa.set(key, { orto: sol?.orto ?? null, ocaso: sol?.ocaso ?? null });
+      }
+    }
+    return calcularActividadPorHora(weather.hourly, mapa);
+  }, [weather, spot.lat, spot.lon]);
 
   const handleCopyCoords = async () => {
     try {
@@ -410,54 +417,89 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 
   const colorNivel = ajustes.colorTabla;
 
+  // Fecha activa mostrada en el encabezado.
+  const colorVeredictoFranja = veredictoFranjaActiva
+    ? veredictoAColor(veredictoFranjaActiva)
+    : 'var(--text-dim)';
+
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, backgroundColor: 'var(--bg)',
-        color: 'var(--text)', fontFamily: 'Inter, system-ui, sans-serif',
-        zIndex: 100, display: 'flex', flexDirection: 'column', overflowY: 'auto',
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'var(--bg)',
+        color: 'var(--text)',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        zIndex: 100,
+        display: 'flex',
+        flexDirection: 'column',
+        overflowY: 'auto',
       }}
     >
       <header
         style={{
-          position: 'sticky', top: 0, backgroundColor: 'var(--bg)',
-          borderBottom: '1px solid var(--border)', zIndex: 10,
+          position: 'sticky',
+          top: 0,
+          backgroundColor: 'var(--bg)',
+          borderBottom: '1px solid var(--border)',
+          zIndex: 10,
           padding: '10px 14px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 6,
+          }}
+        >
           <button
             onClick={onClose}
             style={{
-              padding: '5px 10px', backgroundColor: 'var(--surface)',
-              border: '1px solid var(--border)', borderRadius: 6,
-              color: 'var(--text)', fontSize: '0.8rem',
-              fontWeight: 500, cursor: 'pointer',
+              padding: '5px 10px',
+              backgroundColor: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 6,
+              color: 'var(--text)',
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              cursor: 'pointer',
             }}
           >
             ← {t('common.back')}
           </button>
 
           {editingName ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1, margin: '0 8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, margin: '0 8px' }}>
               <input
                 value={nameDraft}
                 onChange={(e) => setNameDraft(e.target.value)}
                 autoFocus
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setEditingName(false); }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveName();
+                  if (e.key === 'Escape') setEditingName(false);
+                }}
                 style={{
-                  flex: 1, padding: '4px 8px',
+                  flex: 1,
+                  padding: '4px 8px',
                   backgroundColor: 'var(--surface)',
-                  border: '1px solid var(--accent)', borderRadius: 4,
-                  color: 'var(--text)', fontSize: '0.9rem',
+                  border: '1px solid var(--accent)',
+                  borderRadius: 4,
+                  color: 'var(--text)',
+                  fontSize: '0.9rem',
                 }}
               />
               <button
                 onClick={handleSaveName}
                 style={{
-                  padding: '4px 8px', borderRadius: 4,
-                  border: '1px solid var(--accent)', backgroundColor: 'transparent',
-                  color: 'var(--accent)', fontSize: '0.75rem', cursor: 'pointer',
+                  padding: '4px 8px',
+                  borderRadius: 4,
+                  border: '1px solid var(--accent)',
+                  backgroundColor: 'transparent',
+                  color: 'var(--accent)',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
                 }}
               >
                 ✓
@@ -465,21 +507,39 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
               <button
                 onClick={() => setEditingName(false)}
                 style={{
-                  padding: '4px 8px', borderRadius: 4,
-                  border: '1px solid var(--border)', backgroundColor: 'transparent',
-                  color: 'var(--text-dim)', fontSize: '0.75rem', cursor: 'pointer',
+                  padding: '4px 8px',
+                  borderRadius: 4,
+                  border: '1px solid var(--border)',
+                  backgroundColor: 'transparent',
+                  color: 'var(--text-dim)',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
                 }}
               >
                 ✕
               </button>
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, justifyContent: 'center', margin: '0 8px' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                flex: 1,
+                justifyContent: 'center',
+                margin: '0 8px',
+              }}
+            >
               <h1
                 style={{
-                  margin: 0, fontSize: '1rem', fontWeight: 600,
-                  textAlign: 'center', color: 'var(--text)',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  margin: 0,
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  textAlign: 'center',
+                  color: 'var(--text)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {spot.name || t('common.unnamed')}
@@ -488,9 +548,12 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                 onClick={handleStartEditName}
                 title={t('detalle.editName')}
                 style={{
-                  border: 'none', background: 'transparent',
-                  color: 'var(--text-dim)', cursor: 'pointer',
-                  fontSize: '0.85rem', padding: '2px 4px',
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-dim)',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  padding: '2px 4px',
                 }}
               >
                 ✎
@@ -498,34 +561,62 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
             </div>
           )}
 
-          <div style={{ width: '60px' }} />
+          <div style={{ width: 60 }} />
         </div>
 
         {/* Coordenadas + profundidad */}
         <div
           onClick={handleCopyCoords}
           style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            gap: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 10,
             fontFamily: 'var(--font-mono, Fira Code, monospace)',
-            fontSize: '0.7rem', color: 'var(--text-dim)',
-            marginBottom: '6px', cursor: 'pointer',
+            fontSize: '0.7rem',
+            color: 'var(--text-dim)',
+            marginBottom: 6,
+            cursor: 'pointer',
           }}
         >
           <span>{formatearCoords(spot.lat, spot.lon, ajustes.formatoCoords)}</span>
           <span>•</span>
-          <span>{spot.profundidad != null ? `${spot.profundidad} m` : t('detalle.noDepth')}</span>
-          <span style={{
-            color: coordsCopiedFeedback ? 'var(--accent)' : 'var(--text-dim)',
-            fontSize: '0.65rem',
-            fontWeight: coordsCopiedFeedback ? 600 : 400,
-          }}>
+          <span>
+            {spot.profundidad != null
+              ? `${spot.profundidad} m`
+              : t('detalle.noDepth')}
+          </span>
+          <span
+            style={{
+              color: coordsCopiedFeedback ? 'var(--accent)' : 'var(--text-dim)',
+              fontSize: '0.65rem',
+              fontWeight: coordsCopiedFeedback ? 600 : 400,
+            }}
+          >
             {coordsCopiedFeedback ? `✓ ${t('detalle.coordsCopied')}` : `📋`}
           </span>
         </div>
 
-        {/* Franjas clicables (activan filtro) */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '4px', marginBottom: '6px' }}>
+        {/* Zona + Franjas clicables */}
+        <div
+          style={{
+            fontSize: '0.7rem',
+            color: 'var(--text-dim)',
+            textAlign: 'center',
+            marginBottom: 4,
+          }}
+        >
+          {t(`zones.${spot.zona ?? 'mediterraneo_espanol'}`)}
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            gap: 4,
+            marginBottom: 6,
+          }}
+        >
           {ajustes.franjas.map((franja) => {
             const v = veredictos[franja.id];
             const color = v ? veredictoAColor(v) : 'var(--text-dim)';
@@ -535,11 +626,15 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                 key={franja.id}
                 onClick={() => setFranjaActiva(activa ? null : franja.id)}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '4px',
-                  padding: '4px 10px', borderRadius: 6,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '4px 10px',
+                  borderRadius: 6,
                   backgroundColor: activa ? 'var(--surface)' : 'transparent',
                   border: `1px solid ${activa ? color : 'var(--border)'}`,
-                  fontSize: '0.72rem', cursor: 'pointer',
+                  fontSize: '0.72rem',
+                  cursor: 'pointer',
                   color: activa ? color : 'var(--text-dim)',
                   fontWeight: activa ? 700 : 400,
                 }}
@@ -549,13 +644,17 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
               </button>
             );
           })}
-          {ajustes.filtroFranja && (
+          {ajustes.filtroFranja && franjaActiva && (
             <button
               onClick={() => setFranjaActiva(null)}
               style={{
-                padding: '4px 10px', borderRadius: 6,
-                border: '1px solid var(--border)', backgroundColor: 'transparent',
-                color: 'var(--text-dim)', fontSize: '0.72rem', cursor: 'pointer',
+                padding: '4px 10px',
+                borderRadius: 6,
+                border: '1px solid var(--border)',
+                backgroundColor: 'transparent',
+                color: 'var(--text-dim)',
+                fontSize: '0.72rem',
+                cursor: 'pointer',
               }}
             >
               {t('common.all')}
@@ -563,81 +662,18 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
           )}
         </div>
 
-        {/* Factor disparador */}
-        {(veredictoFranjaActiva === 'EXIGENTE' || veredictoFranjaActiva === 'DESACONSEJADO')
-          && detalleFranjaActiva?.factorDisparador && (
-            <div
-              style={{
-                backgroundColor: 'var(--surface)', borderRadius: 6,
-                border: '1px solid var(--border)',
-                padding: '6px 10px', marginBottom: '6px',
-                fontSize: '0.78rem',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>
-                  <strong style={{ color: 'var(--verdict-exigente)' }}>
-                    {t('verdict.triggeringFactor')}:{' '}
-                  </strong>
-                  {t(`factors.${factorKeyMap[detalleFranjaActiva.factorDisparador]}`)}
-                </span>
-                <button
-                  onClick={() => setExpandFactors(!expandFactors)}
-                  style={{
-                    border: 'none', background: 'transparent',
-                    color: 'var(--accent)', fontSize: '0.72rem',
-                    cursor: 'pointer', textDecoration: 'underline',
-                  }}
-                >
-                  {t('verdict.seeAllFactors')} {expandFactors ? '▲' : '▼'}
-                </button>
-              </div>
-              {expandFactors && (
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
-                    gap: '6px', marginTop: '8px', paddingTop: '8px',
-                    borderTop: '1px solid var(--border)',
-                  }}
-                >
-                  {(['viento', 'ola', 'periodo', 'corriente', 'marea'] as const).map((f) => {
-                    const vf = detalleFranjaActiva?.veredictoPorFactor[f];
-                    const col = vf ? veredictoAColor(vf) : 'var(--text-dim)';
-                    const lab = vf ? t(veredictoAClaveI18n(vf)) : t('home.card.noData');
-                    return (
-                      <div
-                        key={f}
-                        style={{
-                          backgroundColor: 'var(--bg)', borderRadius: 4,
-                          padding: '4px 6px', border: `1px solid ${col}`,
-                          textAlign: 'center',
-                        }}
-                      >
-                        <div style={{ fontSize: '0.62rem', color: 'var(--text-dim)' }}>
-                          {t(`factors.${factorKeyMap[f]}`)}
-                        </div>
-                        <div style={{ fontSize: '0.72rem', fontWeight: 600, color: col }}>
-                          {lab}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
         {/* Aviso de stale */}
         {stale && (
           <div
             style={{
-              padding: '6px 10px', marginBottom: '6px',
+              padding: '6px 10px',
+              marginBottom: 6,
               borderRadius: 6,
               border: '1px solid var(--verdict-aceptable)',
               backgroundColor: 'rgba(229, 229, 0, 0.1)',
               color: 'var(--verdict-aceptable)',
-              fontSize: '0.75rem', textAlign: 'center',
+              fontSize: '0.75rem',
+              textAlign: 'center',
             }}
           >
             {t('home.card.staleWarning', { min: ageMin })}
@@ -645,73 +681,180 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         )}
 
         {loading && (
-          <div style={{
-            padding: '6px 10px', marginBottom: '6px',
-            color: 'var(--accent)', fontSize: '0.75rem', textAlign: 'center',
-          }}>
+          <div
+            style={{
+              padding: '6px 10px',
+              marginBottom: 6,
+              color: 'var(--accent)',
+              fontSize: '0.75rem',
+              textAlign: 'center',
+            }}
+          >
             {t('common.loading')}
           </div>
         )}
 
-        {/* Umbral aplicado */}
+        {/* Salida: veredicto + umbral aplicado */}
         <div
           style={{
-            fontSize: '0.68rem', color: 'var(--text-dim)',
-            textAlign: 'center', marginBottom: '4px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 4,
+            fontSize: '0.72rem',
+            marginBottom: 4,
           }}
         >
-          {t('verdict.appliedThreshold', {
-            category: ajustes.categoriaKayak,
-            zone: t(`zones.${spot.zona ?? 'mediterraneo_espanol'}`),
-          })}
-        </div>
-
-        {/* Salida */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          gap: '8px', fontSize: '0.75rem',
-        }}>
           {spot.tipoAcceso != null ? (
-            <>
-              <span style={{ color: 'var(--text-dim)' }}>{t('verdict.launch.title')}:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ color: 'var(--text-dim)' }}>
+                {t('verdict.launch.title')}:
+              </span>
               <span
                 style={{
-                  padding: '2px 8px', borderRadius: 4,
+                  padding: '2px 8px',
+                  borderRadius: 4,
                   backgroundColor: 'var(--surface)',
                   border: `1px solid ${colorSalida}`,
-                  color: colorSalida, fontWeight: 600, fontSize: '0.72rem',
+                  color: colorSalida,
+                  fontWeight: 600,
+                  fontSize: '0.72rem',
                 }}
               >
                 {textoSalida}
               </span>
-            </>
+            </div>
           ) : (
-            <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ color: 'var(--text-dim)' }}>{t('access.none')}</span>
               <button
                 type="button"
                 onClick={() => onAddAccess && onAddAccess(spot.id)}
                 style={{
-                  padding: '2px 8px', borderRadius: 4,
-                  border: '1px solid var(--accent)', backgroundColor: 'transparent',
-                  color: 'var(--accent)', fontSize: '0.72rem',
-                  cursor: 'pointer', fontWeight: 500,
+                  padding: '2px 8px',
+                  borderRadius: 4,
+                  border: '1px solid var(--accent)',
+                  backgroundColor: 'transparent',
+                  color: 'var(--accent)',
+                  fontSize: '0.72rem',
+                  cursor: 'pointer',
+                  fontWeight: 500,
                 }}
               >
                 + {t('access.add')}
               </button>
-            </>
+            </div>
           )}
+
+          {/* Umbral aplicado con letras del color del veredicto. */}
+          <div
+            style={{
+              fontSize: '0.68rem',
+              color: 'var(--text-dim)',
+              textAlign: 'center',
+            }}
+          >
+            {t('verdict.appliedThresholdPrefix')}{' '}
+            <span style={{ color: colorVeredictoFranja, fontWeight: 700 }}>
+              {ajustes.categoriaKayak}
+            </span>
+            {' / '}
+            <span style={{ color: colorVeredictoFranja, fontWeight: 700 }}>
+              {t(`zones.${spot.zona ?? 'mediterraneo_espanol'}`)}
+            </span>
+          </div>
         </div>
+
+        {/* Factores veredicto de la franja activa: SIEMPRE VISIBLES.
+            Botón "Ver todos los factores" desaparece (bug 12). */}
+        {detalleFranjaActiva && (
+          <div
+            style={{
+              backgroundColor: 'var(--surface)',
+              borderRadius: 6,
+              border: '1px solid var(--border)',
+              padding: '6px 10px',
+              marginBottom: 6,
+              fontSize: '0.75rem',
+            }}
+          >
+            <div
+              style={{
+                fontSize: '0.68rem',
+                color: 'var(--text-dim)',
+                marginBottom: 4,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+              }}
+            >
+              {t('verdict.triggeringFactor')}
+              {detalleFranjaActiva.factorDisparador && (
+                <span
+                  style={{
+                    marginLeft: 6,
+                    color: veredictoAColor(detalleFranjaActiva.veredicto),
+                    fontWeight: 700,
+                    textTransform: 'none',
+                  }}
+                >
+                  {t(`factors.${factorKeyMap[detalleFranjaActiva.factorDisparador]}`)}
+                </span>
+              )}
+            </div>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(85px, 1fr))',
+                gap: 4,
+              }}
+            >
+              {(['viento', 'ola', 'periodo', 'corriente', 'marea'] as const).map((f) => {
+                const vf = detalleFranjaActiva?.veredictoPorFactor[f];
+                const col = vf ? veredictoAColor(vf) : 'var(--text-dim)';
+                const lab = vf
+                  ? t(veredictoAClaveI18n(vf))
+                  : t('detalle.noDepth');
+                return (
+                  <div
+                    key={f}
+                    style={{
+                      backgroundColor: 'var(--bg)',
+                      borderRadius: 4,
+                      padding: '4px 6px',
+                      border: `1px solid ${col}`,
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div style={{ fontSize: '0.6rem', color: 'var(--text-dim)' }}>
+                      {t(`factors.${factorKeyMap[f]}`)}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '0.68rem',
+                        fontWeight: 600,
+                        color: col,
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      {lab}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Subpestañas */}
       <nav
         style={{
-          display: 'flex', overflowX: 'auto',
+          display: 'flex',
+          overflowX: 'auto',
           backgroundColor: 'var(--surface)',
           borderBottom: '1px solid var(--border)',
-          scrollbarWidth: 'none', flexShrink: 0,
+          scrollbarWidth: 'none',
+          flexShrink: 0,
         }}
       >
         {subpestanasVisibles.map((tab) => {
@@ -721,12 +864,18 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
               key={tab}
               onClick={() => setTabActiva(tab)}
               style={{
-                flex: '0 0 auto', padding: '8px 14px', border: 'none',
-                borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
+                flex: '0 0 auto',
+                padding: '8px 14px',
+                border: 'none',
+                borderBottom: active
+                  ? '2px solid var(--accent)'
+                  : '2px solid transparent',
                 backgroundColor: active ? 'var(--surface)' : 'transparent',
                 color: active ? 'var(--accent)' : 'var(--text)',
-                fontSize: '0.82rem', fontWeight: active ? 600 : 400,
-                cursor: 'pointer', whiteSpace: 'nowrap',
+                fontSize: '0.82rem',
+                fontWeight: active ? 600 : 400,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
               }}
             >
               {t(`tabs.${tab}`)}
@@ -737,12 +886,22 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 
       <main
         style={{
-          flex: 1, padding: '14px', maxWidth: '900px',
-          width: '100%', margin: '0 auto', boxSizing: 'border-box',
+          flex: 1,
+          padding: 14,
+          maxWidth: 900,
+          width: '100%',
+          margin: '0 auto',
+          boxSizing: 'border-box',
         }}
       >
         {!weather && !loading && (
-          <div style={{ color: 'var(--text-dim)', padding: '30px 0', textAlign: 'center' }}>
+          <div
+            style={{
+              color: 'var(--text-dim)',
+              padding: '30px 0',
+              textAlign: 'center',
+            }}
+          >
             {t('home.card.noData')}
           </div>
         )}
@@ -750,40 +909,67 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {/* ─── OLEAJE ─── */}
         {tabActiva === 'waves' && weather && (
           <div>
-            <div style={{ marginBottom: '8px' }}>
-              <span style={{
-                fontSize: '2rem', fontWeight: 700,
-                fontFamily: 'var(--font-mono, Fira Code, monospace)',
-                color: 'var(--accent)',
-              }}>
+            <div style={{ marginBottom: 8 }}>
+              <span
+                style={{
+                  fontSize: '2rem',
+                  fontWeight: 700,
+                  fontFamily: 'var(--font-mono, Fira Code, monospace)',
+                  color: 'var(--accent)',
+                }}
+              >
                 {horasFiltradas.find((h) => h.waveHeight != null)?.waveHeight?.toFixed(1) ?? '—'}
               </span>
-              <span style={{ fontSize: '1rem', marginLeft: '6px', color: 'var(--text-dim)' }}>m</span>
+              <span
+                style={{ fontSize: '1rem', marginLeft: 6, color: 'var(--text-dim)' }}
+              >
+                m
+              </span>
             </div>
             <TablaDatos
               horas={horasFiltradas}
               colorNivel={colorNivel}
               lang={lang}
               columnas={[
-                { key: 'wt', label: t('factors.waveHeightTotal'),
-                  render: (h) => h.waveHeight != null ? `${h.waveHeight.toFixed(2)} m` : '—',
-                  veredicto: subVeredictoWaves },
-                { key: 'ww', label: t('factors.waveHeightWind'),
-                  render: (h) => h.windWaveHeight != null ? `${h.windWaveHeight.toFixed(2)} m` : '—' },
-                { key: 'ws', label: t('factors.waveHeightSwell'),
-                  render: (h) => h.swellWaveHeight != null ? `${h.swellWaveHeight.toFixed(2)} m` : '—' },
-                { key: 'wp', label: t('factors.wavePeriod'),
-                  render: (h) => h.wavePeriod != null ? `${h.wavePeriod.toFixed(0)} s` : '—' },
-                { key: 'wd', label: t('factors.waveDirection'),
+                {
+                  key: 'wt',
+                  label: t('factors.waveHeightTotal'),
+                  render: (h) =>
+                    h.waveHeight != null ? `${h.waveHeight.toFixed(2)} m` : '—',
+                  veredicto: subVeredictoWaves,
+                },
+                {
+                  key: 'ww',
+                  label: t('factors.waveHeightWind'),
+                  render: (h) =>
+                    h.windWaveHeight != null ? `${h.windWaveHeight.toFixed(2)} m` : '—',
+                },
+                {
+                  key: 'ws',
+                  label: t('factors.waveHeightSwell'),
+                  render: (h) =>
+                    h.swellWaveHeight != null ? `${h.swellWaveHeight.toFixed(2)} m` : '—',
+                },
+                {
+                  key: 'wp',
+                  label: t('factors.wavePeriod'),
+                  render: (h) =>
+                    h.wavePeriod != null ? `${h.wavePeriod.toFixed(0)} s` : '—',
+                },
+                {
+                  key: 'wd',
+                  label: t('factors.waveDirection'),
                   render: (h) => {
-                    const nv = nombreViento(h.waveDirection, spot.zona ?? 'mediterraneo_espanol', lang);
-                    return nv.grados != null ? `${nv.cardinal} ${Math.round(nv.grados)}°` : '—';
-                  } },
-                { key: 'wwd', label: t('factors.windDirection'),
-                  render: (h) => {
-                    const nv = nombreViento(h.windWaveDirection, spot.zona ?? 'mediterraneo_espanol', lang);
-                    return nv.grados != null ? `${nv.cardinal} ${Math.round(nv.grados)}°` : '—';
-                  } },
+                    const nv = nombreViento(
+                      h.waveDirection,
+                      spot.zona ?? 'mediterraneo_espanol',
+                      lang
+                    );
+                    return nv.grados != null
+                      ? `${nv.cardinal} ${Math.round(nv.grados)}°`
+                      : '—';
+                  },
+                },
               ]}
             />
           </div>
@@ -792,35 +978,86 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {/* ─── VIENTO ─── */}
         {tabActiva === 'wind' && weather && (
           <div>
-            <div style={{ marginBottom: '8px' }}>
-              <span style={{
-                fontSize: '2rem', fontWeight: 700,
-                fontFamily: 'var(--font-mono, Fira Code, monospace)',
-                color: 'var(--accent-2)',
-              }}>
+            <div style={{ marginBottom: 8 }}>
+              <span
+                style={{
+                  fontSize: '2rem',
+                  fontWeight: 700,
+                  fontFamily: 'var(--font-mono, Fira Code, monospace)',
+                  color: 'var(--accent-2)',
+                }}
+              >
                 {msAKn(horasFiltradas.find((h) => h.windSpeed != null)?.windSpeed ?? null) ?? '—'}
               </span>
-              <span style={{ fontSize: '1rem', marginLeft: '6px', color: 'var(--text-dim)' }}>kt</span>
+              <span style={{ fontSize: '1rem', marginLeft: 6, color: 'var(--text-dim)' }}>
+                kt
+              </span>
             </div>
             <TablaDatos
               horas={horasFiltradas}
               colorNivel={colorNivel}
               lang={lang}
               columnas={[
-                { key: 'wd', label: t('factors.windDirection'),
+                {
+                  key: 'wd',
+                  label: t('factors.windDirection'),
                   render: (h) => {
-                    const nv = nombreViento(h.windDirection, spot.zona ?? 'mediterraneo_espanol', lang);
+                    const nv = nombreViento(
+                      h.windDirection,
+                      spot.zona ?? 'mediterraneo_espanol',
+                      lang
+                    );
                     return nv.grados != null ? `${nv.nombre} (${nv.cardinal})` : '—';
                   },
-                  veredicto: subVeredictoWind },
-                { key: 'wk', label: t('factors.windSpeedKn'),
-                  render: (h) => { const v = msAKn(h.windSpeed); return v != null ? `${v}` : '—'; } },
-                { key: 'wkh', label: t('factors.windSpeedKmh'),
-                  render: (h) => { const v = msAKmh(h.windSpeed); return v != null ? `${v}` : '—'; } },
-                { key: 'gk', label: t('factors.windGustsKn'),
-                  render: (h) => { const v = msAKn(h.windGusts); return v != null ? `${v}` : '—'; } },
-                { key: 'gkh', label: t('factors.windGustsKmh'),
-                  render: (h) => { const v = msAKmh(h.windGusts); return v != null ? `${v}` : '—'; } },
+                  veredicto: subVeredictoWind,
+                },
+                {
+                  key: 'wk',
+                  label: t('factors.windSpeedKn'),
+                  render: (h) => {
+                    const v = msAKn(h.windSpeed);
+                    return v != null ? `${v}` : '—';
+                  },
+                },
+                {
+                  key: 'wkh',
+                  label: t('factors.windSpeedKmh'),
+                  render: (h) => {
+                    const v = msAKmh(h.windSpeed);
+                    return v != null ? `${v}` : '—';
+                  },
+                },
+                {
+                  key: 'gk',
+                  label: t('factors.windGustsKn'),
+                  render: (h) => {
+                    const v = msAKn(h.windGusts);
+                    return v != null ? `${v}` : '—';
+                  },
+                },
+                {
+                  key: 'gkh',
+                  label: t('factors.windGustsKmh'),
+                  render: (h) => {
+                    const v = msAKmh(h.windGusts);
+                    if (v == null) return '—';
+                    // Bug 4: rachas ≥ 30 km/h en rojo neón.
+                    const esRachaFuerte = v >= 30;
+                    return (
+                      <span
+                        style={{
+                          color: esRachaFuerte ? '#FF2D55' : undefined,
+                          fontWeight: esRachaFuerte ? 700 : 500,
+                          textShadow: esRachaFuerte
+                            ? '0 0 6px rgba(255, 45, 85, 0.7)'
+                            : 'none',
+                        }}
+                      >
+                        {v}
+                      </span>
+                    );
+                  },
+                },
               ]}
             />
           </div>
@@ -829,36 +1066,74 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {/* ─── TIEMPO ─── */}
         {tabActiva === 'weather' && weather && (
           <div>
-            <div style={{ marginBottom: '8px' }}>
-              <span style={{
-                fontSize: '2rem', fontWeight: 700,
-                fontFamily: 'var(--font-mono, Fira Code, monospace)',
-                color: '#f59e0b',
-              }}>
+            <div style={{ marginBottom: 8 }}>
+              <span
+                style={{
+                  fontSize: '2rem',
+                  fontWeight: 700,
+                  fontFamily: 'var(--font-mono, Fira Code, monospace)',
+                  color: '#f59e0b',
+                }}
+              >
                 {horasFiltradas.find((h) => h.temperature != null)?.temperature?.toFixed(1) ?? '—'}
               </span>
-              <span style={{ fontSize: '1rem', marginLeft: '6px', color: 'var(--text-dim)' }}>°C</span>
+              <span style={{ fontSize: '1rem', marginLeft: 6, color: 'var(--text-dim)' }}>
+                °C
+              </span>
             </div>
             <TablaDatos
               horas={horasFiltradas}
               colorNivel={colorNivel}
               lang={lang}
               columnas={[
-                { key: 'ico', label: t('factors.weatherCode'),
+                {
+                  key: 'ico',
+                  label: t('factors.weatherCode'),
                   render: (h) => {
-                    const isNight = new Date(h.time).getHours() < 7 || new Date(h.time).getHours() >= 20;
-                    return <span style={{ fontSize: '1.1rem' }}>{weatherCodeAIcono(h.weatherCode, isNight)}</span>;
-                  } },
-                { key: 'cc', label: t('factors.cloudCover'),
-                  render: (h) => h.cloudCover != null ? `${Math.round(h.cloudCover)}%` : '—' },
-                { key: 'pr', label: t('factors.precipitation'),
-                  render: (h) => h.precipitation != null ? `${h.precipitation.toFixed(1)} mm` : '—' },
-                { key: 'prp', label: t('factors.precipitationProbability'),
-                  render: (h) => h.precipitationProbability != null ? `${Math.round(h.precipitationProbability)}%` : '—' },
-                { key: 'tmp', label: t('factors.temperature'),
-                  render: (h) => h.temperature != null ? `${h.temperature.toFixed(1)}°` : '—' },
-                { key: 'vis', label: t('factors.visibility'),
-                  render: (h) => h.visibility != null ? `${Math.round(h.visibility / 1000)} km` : '—' },
+                    const isNight =
+                      new Date(h.time).getHours() < 7 ||
+                      new Date(h.time).getHours() >= 20;
+                    return (
+                      <span style={{ fontSize: '1.1rem' }}>
+                        {weatherCodeAIcono(h.weatherCode, isNight)}
+                      </span>
+                    );
+                  },
+                },
+                {
+                  key: 'cc',
+                  label: t('factors.cloudCover'),
+                  render: (h) =>
+                    h.cloudCover != null ? `${Math.round(h.cloudCover)}%` : '—',
+                },
+                {
+                  key: 'pr',
+                  label: t('factors.precipitation'),
+                  render: (h) =>
+                    h.precipitation != null ? `${h.precipitation.toFixed(1)} mm` : '—',
+                },
+                {
+                  key: 'prp',
+                  label: t('factors.precipitationProbability'),
+                  render: (h) =>
+                    h.precipitationProbability != null
+                      ? `${Math.round(h.precipitationProbability)}%`
+                      : '—',
+                },
+                {
+                  key: 'tmp',
+                  label: t('factors.temperature'),
+                  render: (h) =>
+                    h.temperature != null ? `${h.temperature.toFixed(1)}°` : '—',
+                },
+                {
+                  key: 'vis',
+                  label: t('factors.visibility'),
+                  render: (h) =>
+                    h.visibility != null
+                      ? `${Math.round(h.visibility / 1000)} km`
+                      : '—',
+                },
               ]}
             />
           </div>
@@ -872,85 +1147,165 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
               colorNivel={colorNivel}
               lang={lang}
               columnas={[
-                { key: 't', label: t('factors.temperature'),
-                  render: (h) => h.temperature != null ? `${h.temperature.toFixed(1)}°` : '—' },
-                { key: 'at', label: t('factors.apparentTemperature'),
-                  render: (h) => h.apparentTemperature != null ? `${h.apparentTemperature.toFixed(1)}°` : '—' },
-                { key: 'sst', label: t('factors.seaTemperature'),
-                  render: (h) => h.seaSurfaceTemperature != null ? `${h.seaSurfaceTemperature.toFixed(1)}°` : '—' },
-                { key: 't10', label: t('factors.seaTemperature10m'),
-                  render: () => '—' },
-                { key: 'tb', label: t('factors.seaTemperatureBottom'),
-                  render: () => '—' },
+                {
+                  key: 't',
+                  label: t('factors.temperature'),
+                  render: (h) =>
+                    h.temperature != null ? `${h.temperature.toFixed(1)}°` : '—',
+                },
+                {
+                  key: 'at',
+                  label: t('factors.apparentTemperature'),
+                  render: (h) =>
+                    h.apparentTemperature != null
+                      ? `${h.apparentTemperature.toFixed(1)}°`
+                      : '—',
+                },
+                {
+                  key: 'sst',
+                  label: t('factors.seaTemperature'),
+                  render: (h) =>
+                    h.seaSurfaceTemperature != null
+                      ? `${h.seaSurfaceTemperature.toFixed(1)}°`
+                      : '—',
+                },
               ]}
             />
           </div>
         )}
 
-        {/* ─── BARÓMETRO ─── */}
+        {/* ─── BARÓMETRO (bug 19) ─── */}
         {tabActiva === 'barometer' && weather && (
           <div>
-            <div style={{ marginBottom: '8px' }}>
-              <span style={{
-                fontSize: '2rem', fontWeight: 700,
-                fontFamily: 'var(--font-mono, Fira Code, monospace)',
-                color: '#a855f7',
-              }}>
+            <div style={{ marginBottom: 8 }}>
+              <span
+                style={{
+                  fontSize: '2rem',
+                  fontWeight: 700,
+                  fontFamily: 'var(--font-mono, Fira Code, monospace)',
+                  color: '#a855f7',
+                }}
+              >
                 {horasFiltradas.find((h) => h.pressure != null)?.pressure?.toFixed(0) ?? '—'}
               </span>
-              <span style={{ fontSize: '1rem', marginLeft: '6px', color: 'var(--text-dim)' }}>hPa</span>
+              <span style={{ fontSize: '1rem', marginLeft: 6, color: 'var(--text-dim)' }}>
+                hPa
+              </span>
             </div>
             <TablaDatos
               horas={horasFiltradas}
               colorNivel={colorNivel}
               lang={lang}
               columnas={[
-                { key: 'p', label: t('factors.pressure'),
-                  render: (h) => h.pressure != null ? `${h.pressure.toFixed(0)}` : '—' },
-                { key: 'tr', label: t('factors.pressureTrend'),
+                {
+                  key: 'p',
+                  label: t('factors.pressure'),
+                  render: (h) => (h.pressure != null ? `${h.pressure.toFixed(0)}` : '—'),
+                },
+                {
+                  key: 'tr',
+                  label: t('factors.pressureTrend'),
                   render: (h) => {
                     const idx = horasFiltradas.indexOf(h);
                     if (idx < 3) return '—';
                     const prev = horasFiltradas[idx - 3].pressure;
                     if (prev == null || h.pressure == null) return '—';
                     const d = h.pressure - prev;
-                    if (d > 1) return '↑';
-                    if (d < -1) return '↓';
-                    return '→';
-                  } },
+                    // Bug 19: caída brusca > 2.5 hPa en 3 h en rojo neón.
+                    if (d < -2.5) {
+                      return (
+                        <span
+                          style={{
+                            color: '#FF2D55',
+                            fontWeight: 700,
+                            textShadow: '0 0 6px rgba(255, 45, 85, 0.7)',
+                          }}
+                        >
+                          ⚡ Caída brusca
+                        </span>
+                      );
+                    }
+                    if (d < -0.8) return '⬇️ Bajando';
+                    if (d > 2.5) return '📈 Subida rápida';
+                    if (d > 0.8) return '⬆️ Subiendo';
+                    return '➡️ Estable';
+                  },
+                },
               ]}
             />
           </div>
         )}
 
-        {/* ─── CORRIENTE ─── */}
+        {/* ─── ACTIVIDAD (bugs 24a, 24b) ─── */}
         {tabActiva === 'activity' && weather && (
           <div>
-            <div style={{ marginBottom: '8px' }}>
-              <span style={{
-                fontSize: '2rem', fontWeight: 700,
-                fontFamily: 'var(--font-mono, Fira Code, monospace)',
-                color: '#06b6d4',
-              }}>
-                {horasFiltradas.find((h) => h.currentVelocity != null)?.currentVelocity?.toFixed(2) ?? '—'}
+            <div style={{ marginBottom: 8 }}>
+              <span
+                style={{
+                  fontSize: '2rem',
+                  fontWeight: 700,
+                  fontFamily: 'var(--font-mono, Fira Code, monospace)',
+                  color: '#06b6d4',
+                }}
+              >
+                {horasFiltradas
+                  .find((h) => h.currentVelocity != null)
+                  ?.currentVelocity?.toFixed(2) ?? '—'}
               </span>
-              <span style={{ fontSize: '1rem', marginLeft: '6px', color: 'var(--text-dim)' }}>kn</span>
+              <span style={{ fontSize: '1rem', marginLeft: 6, color: 'var(--text-dim)' }}>
+                kn
+              </span>
             </div>
             <TablaDatos
               horas={horasFiltradas}
               colorNivel={colorNivel}
               lang={lang}
               columnas={[
-                { key: 'cv', label: t('factors.currentKn'),
-                  render: (h) => h.currentVelocity != null ? `${h.currentVelocity.toFixed(2)}` : '—',
-                  veredicto: subVeredictoCurrent },
-                { key: 'ckh', label: t('factors.currentKmh'),
-                  render: (h) => h.currentVelocity != null ? `${(h.currentVelocity * 1.852).toFixed(1)}` : '—' },
-                { key: 'cd', label: t('factors.currentDirection'),
+                {
+                  key: 'cv',
+                  label: t('factors.currentKn'),
                   render: (h) => {
-                    const nv = nombreViento(h.currentDirection, spot.zona ?? 'mediterraneo_espanol', lang);
-                    return nv.grados != null ? `${nv.cardinal} ${Math.round(nv.grados)}°` : '—';
-                  } },
+                    if (h.currentVelocity == null) return '—';
+                    const kn = h.currentVelocity;
+                    const kmh = kn * 1.852;
+                    let indicador = '▶ correcto';
+                    if (kn < 0.4) indicador = '🐌 Agua parada / baja actividad';
+                    else if (kn > 1.4) indicador = '⚡ Deriva rápida';
+                    return (
+                      <span style={{ fontSize: '0.68rem' }}>
+                        {kn.toFixed(1)} kn ({kmh.toFixed(1).replace('.', ',')} km/h) {indicador}
+                      </span>
+                    );
+                  },
+                  veredicto: subVeredictoCurrent,
+                },
+                {
+                  key: 'cd',
+                  label: t('factors.currentDirection'),
+                  render: (h) => {
+                    const nv = nombreViento(
+                      h.currentDirection,
+                      spot.zona ?? 'mediterraneo_espanol',
+                      lang
+                    );
+                    return nv.grados != null
+                      ? `${nv.cardinal} ${Math.round(nv.grados)}°`
+                      : '—';
+                  },
+                },
+                {
+                  key: 'act',
+                  label: t('factors.fishActivity'),
+                  render: (h) => {
+                    const a = actividad.find((x) => x.hora === h.time);
+                    if (!a) return '—';
+                    return (
+                      <span style={{ fontSize: '0.68rem' }}>
+                        {a.coeficiente}/10 {a.emoji}
+                      </span>
+                    );
+                  },
+                },
               ]}
             />
           </div>
@@ -970,37 +1325,71 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
           </div>
         )}
 
-        {/* ─── MAREAS (7 días) ─── */}
+        {/* ─── MAREAS (bug 22) ─── */}
         {tabActiva === 'tides' && weather && (
           <div>
-            <div style={{ marginBottom: '8px' }}>
-              <span style={{
-                fontSize: '2rem', fontWeight: 700,
-                fontFamily: 'var(--font-mono, Fira Code, monospace)',
-                color: '#38bdf8',
-              }}>
-                {horasFiltradas.find((h) => h.seaLevelHeight != null)?.seaLevelHeight?.toFixed(2) ?? '—'}
+            <div style={{ marginBottom: 8 }}>
+              <span
+                style={{
+                  fontSize: '2rem',
+                  fontWeight: 700,
+                  fontFamily: 'var(--font-mono, Fira Code, monospace)',
+                  color: '#38bdf8',
+                }}
+              >
+                {horasFiltradas
+                  .find((h) => h.seaLevelHeight != null)
+                  ?.seaLevelHeight?.toFixed(2) ?? '—'}
               </span>
-              <span style={{ fontSize: '1rem', marginLeft: '6px', color: 'var(--text-dim)' }}>m</span>
+              <span style={{ fontSize: '1rem', marginLeft: 6, color: 'var(--text-dim)' }}>
+                m
+              </span>
             </div>
             <TablaDatos
               horas={horasFiltradas}
               colorNivel={colorNivel}
               lang={lang}
               columnas={[
-                { key: 'sl', label: t('factors.seaLevel'),
-                  render: (h) => h.seaLevelHeight != null ? `${h.seaLevelHeight.toFixed(2)} m` : '—' },
-                { key: 'tr', label: t('factors.seaLevelTrend'),
+                {
+                  key: 'sl',
+                  label: t('factors.seaLevel'),
+                  render: (h) =>
+                    h.seaLevelHeight != null
+                      ? `${h.seaLevelHeight.toFixed(2)} m`
+                      : '—',
+                },
+                {
+                  key: 'tr',
+                  label: t('factors.seaLevelTrend'),
                   render: (h) => {
                     const idx = horasFiltradas.indexOf(h);
                     if (idx === 0) return '—';
                     const prev = horasFiltradas[idx - 1].seaLevelHeight;
                     if (prev == null || h.seaLevelHeight == null) return '—';
                     const d = h.seaLevelHeight - prev;
+                    // Bug 22: cambio inusual > 0,08 m/h en rojo neón.
+                    // Criterio por zona: Mediterráneo 0,3 m de rango,
+                    // Atlántico 3-6 m. Simplificamos: umbral fijo.
+                    const inusual = Math.abs(d) > 0.08;
+                    if (inusual) {
+                      return (
+                        <span
+                          style={{
+                            color: '#FF2D55',
+                            fontWeight: 700,
+                            textShadow: '0 0 6px rgba(255, 45, 85, 0.7)',
+                          }}
+                        >
+                          {d > 0 ? '⬆️' : '⬇️'} {d > 0 ? '+' : ''}
+                          {d.toFixed(3)}
+                        </span>
+                      );
+                    }
                     if (d > 0.02) return '↑';
                     if (d < -0.02) return '↓';
                     return '→';
-                  } },
+                  },
+                },
               ]}
             />
           </div>
@@ -1012,13 +1401,17 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 
 // ─── Tabla de Sol (30 días) ──────────────────────────────────────
 
-const TablaSol: React.FC<{ lang: string; lat: number; lon: number }> = ({ lang, lat, lon }) => {
+const TablaSol: React.FC<{ lang: string; lat: number; lon: number }> = ({
+  lang, lat, lon,
+}) => {
   const { t } = useTranslation();
   const filas = useMemo(() => {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
     const out: Array<{
-      key: string; fecha: Date; sol: ReturnType<typeof calcularSol>;
+      key: string;
+      fecha: Date;
+      sol: ReturnType<typeof calcularSol>;
     }> = [];
     for (let i = 0; i < 30; i++) {
       const f = new Date(hoy);
@@ -1031,27 +1424,52 @@ const TablaSol: React.FC<{ lang: string; lat: number; lon: number }> = ({ lang, 
   const fmt = (d: Date | null | undefined) => {
     if (!d) return '—';
     return d.toLocaleTimeString(lang === 'en' ? 'en-GB' : 'es-ES', {
-      hour: '2-digit', minute: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
     });
   };
 
   return (
-    <div style={{ borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden', fontSize: '0.72rem' }}>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(64px, auto) repeat(6, 1fr)',
-        backgroundColor: 'var(--surface)',
-        borderBottom: '1px solid var(--border)',
-        fontSize: '0.68rem', color: 'var(--text-dim)', fontWeight: 700,
-        textTransform: 'uppercase', letterSpacing: '0.04em',
-      }}>
-        <div style={{ padding: '6px 6px' }}>Fecha</div>
-        <div style={{ padding: '6px 4px', textAlign: 'center' }}>Orto</div>
-        <div style={{ padding: '6px 4px', textAlign: 'center' }}>Mediodía</div>
-        <div style={{ padding: '6px 4px', textAlign: 'center' }}>Ocaso</div>
-        <div style={{ padding: '6px 4px', textAlign: 'center' }}>Crep. astr.</div>
-        <div style={{ padding: '6px 4px', textAlign: 'center' }}>Crep. naut.</div>
-        <div style={{ padding: '6px 4px', textAlign: 'center' }}>Crep. civil</div>
+    <div
+      style={{
+        borderRadius: 8,
+        border: '1px solid var(--border)',
+        overflow: 'hidden',
+        fontSize: '0.72rem',
+      }}
+    >
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(64px, auto) repeat(6, 1fr)',
+          backgroundColor: 'var(--surface)',
+          borderBottom: '1px solid var(--border)',
+          fontSize: '0.68rem',
+          color: 'var(--text-dim)',
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+        }}
+      >
+        <div style={{ padding: '6px 6px' }}>{t('factors.date')}</div>
+        <div style={{ padding: '6px 4px', textAlign: 'center' }}>
+          {t('factors.sunrise')}
+        </div>
+        <div style={{ padding: '6px 4px', textAlign: 'center' }}>
+          {t('factors.solarNoon')}
+        </div>
+        <div style={{ padding: '6px 4px', textAlign: 'center' }}>
+          {t('factors.sunset')}
+        </div>
+        <div style={{ padding: '6px 4px', textAlign: 'center' }}>
+          {t('factors.twilightAstro')}
+        </div>
+        <div style={{ padding: '6px 4px', textAlign: 'center' }}>
+          {t('factors.twilightNautical')}
+        </div>
+        <div style={{ padding: '6px 4px', textAlign: 'center' }}>
+          {t('factors.twilightCivil')}
+        </div>
       </div>
       {filas.map(({ key, fecha, sol }, i) => (
         <div
@@ -1062,29 +1480,78 @@ const TablaSol: React.FC<{ lang: string; lat: number; lon: number }> = ({ lang, 
             borderTop: i > 0 ? '1px solid var(--border)' : 'none',
           }}
         >
-          <div style={{
-            padding: '5px 6px', fontFamily: 'var(--font-mono, Fira Code, monospace)',
-            color: 'var(--text-dim)', fontWeight: 500,
-          }}>
+          <div
+            style={{
+              padding: '5px 6px',
+              fontFamily: 'var(--font-mono, Fira Code, monospace)',
+              color: 'var(--text-dim)',
+              fontWeight: 500,
+            }}
+          >
             {fechaLarga(fecha, lang)}
           </div>
-          <div style={{ padding: '5px 4px', textAlign: 'center', fontFamily: 'var(--font-mono, Fira Code, monospace)' }}>
+          <div
+            style={{
+              padding: '5px 4px',
+              textAlign: 'center',
+              fontFamily: 'var(--font-mono, Fira Code, monospace)',
+            }}
+          >
             {fmt(sol?.orto)}
           </div>
-          <div style={{ padding: '5px 4px', textAlign: 'center', fontFamily: 'var(--font-mono, Fira Code, monospace)' }}>
+          <div
+            style={{
+              padding: '5px 4px',
+              textAlign: 'center',
+              fontFamily: 'var(--font-mono, Fira Code, monospace)',
+            }}
+          >
             {fmt(sol?.mediodiaSolar)}
           </div>
-          <div style={{ padding: '5px 4px', textAlign: 'center', fontFamily: 'var(--font-mono, Fira Code, monospace)' }}>
+          <div
+            style={{
+              padding: '5px 4px',
+              textAlign: 'center',
+              fontFamily: 'var(--font-mono, Fira Code, monospace)',
+            }}
+          >
             {fmt(sol?.ocaso)}
           </div>
-          <div style={{ padding: '5px 4px', textAlign: 'center', fontFamily: 'var(--font-mono, Fira Code, monospace)', fontSize: '0.68rem' }}>
-            {sol ? `${fmt(sol.crepusculoAstronomicoInicio)}–${fmt(sol.crepusculoAstronomicoFin)}` : '—'}
+          <div
+            style={{
+              padding: '5px 4px',
+              textAlign: 'center',
+              fontFamily: 'var(--font-mono, Fira Code, monospace)',
+              fontSize: '0.68rem',
+            }}
+          >
+            {sol
+              ? `${fmt(sol.crepusculoAstronomicoInicio)}–${fmt(sol.crepusculoAstronomicoFin)}`
+              : '—'}
           </div>
-          <div style={{ padding: '5px 4px', textAlign: 'center', fontFamily: 'var(--font-mono, Fira Code, monospace)', fontSize: '0.68rem' }}>
-            {sol ? `${fmt(sol.crepusculoNauticoInicio)}–${fmt(sol.crepusculoNauticoFin)}` : '—'}
+          <div
+            style={{
+              padding: '5px 4px',
+              textAlign: 'center',
+              fontFamily: 'var(--font-mono, Fira Code, monospace)',
+              fontSize: '0.68rem',
+            }}
+          >
+            {sol
+              ? `${fmt(sol.crepusculoNauticoInicio)}–${fmt(sol.crepusculoNauticoFin)}`
+              : '—'}
           </div>
-          <div style={{ padding: '5px 4px', textAlign: 'center', fontFamily: 'var(--font-mono, Fira Code, monospace)', fontSize: '0.68rem' }}>
-            {sol ? `${fmt(sol.crepusculoCivilInicio)}–${fmt(sol.crepusculoCivilFin)}` : '—'}
+          <div
+            style={{
+              padding: '5px 4px',
+              textAlign: 'center',
+              fontFamily: 'var(--font-mono, Fira Code, monospace)',
+              fontSize: '0.68rem',
+            }}
+          >
+            {sol
+              ? `${fmt(sol.crepusculoCivilInicio)}–${fmt(sol.crepusculoCivilFin)}`
+              : '—'}
           </div>
         </div>
       ))}
@@ -1094,21 +1561,28 @@ const TablaSol: React.FC<{ lang: string; lat: number; lon: number }> = ({ lang, 
 
 // ─── Tabla de Luna (30 días) ─────────────────────────────────────
 
-const TablaLuna: React.FC<{ lang: string; lat: number; lon: number }> = ({ lang, lat, lon }) => {
+const TablaLuna: React.FC<{ lang: string; lat: number; lon: number }> = ({
+  lang, lat, lon,
+}) => {
+  const { t } = useTranslation();
   const filas = useMemo(() => {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
     const out: Array<{
-      key: string; fecha: Date; luna: ReturnType<typeof calcularLuna>;
+      key: string;
+      fecha: Date;
+      luna: ReturnType<typeof calcularLuna>;
     }> = [];
     for (let i = 0; i < 30; i++) {
       const f = new Date(hoy);
       f.setDate(f.getDate() + i);
-      // Nos interesa el cálculo a las 12:00 del día para tener un
-      // valor representativo del día.
       const fMediodia = new Date(f);
       fMediodia.setHours(12, 0, 0, 0);
-      out.push({ key: localDateKey(f), fecha: f, luna: calcularLuna(fMediodia, lat, lon) });
+      out.push({
+        key: localDateKey(f),
+        fecha: f,
+        luna: calcularLuna(fMediodia, lat, lon),
+      });
     }
     return out;
   }, [lat, lon]);
@@ -1116,27 +1590,52 @@ const TablaLuna: React.FC<{ lang: string; lat: number; lon: number }> = ({ lang,
   const fmt = (d: Date | null) => {
     if (!d) return '—';
     return d.toLocaleTimeString(lang === 'en' ? 'en-GB' : 'es-ES', {
-      hour: '2-digit', minute: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
     });
   };
 
   return (
-    <div style={{ borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden', fontSize: '0.72rem' }}>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(64px, auto) 1fr 0.7fr 0.7fr 0.9fr 0.9fr 0.9fr',
-        backgroundColor: 'var(--surface)',
-        borderBottom: '1px solid var(--border)',
-        fontSize: '0.68rem', color: 'var(--text-dim)', fontWeight: 700,
-        textTransform: 'uppercase', letterSpacing: '0.04em',
-      }}>
-        <div style={{ padding: '6px 6px' }}>Fecha</div>
-        <div style={{ padding: '6px 4px', textAlign: 'center' }}>Fase</div>
-        <div style={{ padding: '6px 4px', textAlign: 'center' }}>Edad</div>
-        <div style={{ padding: '6px 4px', textAlign: 'center' }}>Ilum.</div>
-        <div style={{ padding: '6px 4px', textAlign: 'center' }}>Orto</div>
-        <div style={{ padding: '6px 4px', textAlign: 'center' }}>Tránsito</div>
-        <div style={{ padding: '6px 4px', textAlign: 'center' }}>Ocaso</div>
+    <div
+      style={{
+        borderRadius: 8,
+        border: '1px solid var(--border)',
+        overflow: 'hidden',
+        fontSize: '0.72rem',
+      }}
+    >
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(64px, auto) 1fr 0.7fr 0.7fr 0.9fr 0.9fr 0.9fr',
+          backgroundColor: 'var(--surface)',
+          borderBottom: '1px solid var(--border)',
+          fontSize: '0.68rem',
+          color: 'var(--text-dim)',
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+        }}
+      >
+        <div style={{ padding: '6px 6px' }}>{t('factors.date')}</div>
+        <div style={{ padding: '6px 4px', textAlign: 'center' }}>
+          {t('factors.moonPhase')}
+        </div>
+        <div style={{ padding: '6px 4px', textAlign: 'center' }}>
+          {t('factors.moonAge')}
+        </div>
+        <div style={{ padding: '6px 4px', textAlign: 'center' }}>
+          {t('factors.moonIllum')}
+        </div>
+        <div style={{ padding: '6px 4px', textAlign: 'center' }}>
+          {t('factors.moonrise')}
+        </div>
+        <div style={{ padding: '6px 4px', textAlign: 'center' }}>
+          {t('factors.moonTransit')}
+        </div>
+        <div style={{ padding: '6px 4px', textAlign: 'center' }}>
+          {t('factors.moonset')}
+        </div>
       </div>
       {filas.map(({ key, fecha, luna }, i) => (
         <div
@@ -1147,28 +1646,62 @@ const TablaLuna: React.FC<{ lang: string; lat: number; lon: number }> = ({ lang,
             borderTop: i > 0 ? '1px solid var(--border)' : 'none',
           }}
         >
-          <div style={{
-            padding: '5px 6px', fontFamily: 'var(--font-mono, Fira Code, monospace)',
-            color: 'var(--text-dim)', fontWeight: 500,
-          }}>
+          <div
+            style={{
+              padding: '5px 6px',
+              fontFamily: 'var(--font-mono, Fira Code, monospace)',
+              color: 'var(--text-dim)',
+              fontWeight: 500,
+            }}
+          >
             {fechaLarga(fecha, lang)}
           </div>
           <div style={{ padding: '5px 4px', textAlign: 'center', fontSize: '0.7rem' }}>
             {emojiFase(luna.fase)} {nombreFase(luna.fase, lang === 'en' ? 'en' : 'es')}
           </div>
-          <div style={{ padding: '5px 4px', textAlign: 'center', fontFamily: 'var(--font-mono, Fira Code, monospace)' }}>
+          <div
+            style={{
+              padding: '5px 4px',
+              textAlign: 'center',
+              fontFamily: 'var(--font-mono, Fira Code, monospace)',
+            }}
+          >
             {luna.edad.toFixed(1)}
           </div>
-          <div style={{ padding: '5px 4px', textAlign: 'center', fontFamily: 'var(--font-mono, Fira Code, monospace)' }}>
+          <div
+            style={{
+              padding: '5px 4px',
+              textAlign: 'center',
+              fontFamily: 'var(--font-mono, Fira Code, monospace)',
+            }}
+          >
             {Math.round(luna.iluminacion * 100)}%
           </div>
-          <div style={{ padding: '5px 4px', textAlign: 'center', fontFamily: 'var(--font-mono, Fira Code, monospace)' }}>
+          <div
+            style={{
+              padding: '5px 4px',
+              textAlign: 'center',
+              fontFamily: 'var(--font-mono, Fira Code, monospace)',
+            }}
+          >
             {fmt(luna.ortoLunar)}
           </div>
-          <div style={{ padding: '5px 4px', textAlign: 'center', fontFamily: 'var(--font-mono, Fira Code, monospace)' }}>
+          <div
+            style={{
+              padding: '5px 4px',
+              textAlign: 'center',
+              fontFamily: 'var(--font-mono, Fira Code, monospace)',
+            }}
+          >
             {fmt(luna.transitoLunar)}
           </div>
-          <div style={{ padding: '5px 4px', textAlign: 'center', fontFamily: 'var(--font-mono, Fira Code, monospace)' }}>
+          <div
+            style={{
+              padding: '5px 4px',
+              textAlign: 'center',
+              fontFamily: 'var(--font-mono, Fira Code, monospace)',
+            }}
+          >
             {fmt(luna.ocasoLunar)}
           </div>
         </div>

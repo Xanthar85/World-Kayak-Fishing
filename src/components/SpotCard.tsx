@@ -1,13 +1,36 @@
+// src/components/SpotCard.tsx
+// WKF — Tarjeta de un punto en la pantalla Home.
+// v1.010 (bugs 5, 6, 7, 8, 15, 17):
+//   - Estructura nueva (DP-080):
+//       Nombre / Zona geográfica
+//       Coordenadas / Profundidad / Botón copiar
+//       Hoy / F1 F2 F3 F4
+//       Mañana / F1 F2 F3 F4
+//       dd|m × 5 días más
+//   - Franjas clicables desde Home (bug 6). Al clicar, abre el
+//     SpotScreen con la franja activa (onOpenFranja).
+//   - Home muestra 7 días (hoy a +6) (DP-079).
+//   - Franjas encuadradas con el color del veredicto (bug 5).
+//   - Mini-gráfico nuevo con ejes, iconos y franjas (bug 14,
+//     DP-090).
+//   - Arrastrar para reordenar (DP-083): props de drag opcional.
+//   - Botón "Invitar a un café" fuera de la tarjeta (bug 15):
+//     la Home lo gestiona.
+
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatearCoords, type FormatoCoords } from '../lib/coords.ts';
 import {
-  calcularVeredictoPorFranja,
+  calcularVeredictoFranjaDia,
   veredictoAColor,
-  miniGraficoOlaViento,
 } from '../lib/verdict-ui.ts';
+import { MiniGrafico } from './MiniGrafico.tsx';
 import type { Spot, FranjaUsuario } from '../state/store.ts';
-import type { CategoriaKayak, PerfilKayakista, Veredicto } from '../lib/verdict.ts';
+import type {
+  CategoriaKayak,
+  PerfilKayakista,
+  Veredicto,
+} from '../lib/verdict.ts';
 import type { SpotWeather } from '../lib/openmeteo.ts';
 
 export interface SpotCardProps {
@@ -21,15 +44,34 @@ export interface SpotCardProps {
   onEdit: () => void;
   onDelete: () => void;
   refreshing?: boolean;
+  /**
+   * Se llama al clicar una franja. Recibe el id de la franja y el
+   * ISO de fecha (para que SpotScreen sepa qué día mostrar).
+   */
+  onOpenFranja?: (franjaId: string, fechaISO: string) => void;
+  /** Reordenar por arrastre. */
+  draggable?: boolean;
+  onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragOver?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDrop?: (e: React.DragEvent<HTMLDivElement>) => void;
+  isDragging?: boolean;
 }
 
-// Devuelve la fecha YYYY-MM-DD local de un timestamp (para agrupar
-// por día).
 function localDateKey(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${dd}`;
+}
+
+function etiquetaDiaCorta(d: Date, offset: number, lang: string, t: (k: string, o?: Record<string, unknown>) => string): string {
+  if (offset === 0) return t('home.today');
+  if (offset === 1) return t('home.tomorrow');
+  if (offset === 2) return t('home.dayAfter');
+  return d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+  });
 }
 
 export const SpotCard: React.FC<SpotCardProps> = ({
@@ -43,146 +85,151 @@ export const SpotCard: React.FC<SpotCardProps> = ({
   onEdit,
   onDelete,
   refreshing = false,
+  onOpenFranja,
+  draggable = false,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  isDragging = false,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  const veredictos = calcularVeredictoPorFranja(
-    spot,
-    weather,
-    franjas,
-    categoria,
-    perfil
-  );
+  const lang = i18n.language?.startsWith('en') ? 'en' : 'es';
 
-  const graficos = miniGraficoOlaViento(weather);
-  const coordsFormateadas = formatearCoords(spot.lat, spot.lon, formatoCoords);
-
-  // Construye los 3 días a mostrar: hoy, +1, +2.
+  // Construye los 7 días a mostrar: hoy a +6 (DP-079).
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
-  const dias = [0, 1, 2].map((offset) => {
+  const dias = Array.from({ length: 7 }, (_, offset) => {
     const fecha = new Date(hoy);
     fecha.setDate(fecha.getDate() + offset);
-    return {
-      offset,
-      fecha,
-      key: localDateKey(fecha),
-    };
+    return { offset, fecha, key: localDateKey(fecha) };
   });
 
   const ahora = new Date();
-  const horaActual = ahora.getHours();
 
-  // Dada una franja y una fecha, ¿ya ha pasado esa franja?
+  // ¿Está ya pasada la franja? Solo aplica a hoy.
   function franjaPasada(fechaBase: Date, inicio: number, fin: number): boolean {
-    // Solo el día 0 puede tener franjas pasadas. Otros días no.
     const hoyKey = localDateKey(hoy);
     const fechaKey = localDateKey(fechaBase);
     if (fechaKey !== hoyKey) return false;
-    // Si la franja va de hoy a mañana (inicio > fin), no la marcamos
-    // pasada hasta que toda la franja haya terminado. Simplificación:
-    // si inicio < fin, pasada si horaActual >= fin.
-    // Si inicio > fin (noche), pasada solo si horaActual >= inicio.
-    if (inicio < fin) return horaActual >= fin;
-    return horaActual >= inicio;
+    const h = ahora.getHours();
+    if (inicio < fin) return h >= fin;
+    return h >= inicio;
   }
 
-  // Etiqueta legible del día.
-  function etiquetaDia(offset: number): string {
-    if (offset === 0) return t('home.today');
-    if (offset === 1) return t('home.tomorrow');
-    if (offset === 2) return t('home.dayAfter');
-    return t('home.dayN', { n: offset });
-  }
+  // Veredicto por franja y día, cacheado por key+id.
+  const veredictosCache = React.useMemo(() => {
+    const out: Record<string, Veredicto | null> = {};
+    for (const d of dias) {
+      for (const f of franjas) {
+        const k = `${d.key}__${f.id}`;
+        out[k] = calcularVeredictoFranjaDia(
+          spot, weather, f, d.fecha, categoria, perfil
+        );
+      }
+    }
+    return out;
+  }, [spot, weather, franjas, categoria, perfil, dias]);
 
-  // Comprueba si el veredicto de una franja en un día concreto
-  // tiene datos. Si el día no es hoy, no tenemos un veredicto por
-  // hora calculado. Lo calculamos a partir del weather completo.
-  function veredictoFranjaDia(
-    franja: FranjaUsuario,
-    fechaBase: Date
-  ): Veredicto | null {
-    if (!weather) return null;
-    const key = localDateKey(fechaBase);
-    const horas = weather.hourly.filter((h) => {
-      const d = new Date(h.time);
-      return localDateKey(d) === key;
-    });
-    if (horas.length === 0) return null;
+  // Veredictos de HOY por franja (para el mini-gráfico).
+  const veredictosHoy = React.useMemo(() => {
+    const out: Record<string, Veredicto | null> = {};
+    for (const f of franjas) {
+      out[f.id] = veredictosCache[`${dias[0].key}__${f.id}`] ?? null;
+    }
+    return out;
+  }, [veredictosCache, franjas, dias]);
 
-    // Reutilizamos la lógica de verdict-ui.ts pero filtrando por
-    // fecha. Para no duplicar, usamos calcularVeredictoPorFranja
-    // sobre un weather sintético de un día.
-    const weatherDia: SpotWeather = { ...weather, hourly: horas };
-    const res = calcularVeredictoPorFranja(
-      spot,
-      weatherDia,
-      [franja],
-      categoria,
-      perfil
-    );
-    return res[franja.id] ?? null;
-  }
+  const coordsFormateadas = formatearCoords(spot.lat, spot.lon, formatoCoords);
 
   return (
     <div
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
       style={{
         backgroundColor: 'var(--surface)',
         border: '1px solid var(--border)',
         borderRadius: 8,
-        padding: '14px',
-        marginBottom: '12px',
+        padding: '12px',
+        marginBottom: '10px',
         position: 'relative',
+        opacity: isDragging ? 0.4 : 1,
+        cursor: draggable ? 'grab' : 'default',
       }}
     >
-      {/* Fila 1: Nombre + borrar */}
+      {/* Fila 1: Nombre + zona + borrar */}
       <div
         style={{
           display: 'flex',
-          alignItems: 'center',
+          alignItems: 'flex-start',
           justifyContent: 'space-between',
-          marginBottom: '4px',
+          marginBottom: 2,
+          gap: 6,
         }}
       >
-        <h2
-          onClick={onEdit}
-          style={{
-            margin: 0,
-            fontSize: '1rem',
-            fontWeight: 600,
-            color: 'var(--text)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            cursor: 'pointer',
-          }}
-        >
-          {spot.name || t('common.unnamed')}
-        </h2>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <h2
+            onClick={onEdit}
+            style={{
+              margin: 0,
+              fontSize: '1rem',
+              fontWeight: 600,
+              color: 'var(--text)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              cursor: 'pointer',
+            }}
+          >
+            {spot.name || t('common.unnamed')}
+          </h2>
+          <div
+            style={{
+              fontSize: '0.7rem',
+              color: 'var(--text-dim)',
+              marginTop: 2,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {t(`zones.${spot.zona ?? 'mediterraneo_espanol'}`)}
+          </div>
+        </div>
 
         {confirmingDelete ? (
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <button
               onClick={() => setConfirmingDelete(false)}
               style={{
-                padding: '4px 8px', borderRadius: 4,
+                padding: '3px 8px',
+                borderRadius: 4,
                 border: '1px solid var(--border)',
                 backgroundColor: 'transparent',
-                color: 'var(--text-dim)', fontSize: '0.75rem',
+                color: 'var(--text-dim)',
+                fontSize: '0.72rem',
                 cursor: 'pointer',
               }}
             >
               {t('common.cancel')}
             </button>
             <button
-              onClick={() => { onDelete(); setConfirmingDelete(false); }}
+              onClick={() => {
+                onDelete();
+                setConfirmingDelete(false);
+              }}
               style={{
-                padding: '4px 8px', borderRadius: 4,
+                padding: '3px 8px',
+                borderRadius: 4,
                 border: '1px solid #ef4444',
                 backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                color: '#ef4444', fontSize: '0.75rem',
-                fontWeight: 600, cursor: 'pointer',
+                color: '#ef4444',
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                cursor: 'pointer',
               }}
             >
               {t('common.delete')}
@@ -193,10 +240,14 @@ export const SpotCard: React.FC<SpotCardProps> = ({
             onClick={() => setConfirmingDelete(true)}
             title={t('common.delete')}
             style={{
-              border: 'none', background: 'transparent',
-              color: 'var(--text-dim)', cursor: 'pointer',
-              padding: '4px 6px', fontSize: '0.85rem',
-              lineHeight: 1, borderRadius: 4,
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--text-dim)',
+              cursor: 'pointer',
+              padding: '2px 6px',
+              fontSize: '0.85rem',
+              lineHeight: 1,
+              borderRadius: 4,
             }}
           >
             ✕
@@ -204,25 +255,66 @@ export const SpotCard: React.FC<SpotCardProps> = ({
         )}
       </div>
 
-      {/* Fila 2: Coordenadas */}
+      {/* Fila 2: Coordenadas + profundidad + copiar */}
       <div
         style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
           fontFamily: 'var(--font-mono, Fira Code, monospace)',
-          fontSize: '0.72rem',
+          fontSize: '0.68rem',
           color: 'var(--text-dim)',
-          marginBottom: '10px',
+          marginBottom: 8,
+          overflow: 'hidden',
         }}
       >
-        {coordsFormateadas}
+        <span
+          style={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {coordsFormateadas}
+        </span>
+        <span>•</span>
+        <span style={{ whiteSpace: 'nowrap' }}>
+          {spot.profundidad != null
+            ? `${spot.profundidad.toFixed(1)} m`
+            : t('detalle.noDepth')}
+        </span>
+        <button
+          onClick={async (e) => {
+            e.stopPropagation();
+            try {
+              await navigator.clipboard.writeText(
+                `${spot.lat.toFixed(6)}, ${spot.lon.toFixed(6)}`
+              );
+            } catch {
+              /* ignore */
+            }
+          }}
+          title={t('detalle.copyCoords')}
+          style={{
+            border: 'none',
+            background: 'transparent',
+            color: 'var(--text-dim)',
+            cursor: 'pointer',
+            fontSize: '0.75rem',
+            padding: '0 2px',
+          }}
+        >
+          📋
+        </button>
       </div>
 
-      {/* Fila 3: 3 días × franjas. Borde + texto, sin relleno. */}
+      {/* Fila 3: 7 días × franjas clicables */}
       <div
         style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: '6px',
-          marginBottom: '12px',
+          gap: 3,
+          marginBottom: 8,
         }}
       >
         {dias.map(({ offset, fecha, key }) => (
@@ -231,52 +323,54 @@ export const SpotCard: React.FC<SpotCardProps> = ({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: 4,
             }}
           >
             <div
               style={{
-                minWidth: 62,
-                fontSize: '0.7rem',
+                minWidth: 52,
+                fontSize: '0.68rem',
                 fontWeight: 600,
                 color: offset === 0 ? 'var(--accent)' : 'var(--text-dim)',
                 fontFamily: 'var(--font-mono, Fira Code, monospace)',
               }}
             >
-              {etiquetaDia(offset)}
+              {etiquetaDiaCorta(fecha, offset, lang, t)}
             </div>
-            <div style={{ display: 'flex', gap: '4px', flex: 1 }}>
+            <div style={{ display: 'flex', gap: 3, flex: 1, minWidth: 0 }}>
               {franjas.map((franja) => {
-                const v = veredictoFranjaDia(franja, fecha);
+                const v = veredictosCache[`${key}__${franja.id}`] ?? null;
                 const color = v ? veredictoAColor(v) : 'var(--text-dim)';
                 const pasada = franjaPasada(fecha, franja.inicio, franja.fin);
-
                 return (
-                  <div
+                  <button
                     key={franja.id}
+                    onClick={() => {
+                      if (onOpenFranja) {
+                        onOpenFranja(franja.id, fecha.toISOString());
+                      } else {
+                        onEdit();
+                      }
+                    }}
                     style={{
                       flex: 1,
                       minWidth: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '5px 4px',
-                      borderRadius: 6,
-                      backgroundColor: pasada
-                        ? 'var(--bg)'
-                        : 'transparent',
+                      padding: '4px 3px',
+                      borderRadius: 4,
+                      backgroundColor: 'transparent',
                       border: `1px solid ${color}`,
-                      fontSize: '0.72rem',
+                      fontSize: '0.65rem',
                       fontWeight: 600,
                       color: color,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                       opacity: pasada ? 0.35 : 1,
+                      cursor: 'pointer',
                     }}
                   >
                     {franja.nombre}
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -284,52 +378,28 @@ export const SpotCard: React.FC<SpotCardProps> = ({
         ))}
       </div>
 
-      {/* Fila 4: Mini-gráfico */}
-      <div
-        style={{
-          width: '100%',
-          height: '28px',
-          backgroundColor: 'var(--bg)',
-          borderRadius: 4,
-          overflow: 'hidden',
-          marginBottom: '10px',
-          border: '1px solid var(--border)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {graficos.ola && graficos.viento ? (
-          <svg
-            viewBox="0 0 100 30"
-            preserveAspectRatio="none"
-            style={{ width: '100%', height: '28px', display: 'block' }}
-          >
-            <path d={graficos.ola} fill="none" stroke="var(--accent)"
-              strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            <path d={graficos.viento} fill="none" stroke="var(--accent-2)"
-              strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        ) : (
-          <div
-            style={{
-              fontSize: '0.7rem', color: 'var(--text-dim)', fontStyle: 'italic',
-            }}
-          >
-            {t('home.card.noData')}
-          </div>
-        )}
+      {/* Fila 4: Mini-gráfico con ejes, iconos y franjas */}
+      <div style={{ marginBottom: 8 }}>
+        <MiniGrafico
+          weather={weather}
+          franjas={franjas}
+          veredictos={veredictosHoy}
+        />
       </div>
 
       {/* Fila 5: Botones */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
         <button
           onClick={onEdit}
           style={{
-            padding: '5px 10px', borderRadius: 6,
+            padding: '4px 10px',
+            borderRadius: 6,
             border: '1px solid var(--border)',
-            backgroundColor: 'var(--bg)', color: 'var(--text)',
-            fontSize: '0.78rem', fontWeight: 500, cursor: 'pointer',
+            backgroundColor: 'var(--bg)',
+            color: 'var(--text)',
+            fontSize: '0.75rem',
+            fontWeight: 500,
+            cursor: 'pointer',
           }}
         >
           {t('common.edit')}
@@ -338,11 +408,13 @@ export const SpotCard: React.FC<SpotCardProps> = ({
           onClick={onRefresh}
           disabled={refreshing}
           style={{
-            padding: '5px 10px', borderRadius: 6,
+            padding: '4px 10px',
+            borderRadius: 6,
             border: '1px solid var(--border)',
             backgroundColor: 'var(--bg)',
             color: refreshing ? 'var(--text-dim)' : 'var(--text)',
-            fontSize: '0.78rem', fontWeight: 500,
+            fontSize: '0.75rem',
+            fontWeight: 500,
             cursor: refreshing ? 'not-allowed' : 'pointer',
             opacity: refreshing ? 0.6 : 1,
           }}

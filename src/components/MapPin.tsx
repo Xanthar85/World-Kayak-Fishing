@@ -1,9 +1,15 @@
+// src/components/MapPin.tsx
+// WKF — Pin del mapa. Sin cambios en v1.010.
+
 type MapPinProps = {
   size?: number;
   color?: string;
 };
 
-export default function MapPin({ size = 40, color = '#00E56A' }: MapPinProps) {
+export default function MapPin({
+  size = 40,
+  color = '#00E56A',
+}: MapPinProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

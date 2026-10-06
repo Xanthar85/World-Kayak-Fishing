@@ -1,6 +1,9 @@
+// src/lib/kayaks.ts
 // WKF — Catálogo de kayaks.
-// DP-041 / DP-044 / DP-045 / DP-046 / DP-047.
-// Datos puros. Sin lógica de veredicto.
+// v1.010: sin cambios funcionales. Los dos kayaks del usuario
+// (Dolphin Propel 12 y Fisher Pro 12) siguen apareciendo como
+// entradas más del catálogo, sin ningún destacado. Norma de
+// privacidad de datos personales.
 
 import type { CategoriaKayak } from './verdict.ts';
 
@@ -12,14 +15,14 @@ export interface Kayak {
   id: string;
   marca: string;
   modelo: string;
-  eslora: number; // m
-  manga: number; // m
-  volumen: number; // L
+  eslora: number;
+  manga: number;
+  volumen: number;
   tipoCasco: TipoCasco;
   autovaciable: boolean;
   timon: boolean;
   compartimentosEstancos: boolean;
-  capacidadCarga: number; // kg
+  capacidadCarga: number;
   propulsion: Propulsion;
   categoriaWKF: CategoriaKayak;
   categoriaDirectiva: CategoriaDirectiva;
@@ -27,9 +30,6 @@ export interface Kayak {
   verificado: boolean;
 }
 
-// Catálogo de kayaks conocidos.
-// Los modelos del usuario (Dolphin Propel 12, Fisher Pro 12) están
-// como entradas más del catálogo, sin ningún destacado.
 export const CATALOGO_KAYAKS: Kayak[] = [
   {
     id: 'hobie-mirage-outback',
@@ -395,7 +395,7 @@ export const CATALOGO_KAYAKS: Kayak[] = [
     id: 'epic-v5',
     marca: 'Epic Kayaks',
     modelo: 'V5',
-    eslora: 5.20,
+    eslora: 5.2,
     manga: 0.51,
     volumen: 300,
     tipoCasco: 'V',
@@ -413,7 +413,7 @@ export const CATALOGO_KAYAKS: Kayak[] = [
     id: 'epic-v6',
     marca: 'Epic Kayaks',
     modelo: 'V6',
-    eslora: 6.10,
+    eslora: 6.1,
     manga: 0.51,
     volumen: 350,
     tipoCasco: 'V',
@@ -450,7 +450,7 @@ export const CATALOGO_KAYAKS: Kayak[] = [
     marca: 'Fisher',
     modelo: 'Pro 12',
     eslora: 3.66,
-    manga: 0.80,
+    manga: 0.8,
     volumen: 330,
     tipoCasco: 'U',
     autovaciable: true,
@@ -468,7 +468,7 @@ export const CATALOGO_KAYAKS: Kayak[] = [
     marca: 'Fisher',
     modelo: 'Pro 12',
     eslora: 3.66,
-    manga: 0.80,
+    manga: 0.8,
     volumen: 330,
     tipoCasco: 'U',
     autovaciable: true,
@@ -483,12 +483,10 @@ export const CATALOGO_KAYAKS: Kayak[] = [
   },
 ];
 
-// Busca un kayak por id.
 export function buscarKayakPorId(id: string): Kayak | undefined {
   return CATALOGO_KAYAKS.find((k) => k.id === id);
 }
 
-// Busca kayaks por nombre (marca + modelo). Case-insensitive.
 export function buscarKayaksPorNombre(texto: string): Kayak[] {
   const q = texto.trim().toLowerCase();
   if (!q) return [];

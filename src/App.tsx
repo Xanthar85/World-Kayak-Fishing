@@ -1,3 +1,6 @@
+// src/App.tsx
+// WKF — Componente raíz. Sin cambios funcionales en v1.010.
+
 import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from './state/store.ts';

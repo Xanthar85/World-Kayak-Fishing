@@ -1,3 +1,6 @@
+// src/screens/FirstRun.tsx
+// WKF — Pantalla de primer arranque. Sin cambios en v1.010.
+
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../state/store.ts';

@@ -1,4 +1,14 @@
 // src/screens/Home.tsx — completo
+// v1.010 (bugs 5, 6, 7, 15, 17, 20):
+//   - SpotCard rediseñada (delegada).
+//   - Home 7 días (DP-079), ya en SpotCard.
+//   - Franjas clicables desde Home (bug 6): abre SpotScreen con
+//     la franja activa y el día elegido.
+//   - Botón "Invitar a un café" reubicado arriba a la derecha,
+//     debajo de Ajustes (bug 15, DP-094).
+//   - Reordenar por arrastre (DP-083).
+//   - El aviso de actualización se mantiene. Sin cambios.
+
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore, type Spot } from '../state/store.ts';
@@ -20,6 +30,10 @@ export const Home: React.FC = () => {
   const [editSpot, setEditSpot] = useState<Spot | null>(null);
   const [refreshingMap, setRefreshingMap] = useState<Record<string, boolean>>({});
 
+  // Reordenar por arrastre (DP-083).
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+
   const spots = useAppStore((s) => s.spots);
   const ajustes = useAppStore((s) => s.ajustes);
   const getFreshWeather = useAppStore((s) => s.getFreshWeather);
@@ -28,6 +42,8 @@ export const Home: React.FC = () => {
   const addSpot = useAppStore((s) => s.addSpot);
   const updateSpot = useAppStore((s) => s.updateSpot);
   const removeSpot = useAppStore((s) => s.removeSpot);
+  const setFranjaActiva = useAppStore((s) => s.setFranjaActiva);
+  const reorderSpots = useAppStore((s) => s.reorderSpots);
 
   const autoFetchDoneRef = useRef(false);
 
@@ -64,6 +80,13 @@ export const Home: React.FC = () => {
     setViewingSpotId(null);
   };
 
+  // Abrir un punto en concreto y, si aplica, activar una franja
+  // y el día elegido.
+  const abrirPunto = (spotId: string, franjaId?: string) => {
+    if (franjaId) setFranjaActiva(franjaId);
+    setViewingSpotId(spotId);
+  };
+
   if (mapMode !== null) {
     return (
       <MapScreen
@@ -85,7 +108,10 @@ export const Home: React.FC = () => {
         onClose={() => setViewingSpotId(null)}
         onAddAccess={(spotId) => {
           const s = spots.find((x) => x.id === spotId);
-          if (s) { setEditSpot(s); setMapMode('edit'); }
+          if (s) {
+            setEditSpot(s);
+            setMapMode('edit');
+          }
         }}
       />
     );
@@ -95,43 +121,111 @@ export const Home: React.FC = () => {
     return <TutorialScreen onClose={() => setShowTutorial(false)} />;
   }
 
+  // Manejadores de drag and drop para reordenar.
+  const handleDragStart = (spotId: string) => (e: React.DragEvent<HTMLDivElement>) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', spotId);
+    setDraggingId(spotId);
+  };
+
+  const handleDragOver = (spotId: string) => (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverId !== spotId) setDragOverId(spotId);
+  };
+
+  const handleDrop = (targetId: string) => (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const sourceId = e.dataTransfer.getData('text/plain') || draggingId;
+    setDraggingId(null);
+    setDragOverId(null);
+    if (!sourceId || sourceId === targetId) return;
+    const from = spots.findIndex((s) => s.id === sourceId);
+    const to = spots.findIndex((s) => s.id === targetId);
+    if (from < 0 || to < 0) return;
+    const copia = [...spots];
+    const [movido] = copia.splice(from, 1);
+    copia.splice(to, 0, movido);
+    reorderSpots(copia.map((s) => s.id));
+  };
+
   return (
     <div
       style={{
-        minHeight: '100vh', display: 'flex', flexDirection: 'column',
-        backgroundColor: 'var(--bg)', color: 'var(--text)',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        backgroundColor: 'var(--bg)',
+        color: 'var(--text)',
         fontFamily: 'Inter, system-ui, sans-serif',
       }}
     >
       <header
         style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '12px 20px', borderBottom: '1px solid var(--border)',
-          backgroundColor: 'var(--surface)', position: 'sticky',
-          top: 0, zIndex: 100,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '12px 20px',
+          borderBottom: '1px solid var(--border)',
+          backgroundColor: 'var(--surface)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 100,
         }}
       >
         <Logo size="md" />
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span
             style={{
               fontFamily: 'var(--font-mono, Fira Code, monospace)',
-              fontSize: '0.85rem', color: 'var(--text-dim)',
-              backgroundColor: 'var(--bg)', padding: '4px 10px',
-              borderRadius: 6, border: '1px solid var(--border)',
+              fontSize: '0.85rem',
+              color: 'var(--text-dim)',
+              backgroundColor: 'var(--bg)',
+              padding: '4px 10px',
+              borderRadius: 6,
+              border: '1px solid var(--border)',
             }}
           >
             {t('home.counter', { count: spots.length, max: 6 })}
           </span>
+          {/* Ko-fi arriba a la derecha, debajo de Ajustes (bug 15,
+              DP-094). */}
+          <a
+            href="https://ko-fi.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            title={t('settings.donate')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '8px 10px',
+              backgroundColor: 'var(--bg)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              color: 'var(--accent)',
+              fontSize: '0.85rem',
+              fontWeight: 500,
+              textDecoration: 'none',
+            }}
+          >
+            <span style={{ fontSize: '1rem', lineHeight: 1 }}>☕</span>
+          </a>
           <button
             onClick={() => setShowSettings(true)}
             title={t('settings.title')}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: '6px',
-              padding: '8px 12px', backgroundColor: 'var(--bg)',
-              border: '1px solid var(--border)', borderRadius: 8,
-              color: 'var(--text)', fontSize: '0.85rem',
-              fontWeight: 500, cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 12px',
+              backgroundColor: 'var(--bg)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              color: 'var(--text)',
+              fontSize: '0.85rem',
+              fontWeight: 500,
+              cursor: 'pointer',
             }}
           >
             <span style={{ fontSize: '1rem', lineHeight: 1 }}>⚙</span>
@@ -142,44 +236,65 @@ export const Home: React.FC = () => {
 
       <main
         style={{
-          flex: 1, width: '100%', maxWidth: '680px', margin: '0 auto',
-          padding: '20px', boxSizing: 'border-box',
+          flex: 1,
+          width: '100%',
+          maxWidth: '680px',
+          margin: '0 auto',
+          padding: '20px',
+          boxSizing: 'border-box',
           paddingBottom: spots.length > 0 && spots.length < 6 ? '90px' : '40px',
         }}
       >
         {spots.length === 0 ? (
           <div
             style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center',
-              justifyContent: 'center', padding: '60px 20px',
-              textAlign: 'center', backgroundColor: 'var(--surface)',
-              borderRadius: 8, border: '1px solid var(--border)',
-              marginTop: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '60px 20px',
+              textAlign: 'center',
+              backgroundColor: 'var(--surface)',
+              borderRadius: 8,
+              border: '1px solid var(--border)',
+              marginTop: 20,
             }}
           >
-            <div style={{ fontSize: '2rem', marginBottom: '12px', opacity: 0.7 }}>📍</div>
+            <div style={{ fontSize: '2rem', marginBottom: 12, opacity: 0.7 }}>📍</div>
             <h3
               style={{
-                margin: '0 0 8px 0', fontSize: '1.1rem',
-                fontWeight: 600, color: 'var(--text)',
+                margin: '0 0 8px 0',
+                fontSize: '1.1rem',
+                fontWeight: 600,
+                color: 'var(--text)',
               }}
             >
               {t('home.noSpots')}
             </h3>
             <p
               style={{
-                margin: '0 0 20px 0', fontSize: '0.9rem',
-                color: 'var(--text-dim)', maxWidth: '360px',
+                margin: '0 0 20px 0',
+                fontSize: '0.9rem',
+                color: 'var(--text-dim)',
+                maxWidth: 360,
               }}
             >
               {t('home.empty.subtitle')}
             </p>
             <button
-              onClick={() => { setEditSpot(null); setMapMode('new'); }}
+              onClick={() => {
+                setEditSpot(null);
+                setMapMode('new');
+              }}
               style={{
-                padding: '12px 24px', backgroundColor: 'var(--accent)',
-                color: '#000', border: 'none', borderRadius: 8,
-                fontSize: '0.95rem', fontWeight: 600, cursor: 'pointer',
+                padding: '12px 24px',
+                backgroundColor: 'var(--accent)',
+                color: '#000',
+                border: 'none',
+                borderRadius: 8,
+                fontSize: '0.95rem',
+                fontWeight: 600,
+                cursor: 'pointer',
                 boxShadow: '0 2px 8px rgba(0, 229, 106, 0.25)',
               }}
             >
@@ -201,6 +316,12 @@ export const Home: React.FC = () => {
                 onRefresh={() => handleRefreshSpot(spot.id, spot.lat, spot.lon)}
                 onEdit={() => setViewingSpotId(spot.id)}
                 onDelete={() => removeSpot(spot.id)}
+                onOpenFranja={(franjaId) => abrirPunto(spot.id, franjaId)}
+                draggable
+                isDragging={draggingId === spot.id}
+                onDragStart={handleDragStart(spot.id)}
+                onDragOver={handleDragOver(spot.id)}
+                onDrop={handleDrop(spot.id)}
               />
             ))}
           </div>
@@ -210,20 +331,36 @@ export const Home: React.FC = () => {
       {spots.length > 0 && spots.length < 6 && (
         <div
           style={{
-            position: 'fixed', bottom: '20px', left: 0, right: 0,
-            display: 'flex', justifyContent: 'center', zIndex: 90,
+            position: 'fixed',
+            bottom: 20,
+            left: 0,
+            right: 0,
+            display: 'flex',
+            justifyContent: 'center',
+            zIndex: 90,
             pointerEvents: 'none',
           }}
         >
           <button
-            onClick={() => { setEditSpot(null); setMapMode('new'); }}
+            onClick={() => {
+              setEditSpot(null);
+              setMapMode('new');
+            }}
             style={{
-              pointerEvents: 'auto', display: 'inline-flex',
-              alignItems: 'center', gap: '8px', padding: '12px 24px',
-              backgroundColor: 'var(--accent)', color: '#000',
-              border: 'none', borderRadius: 24, fontSize: '0.95rem',
-              fontWeight: 600, cursor: 'pointer',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 229, 106, 0.3)',
+              pointerEvents: 'auto',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '12px 24px',
+              backgroundColor: 'var(--accent)',
+              color: '#000',
+              border: 'none',
+              borderRadius: 24,
+              fontSize: '0.95rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow:
+                '0 4px 16px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 229, 106, 0.3)',
             }}
           >
             <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>+</span>
@@ -232,32 +369,13 @@ export const Home: React.FC = () => {
         </div>
       )}
 
-      <footer
-        style={{
-          borderTop: '1px solid var(--border)',
-          backgroundColor: 'var(--surface)', padding: '16px 20px',
-          textAlign: 'center', marginTop: 'auto',
-        }}
-      >
-        <a
-          href="https://ko-fi.com/"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: '6px',
-            color: 'var(--accent)', fontSize: '0.85rem',
-            fontWeight: 500, textDecoration: 'none',
-          }}
-        >
-          <span>☕</span>
-          <span>{t('settings.donate')}</span>
-        </a>
-      </footer>
-
       {showSettings && (
         <SettingsScreen
           onClose={() => setShowSettings(false)}
-          onOpenTutorial={() => { setShowSettings(false); setShowTutorial(true); }}
+          onOpenTutorial={() => {
+            setShowSettings(false);
+            setShowTutorial(true);
+          }}
         />
       )}
     </div>

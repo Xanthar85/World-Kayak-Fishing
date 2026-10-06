@@ -1,3 +1,8 @@
+// src/screens/MapScreen.tsx
+// WKF — Pantalla de mapa (nuevo/editar punto).
+// v1.010: sin cambios funcionales. La profundidad sigue el mismo
+// flujo (obtenerProfundidad). Se mantiene la firma.
+
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -87,12 +92,10 @@ export const MapScreen: React.FC<MapScreenProps> = ({
 
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
 
-  // Búsqueda
   const [busqueda, setBusqueda] = useState('');
   const [buscando, setBuscando] = useState(false);
   const [errorBusqueda, setErrorBusqueda] = useState<string | null>(null);
 
-  // Punto de pesca
   const [puntoPesca, setPuntoPesca] = useState<{ lat: number; lon: number } | null>(
     initialSpot ? { lat: initialSpot.lat, lon: initialSpot.lon } : null
   );
@@ -100,7 +103,6 @@ export const MapScreen: React.FC<MapScreenProps> = ({
     initialSpot?.profundidad ?? null
   );
 
-  // Punto de acceso (manual desde DP-070)
   const [puntoAcceso, setPuntoAcceso] = useState<{
     lat: number;
     lon: number;
@@ -137,20 +139,17 @@ export const MapScreen: React.FC<MapScreenProps> = ({
     });
   }, [t]);
 
-  // ─── Buscador por nombre o por coordenadas ─────────────────────
   async function handleBuscar(e?: React.FormEvent) {
     if (e) e.preventDefault();
     const query = busqueda.trim();
     if (!query) return;
 
-    // 1. Intentar interpretar como coordenadas (DD, DMS, DDM).
     const coords = parsearCoords(query);
     if (coords && mapInstance) {
       mapInstance.flyTo([coords.lat, coords.lon], 12);
       return;
     }
 
-    // 2. Buscador por nombre (Nominatim + fallback Open-Meteo).
     setBuscando(true);
     setErrorBusqueda(null);
     const lang = i18n.language && i18n.language.startsWith('en') ? 'en' : 'es';
@@ -213,17 +212,14 @@ export const MapScreen: React.FC<MapScreenProps> = ({
     }
   }
 
-  // ─── Clic en el mapa (solo al crear) ────────────────────────────
   async function handlePick(lat: number, lon: number) {
     setPuntoPesca({ lat, lon });
 
-    // Autodetección de zona por coordenadas.
     const zonaDetectada = detectarZona(lat, lon);
     setZona(zonaDetectada);
 
     setCargandoProfundidad(true);
 
-    // 1. Profundidad del punto de pesca.
     obtenerProfundidad(lat, lon)
       .then((prof) => {
         setProfundidadPesca(prof);
@@ -232,7 +228,6 @@ export const MapScreen: React.FC<MapScreenProps> = ({
         setCargandoProfundidad(false);
       });
 
-    // 2. Nombre sugerido vía Nominatim reverse.
     try {
       const lang = i18n.language && i18n.language.startsWith('en') ? 'en' : 'es';
       const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=12&accept-language=${lang}`;
@@ -245,9 +240,6 @@ export const MapScreen: React.FC<MapScreenProps> = ({
       if (res.ok) {
         const data = await res.json();
         const addr = data?.address;
-        // Cascada estricta. Nunca address.country salvo como
-        // último recurso si no hay nada más (evita dejar vacío
-        // en puntos de mar abierto).
         const suggested =
           addr?.city ||
           addr?.town ||
@@ -269,7 +261,6 @@ export const MapScreen: React.FC<MapScreenProps> = ({
     }
   }
 
-  // ─── Cambio de zona desde el desplegable ────────────────────────
   function handleZonaChange(nuevaZona: Zona) {
     setZona(nuevaZona);
     const c = centroideDeZona(nuevaZona);
@@ -278,7 +269,6 @@ export const MapScreen: React.FC<MapScreenProps> = ({
     }
   }
 
-  // ─── Guardar ────────────────────────────────────────────────────
   function handleSave() {
     if (!puntoPesca) return;
     const trimmed = nombre.trim() || t('map.unnamed');
@@ -370,7 +360,6 @@ export const MapScreen: React.FC<MapScreenProps> = ({
       </header>
 
       <div style={{ flex: 1, position: 'relative' }}>
-        {/* Buscador flotante */}
         <div
           style={{
             position: 'absolute',
@@ -469,7 +458,6 @@ export const MapScreen: React.FC<MapScreenProps> = ({
 
           <ClickHandler disabled={isEditing} onPick={handlePick} />
 
-          {/* Pin de pesca (verde lima) */}
           {puntoPesca && (
             <Marker
               position={[puntoPesca.lat, puntoPesca.lon]}
@@ -477,8 +465,6 @@ export const MapScreen: React.FC<MapScreenProps> = ({
             />
           )}
 
-          {/* Pin de acceso manual (azul cian) si el usuario ya
-              eligió tipo de acceso */}
           {tipoAcceso != null && puntoAcceso && (
             <Marker
               position={[puntoAcceso.lat, puntoAcceso.lon]}
@@ -488,7 +474,10 @@ export const MapScreen: React.FC<MapScreenProps> = ({
                 dragend: async (e) => {
                   const marker = e.target as L.Marker;
                   const latlng = marker.getLatLng();
-                  const prof = await obtenerProfundidad(latlng.lat, latlng.lng);
+                  const prof = await obtenerProfundidad(
+                    latlng.lat,
+                    latlng.lng
+                  );
                   setPuntoAcceso({
                     lat: latlng.lat,
                     lon: latlng.lng,
@@ -505,7 +494,6 @@ export const MapScreen: React.FC<MapScreenProps> = ({
             </Marker>
           )}
 
-          {/* Línea discontinua pesca ↔ acceso */}
           {tipoAcceso != null && puntoPesca && puntoAcceso && (
             <Polyline
               positions={[
@@ -521,7 +509,6 @@ export const MapScreen: React.FC<MapScreenProps> = ({
           )}
         </MapContainer>
 
-        {/* Panel inferior */}
         {puntoPesca && (
           <div
             style={{
@@ -624,7 +611,7 @@ export const MapScreen: React.FC<MapScreenProps> = ({
               >
                 {t('access.title')}
               </label>
-              <div style={{ display: 'flex', gap: '6px' }}>
+              <div style={{ display: 'flex', gap: 6 }}>
                 {TIPOS_ACCESO.map((tipo) => {
                   const active = tipoAcceso === tipo;
                   return (
@@ -634,9 +621,6 @@ export const MapScreen: React.FC<MapScreenProps> = ({
                       onClick={() => {
                         const nuevoTipo = active ? null : tipo;
                         setTipoAcceso(nuevoTipo);
-                        // Al elegir tipo por primera vez, colocar el
-                        // pin de acceso en el punto de pesca como
-                        // posición inicial. El usuario lo arrastra.
                         if (nuevoTipo !== null && !puntoAcceso && puntoPesca) {
                           setPuntoAcceso({
                             lat: puntoPesca.lat,
@@ -644,7 +628,6 @@ export const MapScreen: React.FC<MapScreenProps> = ({
                             profundidad: profundidadPesca,
                           });
                         }
-                        // Si el usuario quita el tipo, borrar el pin.
                         if (nuevoTipo === null) {
                           setPuntoAcceso(null);
                         }
@@ -723,9 +706,7 @@ export const MapScreen: React.FC<MapScreenProps> = ({
                 ) : profundidadPesca != null ? (
                   `${profundidadPesca.toFixed(1)} m`
                 ) : (
-                  <span style={{ color: '#ef4444' }}>
-                    {t('errores.noAccess')}
-                  </span>
+                  <span style={{ color: '#ef4444' }}>{t('detalle.noDepth')}</span>
                 )}
               </span>
             </div>

@@ -1,3 +1,7 @@
+/* src/styles/global.css
+   WKF — Reset y estilos base.
+   v1.010: sin cambios funcionales. */
+
 @import "./theme.css";
 
 *,
@@ -32,4 +36,14 @@ body,
 
 .font-sans {
   font-family: var(--font-sans);
+}
+
+/* Scrollbar discreta para paneles de subpestañas. */
+nav::-webkit-scrollbar {
+  height: 0;
+  display: none;
+}
+
+nav {
+  scrollbar-width: none;
 }

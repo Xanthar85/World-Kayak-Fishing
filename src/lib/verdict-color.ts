@@ -1,20 +1,24 @@
+// src/lib/verdict-color.ts
 // WKF — Colores de celda por veredicto.
-// v1.009.4: helper para colorear tablas celda a celda según el
-// sub-veredicto del dato. Configurable desde Ajustes.
+// v1.010: bug 18. El color ya NO se aplica como fondo de celda.
+// Se aplica al NÚMERO (color de texto). El helper devuelve el
+// color CSS del texto. DP-091: modifica DP-042.
 // 5 niveles de coloración:
 //   'ninguno'  → sin color.
 //   'rojos'    → solo DESACONSEJADO.
 //   'rn'       → DESACONSEJADO + EXIGENTE.
-//   'rna'      → DESACONSEJADO + EXIGENTE + ACEPTABLE (recomendado).
+//   'rna'      → DESACONSEJADO + EXIGENTE + ACEPTABLE.
 //   'todo'     → todos los niveles, incluido FAVORABLE.
+// Por defecto (DP-092): 'todo'.
 
 import type { Veredicto } from './verdict.ts';
 
 export type NivelColorTabla = 'ninguno' | 'rojos' | 'rn' | 'rna' | 'todo';
 
-// Devuelve el color de fondo de celda según el veredicto y la
-// configuración del usuario. Devuelve null si no toca pintar.
-export function colorCelda(
+// Devuelve el color de TEXTO de una celda según el veredicto y
+// la configuración del usuario. Devuelve null si no toca colorear
+// (el número va en color normal).
+export function colorNumero(
   veredicto: Veredicto | null,
   nivel: NivelColorTabla
 ): string | null {
@@ -22,22 +26,22 @@ export function colorCelda(
 
   switch (nivel) {
     case 'rojos':
-      if (veredicto === 'DESACONSEJADO') return 'rgba(255, 45, 85, 0.35)';
+      if (veredicto === 'DESACONSEJADO') return 'var(--verdict-desaconsejado)';
       return null;
     case 'rn':
-      if (veredicto === 'DESACONSEJADO') return 'rgba(255, 45, 85, 0.35)';
-      if (veredicto === 'EXIGENTE') return 'rgba(255, 138, 0, 0.30)';
+      if (veredicto === 'DESACONSEJADO') return 'var(--verdict-desaconsejado)';
+      if (veredicto === 'EXIGENTE') return 'var(--verdict-exigente)';
       return null;
     case 'rna':
-      if (veredicto === 'DESACONSEJADO') return 'rgba(255, 45, 85, 0.35)';
-      if (veredicto === 'EXIGENTE') return 'rgba(255, 138, 0, 0.30)';
-      if (veredicto === 'ACEPTABLE') return 'rgba(229, 229, 0, 0.25)';
+      if (veredicto === 'DESACONSEJADO') return 'var(--verdict-desaconsejado)';
+      if (veredicto === 'EXIGENTE') return 'var(--verdict-exigente)';
+      if (veredicto === 'ACEPTABLE') return 'var(--verdict-aceptable)';
       return null;
     case 'todo':
-      if (veredicto === 'DESACONSEJADO') return 'rgba(255, 45, 85, 0.35)';
-      if (veredicto === 'EXIGENTE') return 'rgba(255, 138, 0, 0.30)';
-      if (veredicto === 'ACEPTABLE') return 'rgba(229, 229, 0, 0.25)';
-      if (veredicto === 'FAVORABLE') return 'rgba(0, 229, 106, 0.20)';
+      if (veredicto === 'DESACONSEJADO') return 'var(--verdict-desaconsejado)';
+      if (veredicto === 'EXIGENTE') return 'var(--verdict-exigente)';
+      if (veredicto === 'ACEPTABLE') return 'var(--verdict-aceptable)';
+      if (veredicto === 'FAVORABLE') return 'var(--verdict-favorable)';
       return null;
   }
 }

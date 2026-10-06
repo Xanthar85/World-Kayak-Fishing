@@ -1,3 +1,6 @@
+// src/screens/TutorialScreen.tsx
+// WKF — Pantalla del tutorial. Sin cambios en v1.010.
+
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Logo } from '../components/Logo.tsx';
@@ -78,8 +81,8 @@ export const TutorialScreen: React.FC<TutorialScreenProps> = ({ onClose }) => {
         style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '20px',
-          maxWidth: '680px',
+          padding: 20,
+          maxWidth: 680,
           width: '100%',
           margin: '0 auto',
           boxSizing: 'border-box',
@@ -119,7 +122,7 @@ export const TutorialScreen: React.FC<TutorialScreenProps> = ({ onClose }) => {
                   esUltimo ? 'var(--verdict-aceptable)' : 'var(--border)'
                 }`,
                 borderRadius: 8,
-                padding: '16px',
+                padding: 16,
                 marginBottom: 16,
               }}
             >

@@ -1,15 +1,12 @@
-// WKF — Conversión entre formatos de coordenadas.
-// DP-011: DD (decimal), DMS (grados/min/seg), DDM (grados/min decimales).
-// DP-012: UTM descartado.
+// src/lib/coords.ts
+// WKF — Conversión de coordenadas. Sin cambios en v1.010.
 
 export type FormatoCoords = 'dd' | 'dms' | 'ddm';
 
 export interface Coords {
-  lat: number; // grados decimales, negativo = sur
-  lon: number; // grados decimales, negativo = oeste
+  lat: number;
+  lon: number;
 }
-
-// ─── DD → DMS ─────────────────────────────────────────────────────
 
 function ddADms(valor: number, esLat: boolean): string {
   const abs = Math.abs(valor);
@@ -19,14 +16,16 @@ function ddADms(valor: number, esLat: boolean): string {
   const segundos = (minutosTotal - minutos) * 60;
 
   const hemisferio = esLat
-    ? valor >= 0 ? 'N' : 'S'
-    : valor >= 0 ? 'E' : 'O';
+    ? valor >= 0
+      ? 'N'
+      : 'S'
+    : valor >= 0
+    ? 'E'
+    : 'O';
 
   const seg = segundos.toFixed(1);
   return `${grados}°${minutos}'${seg}"${hemisferio}`;
 }
-
-// ─── DD → DDM ─────────────────────────────────────────────────────
 
 function ddADdm(valor: number, esLat: boolean): string {
   const abs = Math.abs(valor);
@@ -34,14 +33,16 @@ function ddADdm(valor: number, esLat: boolean): string {
   const minutos = (abs - grados) * 60;
 
   const hemisferio = esLat
-    ? valor >= 0 ? 'N' : 'S'
-    : valor >= 0 ? 'E' : 'O';
+    ? valor >= 0
+      ? 'N'
+      : 'S'
+    : valor >= 0
+    ? 'E'
+    : 'O';
 
   const min = minutos.toFixed(3);
   return `${grados}°${min}'${hemisferio}`;
 }
-
-// ─── Formateo ─────────────────────────────────────────────────────
 
 export function formatearLat(lat: number, formato: FormatoCoords): string {
   switch (formato) {
@@ -73,13 +74,8 @@ export function formatearCoords(
   return `${formatearLat(lat, formato)} ${formatearLon(lon, formato)}`;
 }
 
-// ─── Parseo ───────────────────────────────────────────────────────
-// Acepta los tres formatos. Devuelve null si no reconoce.
-
 function parsearDd(texto: string): Coords | null {
-  const match = texto.match(
-    /(-?\d+\.?\d*)\s*[,°]?\s*(-?\d+\.?\d*)/
-  );
+  const match = texto.match(/(-?\d+\.?\d*)\s*[,°]?\s*(-?\d+\.?\d*)/);
   if (!match) return null;
   const lat = parseFloat(match[1]);
   const lon = parseFloat(match[2]);
@@ -90,13 +86,15 @@ function parsearDd(texto: string): Coords | null {
 }
 
 function parsearDmsODdm(texto: string): Coords | null {
-  // Busca dos bloques: grados, minutos, (segundos opcionales), hemisferio.
   const regex =
     /(\d+)\s*°\s*(\d+\.?\d*)\s*['′]?\s*(\d+\.?\d*)?\s*["″]?\s*([NSEOnseo])/g;
   const matches = [...texto.matchAll(regex)];
   if (matches.length < 2) return null;
 
-  const parsearBloque = (m: RegExpMatchArray, esLat: boolean): number | null => {
+  const parsearBloque = (
+    m: RegExpMatchArray,
+    esLat: boolean
+  ): number | null => {
     const grados = parseFloat(m[1]);
     const minutos = parseFloat(m[2]);
     const segundos = m[3] !== undefined ? parseFloat(m[3]) : 0;
@@ -105,7 +103,7 @@ function parsearDmsODdm(texto: string): Coords | null {
     let valor = grados + minutos / 60 + segundos / 3600;
 
     const esNegativo =
-      (esLat && (hemisferio === 'S')) ||
+      (esLat && hemisferio === 'S') ||
       (!esLat && (hemisferio === 'O' || hemisferio === 'W'));
 
     if (esNegativo) valor = -valor;
@@ -126,7 +124,6 @@ export function parsearCoords(texto: string): Coords | null {
   const limpio = texto.trim();
   if (!limpio) return null;
 
-  // Si tiene grados/minutos/hemisferio, es DMS o DDM.
   if (/[°'′"″]/.test(limpio) && /[NSEOnseo]/.test(limpio)) {
     return parsearDmsODdm(limpio);
   }

@@ -1,7 +1,8 @@
+// src/lib/wind.ts
 // WKF — Nombres de los vientos.
 // DP-034: rosa mediterránea de 16 rumbos para fachada mediterránea.
 // Genéricos en el resto del mundo.
-// v1.009.4: devuelve grados + cardinal + nombre en un solo objeto.
+// v1.010: se mantiene la interfaz. Sin cambios funcionales.
 
 export type ZonaViento = 'mediterraneo' | 'generico';
 

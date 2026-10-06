@@ -1,7 +1,5 @@
-// WKF — Cálculo lunar ampliado.
-// v1.009.4: fase, edad, iluminación + orto, ocaso y tránsito lunar.
-// Algoritmo simplificado. Precisión ±15 min en orto/ocaso. Suficiente
-// para pesca: lo que importa es la referencia, no el segundo.
+// src/lib/moon.ts
+// WKF — Cálculo lunar. Sin cambios funcionales en v1.010.
 
 export type FaseLunar =
   | 'nueva'
@@ -16,7 +14,7 @@ export type FaseLunar =
 export interface DatosLuna {
   edad: number;
   fase: FaseLunar;
-  iluminacion: number; // 0-1
+  iluminacion: number;
   ortoLunar: Date | null;
   ocasoLunar: Date | null;
   transitoLunar: Date | null;
@@ -25,22 +23,18 @@ export interface DatosLuna {
 const CICLO_LUNAR = 29.530588853;
 const RAD = Math.PI / 180;
 
-// Fecha de referencia: luna nueva conocida (6 enero 2000, 18:14 UTC).
 const LUNA_NUEVA_REF = Date.UTC(2000, 0, 6, 18, 14, 0);
 
-// Declinación lunar aproximada: oscila entre ±23.44° y ±28.6°
-// según los nodos. Aproximación: ±23.44 + 5°*sin(ciclo de nodos)
-// — pero como no necesitamos extrema precisión, usamos un valor
-// fijo intermedio ±25°.
 function declinacionLunar(edad: number): number {
-  // Aproximación gruesa: seno del ciclo lunar modulado por la
-  // inclinación de la órbita lunar.
   const fase = (edad / CICLO_LUNAR) * 2 * Math.PI;
   return 23.44 * Math.sin(fase) * RAD * 1.1;
 }
 
-// Ángulo horario para una elevación dada.
-function anguloHorario(lat: number, decl: number, elevation: number): number | null {
+function anguloHorario(
+  lat: number,
+  decl: number,
+  elevation: number
+): number | null {
   const cosH =
     (Math.sin(elevation * RAD) - Math.sin(lat * RAD) * Math.sin(decl)) /
     (Math.cos(lat * RAD) * Math.cos(decl));
@@ -50,13 +44,11 @@ function anguloHorario(lat: number, decl: number, elevation: number): number | n
   return Math.acos(cosH) / RAD;
 }
 
-function diaDelAno(fecha: Date): number {
-  const inicio = Date.UTC(fecha.getUTCFullYear(), 0, 0);
-  const diff = fecha.getTime() - inicio;
-  return Math.floor(diff / 86400000);
-}
-
-export function calcularLuna(fecha: Date, lat?: number, lon?: number): DatosLuna {
+export function calcularLuna(
+  fecha: Date,
+  lat?: number,
+  lon?: number
+): DatosLuna {
   const diff = fecha.getTime() - LUNA_NUEVA_REF;
   const dias = diff / 86400000;
   const ciclos = dias / CICLO_LUNAR;
@@ -73,28 +65,26 @@ export function calcularLuna(fecha: Date, lat?: number, lon?: number): DatosLuna
     transitoLunar: null,
   };
 
-  // Si tenemos lat/lon, calculamos orto/ocaso/tránsito.
   if (lat != null && lon != null && Math.abs(lat) < 89) {
     const decl = declinacionLunar(edad);
 
-    // Tránsito lunar: momento en el que la luna cruza el meridiano.
-    // Aproximación: la luna nueva transita a mediodía solar; cada
-    // día de edad lunar retrasa ~50 min el tránsito.
     const mediodiaSolarUTC = 720 - 4 * lon;
     const desplazamientoMin = faseCiclo * 1440;
-    const transitoUTC = ((mediodiaSolarUTC + desplazamientoMin) % 1440 + 1440) % 1440;
+    const transitoUTC =
+      ((mediodiaSolarUTC + desplazamientoMin) % 1440 + 1440) % 1440;
     const baseUTC = Date.UTC(
       fecha.getUTCFullYear(),
       fecha.getUTCMonth(),
       fecha.getUTCDate(),
-      0, 0, 0
+      0,
+      0,
+      0
     );
     datos.transitoLunar = new Date(baseUTC + transitoUTC * 60000);
 
-    // Orto y ocaso lunar: ± ángulo horario alrededor del tránsito.
     const H = anguloHorario(lat, decl, 0);
     if (H != null) {
-      const Hmin = H * 4; // grados → minutos (15°/h → 4 min/°)
+      const Hmin = H * 4;
       datos.ortoLunar = new Date(datos.transitoLunar.getTime() - Hmin * 60000);
       datos.ocasoLunar = new Date(datos.transitoLunar.getTime() + Hmin * 60000);
     }
@@ -109,13 +99,12 @@ function clasificarFase(edad: number): FaseLunar {
   if (edad < 9.22) return 'cuarto_creciente';
   if (edad < 12.91) return 'gibosa_creciente';
   if (edad < 16.61) return 'llena';
-  if (edad < 20.30) return 'gibosa_menguante';
+  if (edad < 20.3) return 'gibosa_menguante';
   if (edad < 23.99) return 'cuarto_menguante';
   if (edad < 27.68) return 'menguante';
   return 'nueva';
 }
 
-// Nombre humano de la fase según idioma.
 export function nombreFase(fase: FaseLunar, idioma: 'es' | 'en'): string {
   const es: Record<FaseLunar, string> = {
     nueva: 'Luna nueva',
@@ -140,16 +129,23 @@ export function nombreFase(fase: FaseLunar, idioma: 'es' | 'en'): string {
   return idioma === 'en' ? en[fase] : es[fase];
 }
 
-// Emoji de la fase, para tablas compactas.
 export function emojiFase(fase: FaseLunar): string {
   switch (fase) {
-    case 'nueva': return '🌑';
-    case 'creciente': return '🌒';
-    case 'cuarto_creciente': return '🌓';
-    case 'gibosa_creciente': return '🌔';
-    case 'llena': return '🌕';
-    case 'gibosa_menguante': return '🌖';
-    case 'cuarto_menguante': return '🌗';
-    case 'menguante': return '🌘';
+    case 'nueva':
+      return '🌑';
+    case 'creciente':
+      return '🌒';
+    case 'cuarto_creciente':
+      return '🌓';
+    case 'gibosa_creciente':
+      return '🌔';
+    case 'llena':
+      return '🌕';
+    case 'gibosa_menguante':
+      return '🌖';
+    case 'cuarto_menguante':
+      return '🌗';
+    case 'menguante':
+      return '🌘';
   }
 }

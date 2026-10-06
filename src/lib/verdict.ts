@@ -1,7 +1,6 @@
+// src/lib/verdict.ts
 // WKF — Núcleo de cálculo de veredictos.
-// Generado a partir de InformeDeUmbralesSeguridad v2.
-// Los datos (tipos de zona, tabla de umbrales, ajustes) viven en
-// verdict-tabla.ts. Aquí solo la lógica.
+// Sin cambios en v1.010.
 
 import {
   UMBRALES_BASE,
@@ -12,8 +11,6 @@ import {
   type FranjaDiaTabla,
   type TipoAccesoTabla,
 } from './verdict-tabla.ts';
-
-// ─── TIPOS ────────────────────────────────────────────────────────
 
 export type Zona = ZonaTabla;
 export type CategoriaKayak = CategoriaKayakTabla;
@@ -27,20 +24,16 @@ export type Veredicto =
   | 'EXIGENTE'
   | 'DESACONSEJADO';
 
-export type VeredictoAcceso =
-  | 'SEGURA'
-  | 'VIGILAR'
-  | 'DIFICIL'
-  | 'NO_SALIR';
+export type VeredictoAcceso = 'SEGURA' | 'VIGILAR' | 'DIFICIL' | 'NO_SALIR';
 
 export type { Umbral };
 
 export interface Condiciones {
-  viento: number; // Bf
-  ola: number; // m
-  periodo: number; // s
-  corriente: number; // nudos
-  marea: number; // m
+  viento: number;
+  ola: number;
+  periodo: number;
+  corriente: number;
+  marea: number;
 }
 
 export interface PerfilKayakista {
@@ -63,8 +56,6 @@ export interface ResultadoVeredicto {
   };
   umbralAplicado: Umbral;
 }
-
-// ─── CONSTANTES ───────────────────────────────────────────────────
 
 export const CATEGORIAS_KAYAK: CategoriaKayak[] = ['K1', 'K2', 'K3', 'K4', 'K5'];
 
@@ -99,8 +90,6 @@ export const VEREDICTOS_ACCESO: VeredictoAcceso[] = [
   'NO_SALIR',
 ];
 
-// ─── TABLAS DE AJUSTE ─────────────────────────────────────────────
-
 export const AJUSTE_PERFIL: Record<
   NivelExperiencia,
   { viento: number; ola: number; periodo: number; corriente: number; marea: number }
@@ -121,8 +110,6 @@ export const AJUSTE_FRANJA: Record<
   noche:  { viento: -1, ola: -0.2, corriente: -0.2 },
 };
 
-// Ajustes por equipo. Positivos si se lleva, negativos si no se lleva.
-// Todos afectan solo al viento.
 export type ClaveEquipo =
   | 'vhf'
   | 'remoRepuesto'
@@ -153,15 +140,12 @@ export const UMBRALES_ACCESO: Record<
   otro:             { segura: 0.3, vigilar: 0.6, dificil: 0.9, noSalir: 1.0 },
 };
 
-// ─── FUNCIONES INTERNAS ───────────────────────────────────────────
-
 function evaluarFactor(
   valor: number,
   umbral: { fav: number; ace: number; exi: number; des: number },
   invertido = false
 ): Veredicto {
   if (invertido) {
-    // Para periodo: valores más altos son mejores.
     if (valor >= umbral.fav) return 'FAVORABLE';
     if (valor >= umbral.ace) return 'ACEPTABLE';
     if (valor >= umbral.exi) return 'EXIGENTE';
@@ -190,8 +174,6 @@ function aplicarAjuste(
   };
 }
 
-// ─── FUNCIONES PÚBLICAS ───────────────────────────────────────────
-
 export function calcularVeredicto(
   zona: Zona,
   categoria: CategoriaKayak,
@@ -203,7 +185,6 @@ export function calcularVeredicto(
   const ajPerfil = AJUSTE_PERFIL[perfil.experiencia];
   const ajFranja = AJUSTE_FRANJA[franja];
 
-  // Ajuste de equipo: cada pieza suma si se lleva, resta si no.
   let ajEquipoViento = 0;
   ajEquipoViento += perfil.vhf
     ? AJUSTE_EQUIPO.vhf.viento

@@ -1,7 +1,7 @@
-// WKF — Tabla de umbrales base.
-// Generado a partir de InformeDeUmbralesSeguridad v2.
+// src/lib/verdict-tabla.ts
+// WKF — Tabla de umbrales base. Sin cambios en v1.010.
+// 99 zonas × 5 categorías de kayak.
 // Datos puros. No contiene lógica de veredicto.
-// Si un umbral cambia, se toca aquí.
 
 export interface Umbral {
   viento: { fav: number; ace: number; exi: number; des: number };
@@ -129,8 +129,6 @@ export type TipoAccesoTabla =
   | 'puerto_escollera'
   | 'otro';
 
-// Tabla de umbrales base por zona y categoría.
-// Nivel base: Intermedio. Franja base: Mañana.
 export const UMBRALES_BASE: Record<
   ZonaTabla,
   Record<CategoriaKayakTabla, Umbral>
