@@ -81,11 +81,11 @@ const FRANJAS_DEFECTO: FranjaUsuario[] = [
 ];
 
 const PERFIL_DEFECTO: PerfilKayakista = {
-  experiencia: 'intermedio',
+  experiencia: 'avanzado',
   vhf: false,
-  remoRepuesto: false,
-  ropaSeca: false,
-  compartimentosEstancos: false,
+  remoRepuesto: true,
+  ropaSeca: true,
+  compartimentosEstancos: true,
 };
 
 const CATEGORIAS_VALIDAS: CategoriaKayak[] = ['K1', 'K2', 'K3', 'K4', 'K5'];
@@ -268,7 +268,7 @@ export const useAppStore = create<AppState>()(
         subpestanasOcultas: [],
         // DP-092: color de tabla por defecto = "todo".
         colorTabla: 'todo',
-        filtroFranja: false,
+        filtroFranja: true,
       },
 
       setLanguage: (lang) => {
@@ -397,7 +397,7 @@ export const useAppStore = create<AppState>()(
             franjaActivaId: 'manana',
             subpestanasOcultas: [],
             colorTabla: 'todo',
-            filtroFranja: false,
+            filtroFranja: true,
           },
         })),
 
@@ -448,7 +448,7 @@ export const useAppStore = create<AppState>()(
         const ajustesConDefaults: AjustesApp = {
           ...ajustesImportados,
           colorTabla: ajustesImportados.colorTabla ?? 'todo',
-          filtroFranja: ajustesImportados.filtroFranja ?? false,
+          filtroFranja: ajustesImportados.filtroFranja ?? true,
         };
 
         set(() => ({

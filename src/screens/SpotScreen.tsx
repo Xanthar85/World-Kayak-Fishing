@@ -1043,6 +1043,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                     const v = msAKn(h.windSpeed);
                     return v != null ? `${v}` : '—';
                   },
+                  veredicto: subVeredictoWind,
                 },
                 {
                   key: 'wkh',
@@ -1051,6 +1052,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                     const v = msAKmh(h.windSpeed);
                     return v != null ? `${v}` : '—';
                   },
+                  veredicto: subVeredictoWind,
                 },
                 {
                   key: 'gk',
@@ -1059,6 +1061,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                     const v = msAKn(h.windGusts);
                     return v != null ? `${v}` : '—';
                   },
+                  veredicto: subVeredictoWind,
                 },
                 {
                   key: 'gkh',

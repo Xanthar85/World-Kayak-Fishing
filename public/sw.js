@@ -1,6 +1,6 @@
 // public/sw.js
 // WKF — Service Worker para instalación PWA y funcionamiento offline
-const CACHE_NAME = 'wkf-v1';
+const CACHE_NAME = 'wkf-v2';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
