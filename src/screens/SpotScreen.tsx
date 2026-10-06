@@ -38,11 +38,7 @@ import {
   type Umbral,
   type Veredicto,
 } from '../lib/verdict.ts';
-import {
-  calcularShoaling,
-  PROFUNDIDAD_PROFUNDA_DEFECTO,
-  PROFUNDIDAD_SOMERA_DEFECTO,
-} from '../lib/shoaling.ts';
+import { calcularShoaling } from '../lib/shoaling.ts';
 import { calcularSol } from '../lib/sun.ts';
 import { calcularLuna, nombreFase, emojiFase } from '../lib/moon.ts';
 import {
@@ -317,10 +313,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
       });
       const olas = horasFranja.map((h) => h.waveHeight).filter((o): o is number => o != null);
       const mediaOla = olas.length > 0 ? olas.reduce((a, c) => a + c, 0) / olas.length : 0;
-      const resShoaling = calcularShoaling(
-        mediaOla, PROFUNDIDAD_PROFUNDA_DEFECTO,
-        spot.profundidad ?? PROFUNDIDAD_SOMERA_DEFECTO
-      );
+      const resShoaling = calcularShoaling(mediaOla);
       olaCorregida = resShoaling.alturaCorregida;
     }
     const resAcceso = calcularVeredictoAcceso(spot.tipoAcceso, olaCorregida);
@@ -580,12 +573,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
           }}
         >
           <span>{formatearCoords(spot.lat, spot.lon, ajustes.formatoCoords)}</span>
-          <span>•</span>
-          <span>
-            {spot.profundidad != null
-              ? `${spot.profundidad} m`
-              : t('detalle.noDepth')}
-          </span>
           <span
             style={{
               color: coordsCopiedFeedback ? 'var(--accent)' : 'var(--text-dim)',

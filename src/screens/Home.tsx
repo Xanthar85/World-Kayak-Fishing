@@ -18,6 +18,7 @@ import { SpotScreen } from './SpotScreen.tsx';
 import { MapScreen } from './MapScreen.tsx';
 import { TutorialScreen } from './TutorialScreen.tsx';
 import { SpotCard } from '../components/SpotCard.tsx';
+import { PWAInstallButton } from '../components/PWAInstallButton.tsx';
 import { fetchSpotWeather } from '../lib/openmeteo.ts';
 
 export const Home: React.FC = () => {
@@ -188,6 +189,7 @@ export const Home: React.FC = () => {
           >
             {t('home.counter', { count: spots.length, max: 6 })}
           </span>
+          <PWAInstallButton />
           {/* Ko-fi arriba a la derecha, debajo de Ajustes (bug 15,
               DP-094). */}
           <a

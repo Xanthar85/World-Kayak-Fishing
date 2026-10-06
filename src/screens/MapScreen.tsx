@@ -20,7 +20,6 @@ import 'leaflet/dist/leaflet.css';
 import type { Spot } from '../state/store.ts';
 import type { Zona, TipoAcceso } from '../lib/verdict.ts';
 import { stringsEs } from '../i18n/strings.es.ts';
-import { obtenerProfundidad } from '../lib/batimetria.ts';
 import { detectarZona, centroideDeZona } from '../lib/zonas-geo.ts';
 import { parsearCoords } from '../lib/coords.ts';
 
@@ -99,20 +98,15 @@ export const MapScreen: React.FC<MapScreenProps> = ({
   const [puntoPesca, setPuntoPesca] = useState<{ lat: number; lon: number } | null>(
     initialSpot ? { lat: initialSpot.lat, lon: initialSpot.lon } : null
   );
-  const [profundidadPesca, setProfundidadPesca] = useState<number | null>(
-    initialSpot?.profundidad ?? null
-  );
 
   const [puntoAcceso, setPuntoAcceso] = useState<{
     lat: number;
     lon: number;
-    profundidad: number | null;
   } | null>(
     initialSpot?.accesoLat != null && initialSpot?.accesoLon != null
       ? {
           lat: initialSpot.accesoLat,
           lon: initialSpot.accesoLon,
-          profundidad: initialSpot.accesoProfundidad ?? null,
         }
       : null
   );
@@ -129,7 +123,6 @@ export const MapScreen: React.FC<MapScreenProps> = ({
     initialSpot?.tipoAcceso ?? null
   );
 
-  const [cargandoProfundidad, setCargandoProfundidad] = useState(false);
 
   const zonasOrdenadas = React.useMemo(() => {
     return [...TODAS_ZONAS].sort((a, b) => {
@@ -218,16 +211,6 @@ export const MapScreen: React.FC<MapScreenProps> = ({
     const zonaDetectada = detectarZona(lat, lon);
     setZona(zonaDetectada);
 
-    setCargandoProfundidad(true);
-
-    obtenerProfundidad(lat, lon)
-      .then((prof) => {
-        setProfundidadPesca(prof);
-      })
-      .finally(() => {
-        setCargandoProfundidad(false);
-      });
-
     try {
       const lang = i18n.language && i18n.language.startsWith('en') ? 'en' : 'es';
       const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=12&accept-language=${lang}`;
@@ -278,10 +261,8 @@ export const MapScreen: React.FC<MapScreenProps> = ({
       lon: puntoPesca.lon,
       zona,
       tipoAcceso,
-      profundidad: profundidadPesca,
       accesoLat: puntoAcceso?.lat ?? null,
       accesoLon: puntoAcceso?.lon ?? null,
-      accesoProfundidad: puntoAcceso?.profundidad ?? null,
     });
   }
 
@@ -471,17 +452,12 @@ export const MapScreen: React.FC<MapScreenProps> = ({
               icon={pinAccesoIcon}
               draggable={true}
               eventHandlers={{
-                dragend: async (e) => {
+                dragend: (e) => {
                   const marker = e.target as L.Marker;
                   const latlng = marker.getLatLng();
-                  const prof = await obtenerProfundidad(
-                    latlng.lat,
-                    latlng.lng
-                  );
                   setPuntoAcceso({
                     lat: latlng.lat,
                     lon: latlng.lng,
-                    profundidad: prof,
                   });
                 },
               }}
@@ -625,7 +601,6 @@ export const MapScreen: React.FC<MapScreenProps> = ({
                           setPuntoAcceso({
                             lat: puntoPesca.lat,
                             lon: puntoPesca.lon,
-                            profundidad: profundidadPesca,
                           });
                         }
                         if (nuevoTipo === null) {
@@ -674,10 +649,7 @@ export const MapScreen: React.FC<MapScreenProps> = ({
                     marginBottom: 2,
                   }}
                 >
-                  {t('access.title')}{' '}
-                  {puntoAcceso?.profundidad != null
-                    ? `• ${puntoAcceso.profundidad.toFixed(1)} m`
-                    : `• ${t('detalle.noDepth')}`}
+                  {t('access.title')}
                 </div>
                 <div style={{ fontStyle: 'italic' }}>
                   {t('access.dragToAdjust')}
@@ -699,15 +671,6 @@ export const MapScreen: React.FC<MapScreenProps> = ({
             >
               <span>
                 {puntoPesca.lat.toFixed(5)}, {puntoPesca.lon.toFixed(5)}
-              </span>
-              <span>
-                {cargandoProfundidad ? (
-                  t('common.loading')
-                ) : profundidadPesca != null ? (
-                  `${profundidadPesca.toFixed(1)} m`
-                ) : (
-                  <span style={{ color: '#ef4444' }}>{t('detalle.noDepth')}</span>
-                )}
               </span>
             </div>
           </div>

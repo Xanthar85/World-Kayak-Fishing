@@ -277,12 +277,6 @@ export const SpotCard: React.FC<SpotCardProps> = ({
         >
           {coordsFormateadas}
         </span>
-        <span>•</span>
-        <span style={{ whiteSpace: 'nowrap' }}>
-          {spot.profundidad != null
-            ? `${spot.profundidad.toFixed(1)} m`
-            : t('detalle.noDepth')}
-        </span>
         <button
           onClick={async (e) => {
             e.stopPropagation();

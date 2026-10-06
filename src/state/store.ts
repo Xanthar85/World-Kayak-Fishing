@@ -29,10 +29,8 @@ export interface Spot {
   createdAt: number;
   zona?: Zona;
   tipoAcceso?: TipoAcceso | null;
-  profundidad?: number | null;
   accesoLat?: number | null;
   accesoLon?: number | null;
-  accesoProfundidad?: number | null;
 }
 
 export type FranjaUsuario = {
@@ -138,12 +136,6 @@ function validarSpot(raw: unknown): raw is Spot {
   )
     return false;
   if (
-    raw.profundidad !== undefined &&
-    raw.profundidad !== null &&
-    !esNumeroFinito(raw.profundidad)
-  )
-    return false;
-  if (
     raw.accesoLat !== undefined &&
     raw.accesoLat !== null &&
     !esNumeroFinito(raw.accesoLat)
@@ -153,12 +145,6 @@ function validarSpot(raw: unknown): raw is Spot {
     raw.accesoLon !== undefined &&
     raw.accesoLon !== null &&
     !esNumeroFinito(raw.accesoLon)
-  )
-    return false;
-  if (
-    raw.accesoProfundidad !== undefined &&
-    raw.accesoProfundidad !== null &&
-    !esNumeroFinito(raw.accesoProfundidad)
   )
     return false;
   return true;
@@ -299,10 +285,8 @@ export const useAppStore = create<AppState>()(
             {
               zona: 'mediterraneo_espanol',
               tipoAcceso: null,
-              profundidad: null,
               accesoLat: null,
               accesoLon: null,
-              accesoProfundidad: null,
               ...spot,
               id:
                 typeof crypto !== 'undefined' && 'randomUUID' in crypto
