@@ -28,8 +28,8 @@ export type HourlyPoint = {
   windWaveDirection: number | null;
   swellWaveDirection: number | null;
   // Viento
-  windSpeed: number | null;          // m/s
-  windGusts: number | null;          // m/s
+  windSpeed: number | null;          // km/h
+  windGusts: number | null;          // km/h
   windDirection: number | null;      // °
   // Temperatura
   temperature: number | null;        // °C aire
@@ -147,6 +147,7 @@ export async function fetchSpotWeather(
     ].join(','),
     forecast_days: forecastDays,
     timezone: 'auto',
+    wind_speed_unit: 'kmh',
   });
 
   const [marineRes, atmosRes] = await Promise.all([
@@ -186,7 +187,7 @@ export async function fetchSpotWeather(
       waveDirection: marine.hourly.wave_direction?.[i] ?? null,
       windWaveDirection: marine.hourly.wind_wave_direction?.[i] ?? null,
       swellWaveDirection: marine.hourly.swell_wave_direction?.[i] ?? null,
-      // Viento
+      // Viento (ya en km/h)
       windSpeed: ai !== undefined ? atmos.hourly.wind_speed_10m[ai] ?? null : null,
       windGusts: ai !== undefined ? atmos.hourly.wind_gusts_10m[ai] ?? null : null,
       windDirection: ai !== undefined ? atmos.hourly.wind_direction_10m[ai] ?? null : null,
@@ -237,10 +238,19 @@ export function msAKmh(ms: number | null): number | null {
 // m/s → Beaufort (0-12)
 export function msABf(ms: number | null): number | null {
   if (ms == null) return null;
-  // Tabla de umbrales Bf en m/s (aprox).
   const umbrales = [0.3, 1.6, 3.4, 5.5, 8.0, 10.8, 13.9, 17.2, 20.8, 24.5, 28.5, 32.7];
   for (let i = 0; i < umbrales.length; i++) {
     if (ms < umbrales[i]) return i;
+  }
+  return 12;
+}
+
+// km/h → Beaufort (0-12)
+export function kmhABf(kmh: number | null): number | null {
+  if (kmh == null) return null;
+  const umbrales = [1, 5, 11, 19, 28, 38, 49, 61, 74, 88, 102, 117];
+  for (let i = 0; i < umbrales.length; i++) {
+    if (kmh < umbrales[i]) return i;
   }
   return 12;
 }
