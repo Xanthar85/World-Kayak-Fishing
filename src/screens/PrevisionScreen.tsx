@@ -12,10 +12,18 @@ import {
   calcularVeredictoFranjaDia,
   veredictoAColor,
 } from '../lib/verdict-ui.ts';
-import { msAKmh, weatherCodeAIconoGrafico } from '../lib/openmeteo.ts';
+import {
+  msAKmh,
+  kmhABf,
+  weatherCodeAIcono,
+  weatherCodeAIconoGrafico,
+} from '../lib/openmeteo.ts';
 import type { SpotWeather, HourlyPoint } from '../lib/openmeteo.ts';
-import type { FranjaUsuario } from '../state/store.ts';
-import type { Veredicto } from '../lib/verdict.ts';
+import type { Spot, FranjaUsuario } from '../state/store.ts';
+import { calcularVeredicto, type FranjaDia, type Veredicto } from '../lib/verdict.ts';
+import { colorNumero } from '../lib/verdict-color.ts';
+import { calcularSol } from '../lib/sun.ts';
+import { calcularActividadPorHora, type ActividadHora } from '../lib/actividad.ts';
 
 function localDateKey(d: Date): string {
   const y = d.getFullYear();
@@ -380,6 +388,413 @@ const ResumenDia: React.FC<ResumenDiaProps> = ({ puntos }) => {
   );
 };
 
+function formatearCabeceraDia(fecha: Date, lang: string): string {
+  const locale = lang.startsWith('en') ? 'en-GB' : 'es-ES';
+  const diaSemana = fecha
+    .toLocaleDateString(locale, { weekday: 'short' })
+    .replace('.', '')
+    .toUpperCase();
+  const dia = String(fecha.getDate()).padStart(2, '0');
+  const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+  return `${diaSemana}, ${dia}/${mes}`;
+}
+
+function obtenerFranjaDia(fecha: Date): FranjaDia {
+  const h = fecha.getHours();
+  if (h < 12) return 'manana';
+  if (h < 20) return 'tarde';
+  return 'noche';
+}
+
+interface Tabla72HorasProps {
+  weather: SpotWeather | null;
+  spot: Spot | null;
+  lang: string;
+}
+
+const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
+  const ajustes = useAppStore((s) => s.ajustes);
+
+  const actividadMap = useMemo(() => {
+    if (!weather?.hourly || !spot) return new Map<string, ActividadHora>();
+    const mapaSol = new Map<string, { orto: Date | null; ocaso: Date | null }>();
+    for (const h of weather.hourly) {
+      const d = new Date(h.time);
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      if (!mapaSol.has(key)) {
+        const sol = calcularSol(d, spot.lat, spot.lon);
+        mapaSol.set(key, { orto: sol?.orto ?? null, ocaso: sol?.ocaso ?? null });
+      }
+    }
+    const lista = calcularActividadPorHora(weather.hourly, mapaSol);
+    const m = new Map<string, ActividadHora>();
+    for (const item of lista) {
+      m.set(item.hora, item);
+    }
+    return m;
+  }, [weather, spot]);
+
+  const filas72 = useMemo(() => {
+    const ahora = new Date();
+    const baseYear = ahora.getFullYear();
+    const baseMonth = ahora.getMonth();
+    const baseDay = ahora.getDate();
+    const ahoraHora = ahora.getHours();
+
+    const result: Array<{
+      fecha: Date;
+      esCambioDia: boolean;
+      point: HourlyPoint | null;
+    }> = [];
+
+    let prevDia: number | null = null;
+
+    for (let i = 0; i < 72; i++) {
+      const fecha = new Date(baseYear, baseMonth, baseDay, ahoraHora + i, 0, 0, 0);
+      const diaNum = fecha.getDate();
+      const esCambioDia = prevDia !== null && diaNum !== prevDia;
+      prevDia = diaNum;
+
+      let point: HourlyPoint | null = null;
+      if (weather?.hourly) {
+        point =
+          weather.hourly.find((h) => {
+            const d = new Date(h.time);
+            return (
+              d.getFullYear() === fecha.getFullYear() &&
+              d.getMonth() === fecha.getMonth() &&
+              d.getDate() === fecha.getDate() &&
+              d.getHours() === fecha.getHours()
+            );
+          }) ?? null;
+      }
+
+      result.push({ fecha, esCambioDia, point });
+    }
+
+    return result;
+  }, [weather]);
+
+  const columnas = [
+    'Hora',
+    'Clima',
+    'mm',
+    'ºC',
+    'OlaT',
+    'Per',
+    'V.Med',
+    'V.Max',
+    'KN',
+    'Act',
+  ];
+
+  const celdaBase: React.CSSProperties = {
+    padding: '5px 2px',
+    textAlign: 'center',
+    whiteSpace: 'nowrap',
+  };
+
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        border: '1px solid var(--border)',
+        borderRadius: 8,
+        backgroundColor: 'var(--surface)',
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          maxHeight: '55vh',
+          overflowY: 'auto',
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
+        <table
+          style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            fontSize: '0.72rem',
+            fontFamily: 'var(--font-mono, Fira Code, monospace)',
+          }}
+        >
+          <thead
+            style={{
+              position: 'sticky',
+              top: 0,
+              backgroundColor: 'var(--surface)',
+              zIndex: 2,
+              boxShadow: '0 1px 0 var(--border)',
+            }}
+          >
+            <tr>
+              {columnas.map((col) => (
+                <th
+                  key={col}
+                  style={{
+                    padding: '6px 2px',
+                    fontWeight: 600,
+                    color: 'var(--text-dim)',
+                    fontSize: '0.68rem',
+                    borderBottom: '1px solid var(--border)',
+                    whiteSpace: 'nowrap',
+                    textAlign: 'center',
+                  }}
+                >
+                  {col}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filas72.map((item) => {
+              const { fecha, esCambioDia, point } = item;
+              const franjaDia = obtenerFranjaDia(fecha);
+              const horaTexto = `${String(fecha.getHours()).padStart(2, '0')}:00`;
+
+              // Clima
+              const climaIcono = weatherCodeAIcono(
+                point?.weatherCode ?? null,
+                fecha.getHours() < 7 || fecha.getHours() >= 21
+              );
+
+              // mm (precipitación)
+              const mmTexto =
+                point?.precipitation != null
+                  ? `${point.precipitation.toFixed(1)}mm`
+                  : '—';
+
+              // ºC (temperatura)
+              const tempTexto =
+                point?.temperature != null
+                  ? `${point.temperature.toFixed(1)}ºC`
+                  : '—';
+
+              // OlaT
+              const olaTexto =
+                point?.waveHeight != null
+                  ? `${point.waveHeight.toFixed(2)}m`
+                  : '—';
+              const vOla =
+                point?.waveHeight != null && spot
+                  ? calcularVeredicto(
+                      spot.zona ?? 'mediterraneo_espanol',
+                      ajustes.categoriaKayak,
+                      ajustes.perfil,
+                      franjaDia,
+                      {
+                        viento: 0,
+                        ola: point.waveHeight,
+                        periodo: point.wavePeriod ?? 0,
+                        corriente: 0,
+                        marea: 0,
+                      }
+                    ).veredictoPorFactor.ola
+                  : null;
+              const colorOla = colorNumero(vOla, ajustes.colorTabla);
+
+              // Per
+              const perTexto =
+                point?.wavePeriod != null
+                  ? `${Math.round(point.wavePeriod)}s`
+                  : '—';
+              const vPer =
+                point?.wavePeriod != null && spot
+                  ? calcularVeredicto(
+                      spot.zona ?? 'mediterraneo_espanol',
+                      ajustes.categoriaKayak,
+                      ajustes.perfil,
+                      franjaDia,
+                      {
+                        viento: 0,
+                        ola: 0,
+                        periodo: point.wavePeriod,
+                        corriente: 0,
+                        marea: 0,
+                      }
+                    ).veredictoPorFactor.periodo
+                  : null;
+              const colorPer = colorNumero(vPer, ajustes.colorTabla);
+
+              // V.Med
+              const vmedTexto =
+                point?.windSpeed != null
+                  ? `${Math.round(point.windSpeed)}`
+                  : '—';
+              const vVmed =
+                point?.windSpeed != null && spot
+                  ? calcularVeredicto(
+                      spot.zona ?? 'mediterraneo_espanol',
+                      ajustes.categoriaKayak,
+                      ajustes.perfil,
+                      franjaDia,
+                      {
+                        viento: kmhABf(point.windSpeed) ?? 0,
+                        ola: 0,
+                        periodo: 0,
+                        corriente: 0,
+                        marea: 0,
+                      }
+                    ).veredictoPorFactor.viento
+                  : null;
+              const colorVmed = colorNumero(vVmed, ajustes.colorTabla);
+
+              // V.Max
+              const vmaxTexto =
+                point?.windGusts != null
+                  ? `${Math.round(point.windGusts)}`
+                  : '—';
+              const vVmax =
+                point?.windGusts != null && spot
+                  ? calcularVeredicto(
+                      spot.zona ?? 'mediterraneo_espanol',
+                      ajustes.categoriaKayak,
+                      ajustes.perfil,
+                      franjaDia,
+                      {
+                        viento: kmhABf(point.windGusts) ?? 0,
+                        ola: 0,
+                        periodo: 0,
+                        corriente: 0,
+                        marea: 0,
+                      }
+                    ).veredictoPorFactor.viento
+                  : null;
+              const colorVmax = colorNumero(vVmax, ajustes.colorTabla);
+
+              // KN (corriente en km/h)
+              const knVal = point?.currentVelocity;
+              const kmhVal = knVal != null ? knVal * 1.852 : null;
+              const knTexto = kmhVal != null ? kmhVal.toFixed(1) : '—';
+              const vKN =
+                point?.currentVelocity != null && spot
+                  ? calcularVeredicto(
+                      spot.zona ?? 'mediterraneo_espanol',
+                      ajustes.categoriaKayak,
+                      ajustes.perfil,
+                      franjaDia,
+                      {
+                        viento: 0,
+                        ola: 0,
+                        periodo: 0,
+                        corriente: point.currentVelocity,
+                        marea: 0,
+                      }
+                    ).veredictoPorFactor.corriente
+                  : null;
+              const colorKN = colorNumero(vKN, ajustes.colorTabla);
+
+              // Act (actividad peces 0-10)
+              const actItem = point ? actividadMap.get(point.time) : null;
+              const actTexto =
+                actItem != null ? String(actItem.coeficiente) : '—';
+
+              return (
+                <React.Fragment key={fecha.toISOString()}>
+                  {esCambioDia && (
+                    <tr>
+                      <td
+                        colSpan={10}
+                        style={{
+                          padding: '6px 8px',
+                          backgroundColor: 'rgba(0, 230, 118, 0.08)',
+                          color: 'var(--accent)',
+                          fontWeight: 700,
+                          fontSize: '0.74rem',
+                          textAlign: 'left',
+                          borderTop: '1px solid var(--border)',
+                          borderBottom: '1px solid var(--border)',
+                          letterSpacing: '0.04em',
+                        }}
+                      >
+                        {formatearCabeceraDia(fecha, lang)}
+                      </td>
+                    </tr>
+                  )}
+                  <tr
+                    style={{
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+                    }}
+                  >
+                    <td
+                      style={{
+                        ...celdaBase,
+                        color: 'var(--text-dim)',
+                        fontWeight: 500,
+                      }}
+                    >
+                      {horaTexto}
+                    </td>
+                    <td style={{ ...celdaBase, fontSize: '0.82rem' }}>
+                      {climaIcono}
+                    </td>
+                    <td style={{ ...celdaBase, color: 'var(--text)' }}>
+                      {mmTexto}
+                    </td>
+                    <td style={{ ...celdaBase, color: 'var(--text)' }}>
+                      {tempTexto}
+                    </td>
+                    <td
+                      style={{
+                        ...celdaBase,
+                        color: colorOla ?? 'var(--text)',
+                        fontWeight: colorOla ? 600 : 400,
+                      }}
+                    >
+                      {olaTexto}
+                    </td>
+                    <td
+                      style={{
+                        ...celdaBase,
+                        color: colorPer ?? 'var(--text)',
+                        fontWeight: colorPer ? 600 : 400,
+                      }}
+                    >
+                      {perTexto}
+                    </td>
+                    <td
+                      style={{
+                        ...celdaBase,
+                        color: colorVmed ?? 'var(--text)',
+                        fontWeight: colorVmed ? 600 : 400,
+                      }}
+                    >
+                      {vmedTexto}
+                    </td>
+                    <td
+                      style={{
+                        ...celdaBase,
+                        color: colorVmax ?? 'var(--text)',
+                        fontWeight: colorVmax ? 600 : 400,
+                      }}
+                    >
+                      {vmaxTexto}
+                    </td>
+                    <td
+                      style={{
+                        ...celdaBase,
+                        color: colorKN ?? 'var(--text)',
+                        fontWeight: colorKN ? 600 : 400,
+                      }}
+                    >
+                      {knTexto}
+                    </td>
+                    <td style={{ ...celdaBase, color: 'var(--text)' }}>
+                      {actTexto}
+                    </td>
+                  </tr>
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 export const PrevisionScreen: React.FC = () => {
   const { t, i18n } = useTranslation();
   const spots = useAppStore((s) => s.spots);
@@ -517,6 +932,8 @@ export const PrevisionScreen: React.FC = () => {
       />
 
       {puntosDia.length > 0 && <ResumenDia puntos={puntosDia} />}
+
+      <Tabla72Horas spot={spotActivo} weather={weather} lang={lang} />
     </div>
   );
 };
