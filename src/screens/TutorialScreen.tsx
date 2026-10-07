@@ -1,7 +1,7 @@
 // src/screens/TutorialScreen.tsx
 // WKF — Pantalla del tutorial. Sin cambios en v1.010.
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Logo } from '../components/Logo.tsx';
 
@@ -25,6 +25,7 @@ const PASOS: Paso[] = [
 
 export const TutorialScreen: React.FC<TutorialScreenProps> = ({ onClose }) => {
   const { t } = useTranslation();
+  const [copiado, setCopiado] = useState(false);
 
   return (
     <div
@@ -149,6 +150,65 @@ export const TutorialScreen: React.FC<TutorialScreenProps> = ({ onClose }) => {
             </section>
           );
         })}
+
+        <section
+          style={{
+            backgroundColor: 'var(--surface)',
+            border: '1px solid var(--accent-2)',
+            borderRadius: 8,
+            padding: 16,
+            marginBottom: 16,
+          }}
+        >
+          <h2
+            style={{
+              margin: '0 0 8px 0',
+              fontSize: '1rem',
+              fontWeight: 700,
+              color: 'var(--accent-2)',
+            }}
+          >
+            {t('tutorial.thresholdsTitle')}
+          </h2>
+          <p
+            style={{
+              margin: '0 0 12px 0',
+              fontSize: '0.9rem',
+              lineHeight: 1.6,
+              color: 'var(--text)',
+            }}
+          >
+            {t('tutorial.thresholdsIntro')}
+          </p>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(t('tutorial.thresholdsPromptIA'));
+                setCopiado(true);
+                setTimeout(() => setCopiado(false), 2000);
+              } catch {
+                /* ignore */
+              }
+            }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 14px',
+              borderRadius: 6,
+              border: `1px solid ${copiado ? 'var(--accent)' : 'var(--accent-2)'}`,
+              backgroundColor: 'transparent',
+              color: copiado ? 'var(--accent)' : 'var(--accent-2)',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            <span>📋</span>
+            <span>{copiado ? t('tutorial.thresholdsCopied') : t('tutorial.thresholdsCopyButton')}</span>
+          </button>
+        </section>
 
         <div
           style={{

@@ -213,7 +213,7 @@ export const MapScreen: React.FC<MapScreenProps> = ({
 
     try {
       const lang = i18n.language && i18n.language.startsWith('en') ? 'en' : 'es';
-      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=12&accept-language=${lang}`;
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14&addressdetails=1&accept-language=${lang}`;
       const res = await fetch(url, {
         headers: {
           Accept: 'application/json',
@@ -224,16 +224,17 @@ export const MapScreen: React.FC<MapScreenProps> = ({
         const data = await res.json();
         const addr = data?.address;
         const suggested =
-          addr?.city ||
-          addr?.town ||
           addr?.village ||
           addr?.hamlet ||
+          addr?.town ||
+          addr?.city ||
           addr?.municipality ||
           addr?.suburb ||
+          addr?.city_district ||
           addr?.county ||
+          addr?.state_district ||
           addr?.state ||
           (data?.name && data?.name !== addr?.country ? data.name : '') ||
-          addr?.country ||
           '';
         if (suggested && !nombreEditadoManualmente) {
           setNombre(suggested);
@@ -437,12 +438,20 @@ export const MapScreen: React.FC<MapScreenProps> = ({
             url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          <ClickHandler disabled={isEditing} onPick={handlePick} />
+          <ClickHandler disabled={false} onPick={handlePick} />
 
           {puntoPesca && (
             <Marker
               position={[puntoPesca.lat, puntoPesca.lon]}
               icon={pinPescaIcon}
+              draggable={true}
+              eventHandlers={{
+                dragend: (e) => {
+                  const marker = e.target as L.Marker;
+                  const latlng = marker.getLatLng();
+                  setPuntoPesca({ lat: latlng.lat, lon: latlng.lng });
+                },
+              }}
             />
           )}
 

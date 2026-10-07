@@ -270,6 +270,42 @@ export const stringsEn: StringsSchema = {
     step6Title: '6. Important warning',
     step6Body:
       'WKF is an aid, not a substitute for your judgement. Data comes from open weather models, with limited accuracy at the shore. It is not a navigation tool. Before going out to sea, always assess the real conditions and your own experience.',
+    thresholdsTitle: 'Threshold system',
+    thresholdsIntro:
+      'Each verdict is derived by cross-referencing your geographical zone, kayak category, kayaker profile, and current conditions. The most unfavorable factor rules: there is no averaging. If you want a detailed explanation in plain language, copy the text using the button and paste it into any AI of your choice.',
+    thresholdsCopyButton: 'Copy prompt for AI',
+    thresholdsCopied: 'Prompt copied',
+    thresholdsPromptIA: `Hello. I am a user of WKF (World Kayak Fishing), a web app for kayak and shore fishing. I need you to explain in simple words how the safety threshold system used by the app works. Here is the summary:
+
+VERDICTS (from best to worst):
+- FAVORABLE: you can launch with confidence.
+- ACCEPTABLE: you can launch, but stay alert.
+- DEMANDING: experienced kayakers only with full safety gear.
+- ADVISED AGAINST: you should not launch.
+
+KAYAK CATEGORIES (WKF):
+- K1: ultra-light (< 3 m), no bulkheads, low secondary stability.
+- K2: light (3–3.6 m), no bulkheads.
+- K3: medium (3.6–4.2 m), sit-on-top, optional rudder.
+- K4: heavy (4.2–4.8 m), with watertight bulkheads and rudder.
+- K5: sea kayak (> 4.8 m), closed cockpit, bulkheads and rudder.
+
+EVALUATED FACTORS:
+- Wind (Beaufort scale).
+- Wave (significant wave height, meters).
+- Wave period (seconds, shorter is worse).
+- Current (knots).
+- Tide (meters).
+
+RULE: the worst factor rules. A single advised-against factor overrides the entire verdict.
+
+SHORE ACCESS AND LAUNCH LEVELS:
+- Beach, rocky shore, harbour/breakwater, other.
+- Levels: SAFE, WATCH, HARD, NO GO.
+
+SOURCES: Directive 2013/53/EU (boat categories A/B/C/D), British Canoeing, American Canoe Association (ACA), French Canoeing Federation (FFCK), Sea Kayak Italy.
+
+Please explain all this to me as if I had little technical experience. What does each level mean, why the worst factor rules, and what should I check before launching my kayak. Finally, give me three practical tips for using the app wisely.`,
   },
 
   winds: {

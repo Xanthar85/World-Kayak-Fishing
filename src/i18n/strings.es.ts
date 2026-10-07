@@ -277,6 +277,42 @@ export const stringsEs = {
     step6Title: '6. Aviso importante',
     step6Body:
       'WKF es una ayuda, no un sustituto de tu criterio. Los datos vienen de modelos meteorológicos abiertos, con precisión limitada en costa. No es una herramienta de navegación. Antes de salir al mar, valora siempre las condiciones reales y tu propia experiencia.',
+    thresholdsTitle: 'Sistema de umbrales',
+    thresholdsIntro:
+      'Cada veredicto sale de cruzar la zona geográfica, la categoría del kayak, tu perfil de kayakista y las condiciones del momento. El factor más desfavorable manda: no se hace media. Si quieres una explicación detallada en lenguaje sencillo, copia el texto del botón y pégaselo a la IA que prefieras.',
+    thresholdsCopyButton: 'Copiar texto para IA',
+    thresholdsCopied: 'Texto copiado',
+    thresholdsPromptIA: `Hola. Soy usuario de WKF (World Kayak Fishing), una webapp de pesca en kayak y desde costa. Necesito que me expliques con palabras sencillas cómo funciona el sistema de umbrales de seguridad que usa la app. Te paso el resumen:
+
+VEREDICTOS (de mejor a peor):
+- FAVORABLE: se puede salir con confianza.
+- ACEPTABLE: se puede salir, pero con atención.
+- EXIGENTE: solo kayakistas experimentados con equipo completo.
+- DESACONSEJADO: no se debe salir.
+
+CATEGORÍAS DE KAYAK (WKF):
+- K1: ultra-ligero (< 3 m), sin compartimentos, estabilidad secundaria baja.
+- K2: ligero (3-3.6 m), sin compartimentos.
+- K3: medio (3.6-4.2 m), autovaciable, timón opcional.
+- K4: pesado (4.2-4.8 m), con compartimentos estancos y timón.
+- K5: kayak de mar (> 4.8 m), cerrado, con compartimentos y timón.
+
+FACTORES EVALUADOS:
+- Viento (Beaufort).
+- Ola (altura significativa, metros).
+- Periodo de ola (segundos, cuanto más corto peor).
+- Corriente (nudos).
+- Marea (metros).
+
+REGLA: el peor factor manda. Un solo factor desaconsejado tumba todo el veredicto.
+
+ACCESOS AL MAR Y NIVELES DE SALIDA:
+- Playa, roca, puerto-escollera, otro.
+- Niveles: SEGURA, VIGILAR, DIFÍCIL, NO SALIR.
+
+FUENTES: Directiva 2013/53/UE (categorías A/B/C/D de embarcaciones), British Canoeing, American Canoe Association (ACA), Federación Francesa de Canotaje (FFCK), Sea Kayak Italy.
+
+Por favor, explícame todo esto como si tuviera poca experiencia técnica. Qué significa cada nivel, por qué el peor factor manda, y qué debería mirar antes de salir con mi kayak. Al final dame tres consejos prácticos para usar la app con cabeza.`,
   },
 
   winds: {

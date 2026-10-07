@@ -32,12 +32,20 @@ export const PantallaDeslizante: React.FC<PantallaDeslizanteProps> = ({
 
   const style: React.CSSProperties = {
     position: 'fixed',
-    inset: 0,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100vw',
+    height: '100vh',
     backgroundColor: 'var(--bg)',
     zIndex: 200,
     transform: visible ? 'translateX(0)' : 'translateX(100%)',
-    transition: 'transform 250ms cubic-bezier(0.22, 1, 0.36, 1)',
+    transition: 'transform 320ms cubic-bezier(0.16, 1, 0.3, 1)',
     willChange: 'transform',
+    overflow: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
   };
 
   return (

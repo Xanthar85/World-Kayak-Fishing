@@ -254,6 +254,7 @@ const TablaAyuda: React.FC<TablaAyudaProps> = ({ tabId }) => {
   const [abierto, setAbierto] = useState(false);
   return (
     <div
+      id={`tabla-ayuda-${tabId}`}
       style={{
         marginTop: 14,
         border: '1px solid var(--border)',
@@ -296,6 +297,46 @@ const TablaAyuda: React.FC<TablaAyudaProps> = ({ tabId }) => {
         </div>
       )}
     </div>
+  );
+};
+
+interface BotonAyudaProps {
+  tabId: string;
+}
+
+const BotonAyuda: React.FC<BotonAyudaProps> = ({ tabId }) => {
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        const el = document.getElementById(`tabla-ayuda-${tabId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          const btn = el.querySelector('button');
+          if (btn) (btn as HTMLButtonElement).click();
+        }
+      }}
+      title="Cómo leer esta tabla"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 14,
+        height: 14,
+        borderRadius: '50%',
+        border: '1px solid var(--text-dim)',
+        backgroundColor: 'transparent',
+        color: 'var(--text-dim)',
+        fontSize: '0.6rem',
+        fontWeight: 700,
+        cursor: 'pointer',
+        padding: 0,
+        marginLeft: 4,
+        lineHeight: 1,
+      }}
+    >
+      ?
+    </button>
   );
 };
 
@@ -1127,16 +1168,19 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                     // Bug 4: rachas ≥ 30 km/h en rojo neón.
                     const esRachaFuerte = v >= 30;
                     return (
-                      <span
-                        style={{
-                          color: esRachaFuerte ? '#FF2D55' : undefined,
-                          fontWeight: esRachaFuerte ? 700 : 500,
-                          textShadow: esRachaFuerte
-                            ? '0 0 6px rgba(255, 45, 85, 0.7)'
-                            : 'none',
-                        }}
-                      >
-                        {v}
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                        <span
+                          style={{
+                            color: esRachaFuerte ? '#FF2D55' : undefined,
+                            fontWeight: esRachaFuerte ? 700 : 500,
+                            textShadow: esRachaFuerte
+                              ? '0 0 6px rgba(255, 45, 85, 0.7)'
+                              : 'none',
+                          }}
+                        >
+                          {v}
+                        </span>
+                        {esRachaFuerte && <BotonAyuda tabId="wind" />}
                       </span>
                     );
                   },
@@ -1297,24 +1341,38 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                     const prev = horasFiltradas[idx - 3].pressure;
                     if (prev == null || h.pressure == null) return '—';
                     const d = h.pressure - prev;
-                    // Bug 19: caída brusca > 2.5 hPa en 3 h en rojo neón.
-                    if (d < -2.5) {
+
+                    if (d < -2.5 || d > 2.5) {
                       return (
-                        <span
-                          style={{
-                            color: '#FF2D55',
-                            fontWeight: 700,
-                            textShadow: '0 0 6px rgba(255, 45, 85, 0.7)',
-                          }}
-                        >
-                          ⚡ Caída brusca
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                          <span
+                            style={{
+                              color: 'var(--verdict-desaconsejado)',
+                              fontWeight: 700,
+                              textShadow: '0 0 6px rgba(255, 45, 85, 0.7)',
+                            }}
+                          >
+                            {d < 0 ? '⬇ ‼' : '⬆ ‼'}
+                          </span>
+                          <BotonAyuda tabId="barometer" />
                         </span>
                       );
                     }
-                    if (d < -0.8) return '⬇️ Bajando';
-                    if (d > 2.5) return '📈 Subida rápida';
-                    if (d > 0.8) return '⬆️ Subiendo';
-                    return '➡️ Estable';
+                    if (d < -0.8) {
+                      return (
+                        <span style={{ color: 'var(--verdict-exigente)', fontWeight: 600 }}>
+                          ⬇
+                        </span>
+                      );
+                    }
+                    if (d > 0.8) {
+                      return (
+                        <span style={{ color: 'var(--verdict-favorable)', fontWeight: 600 }}>
+                          ⬆
+                        </span>
+                      );
+                    }
+                    return <span style={{ color: 'var(--text-dim)' }}>➡</span>;
                   },
                 },
               ]}
@@ -1358,9 +1416,11 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                     let indicador = '▶ correcto';
                     if (kn < 0.4) indicador = '🐌 Agua parada / baja actividad';
                     else if (kn > 1.4) indicador = '⚡ Deriva rápida';
+                    const color = colorNumero(subVeredictoCurrent(h), colorNivel);
                     return (
-                      <span style={{ fontSize: '0.68rem' }}>
-                        {kn.toFixed(1)} kn ({kmh.toFixed(1).replace('.', ',')} km/h) {indicador}
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color, fontSize: '0.68rem' }}>
+                        <span>{kn.toFixed(1)} kn ({kmh.toFixed(1).replace('.', ',')} km/h) {indicador}</span>
+                        {(kn < 0.4 || kn > 1.4) && <BotonAyuda tabId="activity" />}
                       </span>
                     );
                   },
@@ -1463,15 +1523,18 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                     const inusual = Math.abs(d) > 0.08;
                     if (inusual) {
                       return (
-                        <span
-                          style={{
-                            color: '#FF2D55',
-                            fontWeight: 700,
-                            textShadow: '0 0 6px rgba(255, 45, 85, 0.7)',
-                          }}
-                        >
-                          {d > 0 ? '⬆️' : '⬇️'} {d > 0 ? '+' : ''}
-                          {d.toFixed(3)}
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                          <span
+                            style={{
+                              color: 'var(--verdict-desaconsejado)',
+                              fontWeight: 700,
+                              textShadow: '0 0 6px rgba(255, 45, 85, 0.7)',
+                            }}
+                          >
+                            {d > 0 ? '⬆️' : '⬇️'} {d > 0 ? '+' : ''}
+                            {d.toFixed(3)}
+                          </span>
+                          <BotonAyuda tabId="tides" />
                         </span>
                       );
                     }

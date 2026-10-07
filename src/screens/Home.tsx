@@ -21,21 +21,7 @@ import { SpotCard } from '../components/SpotCard.tsx';
 import { PWAInstallButton } from '../components/PWAInstallButton.tsx';
 import { PantallaDeslizante } from '../components/PantallaDeslizante.tsx';
 import { fetchSpotWeather } from '../lib/openmeteo.ts';
-
-const PrevisionPlaceholder: React.FC = () => {
-  return (
-    <div
-      style={{
-        padding: '40px',
-        textAlign: 'center',
-        color: 'var(--text-dim)',
-        fontSize: '0.9rem',
-      }}
-    >
-      Previsión meteorológica — próximamente
-    </div>
-  );
-};
+import { PrevisionScreen } from './PrevisionScreen.tsx';
 
 export const Home: React.FC = () => {
   const { t } = useTranslation();
@@ -80,8 +66,8 @@ export const Home: React.FC = () => {
   };
 
   useEffect(() => {
-    if (autoFetchDoneRef.current) return;
     if (spots.length === 0) return;
+    if (autoFetchDoneRef.current) return;
     autoFetchDoneRef.current = true;
 
     for (const spot of spots) {
@@ -91,7 +77,7 @@ export const Home: React.FC = () => {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [spots.length]);
 
   const volverAHome = () => {
     setMapMode(null);
@@ -311,7 +297,7 @@ export const Home: React.FC = () => {
             </div>
           ))}
 
-        {pestanaActiva === 'prevision' && <PrevisionPlaceholder />}
+        {pestanaActiva === 'prevision' && <PrevisionScreen />}
 
         {pestanaActiva === 'ajustes' && (
           <SettingsScreen
