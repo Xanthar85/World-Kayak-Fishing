@@ -179,7 +179,7 @@ export const Home: React.FC = () => {
           {/* Ko-fi arriba a la derecha, debajo de Ajustes (bug 15,
               DP-094). */}
           <a
-            href="https://ko-fi.com/"
+            href="https://ko-fi.com/xanthar"
             target="_blank"
             rel="noopener noreferrer"
             title={t('settings.donate')}

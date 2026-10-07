@@ -1127,7 +1127,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </span>
           </div>
           <a
-            href="https://ko-fi.com/"
+            href="https://ko-fi.com/xanthar"
             target="_blank"
             rel="noopener noreferrer"
             style={{
