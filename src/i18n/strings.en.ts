@@ -531,6 +531,7 @@ Please explain all this to me as if I had little technical experience. What does
   },
 
   detalle: {
+    editSpot: 'Edit spot',
     coords: 'Coordinates',
     coordsCopied: 'Coordinates copied',
     depth: 'Depth',

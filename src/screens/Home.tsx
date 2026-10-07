@@ -465,7 +465,7 @@ export const Home: React.FC = () => {
           <SpotScreen
             spotId={viewingSpotId}
             onClose={() => setCerrando(true)}
-            onAddAccess={(spotId) => {
+            onEditSpot={(spotId) => {
               const s = spots.find((x) => x.id === spotId);
               if (s) {
                 setEditSpot(s);

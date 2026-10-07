@@ -1,11 +1,10 @@
 // src/screens/SpotScreen.tsx — completo
-// v1.011:
-//   - Número grande + cabecera de columnas fijos.
-//   - Coloreo de cada número según su veredicto individual.
-//   - Barra inferior de subpestañas fija.
-//   - Factor disparador con valor.
-//   - Leyenda "Cómo leer esta tabla" DENTRO del scroll.
-//   - Botón Ko-fi grande al lado del número grande.
+// v1.013:
+//   - El lápiz junto al nombre ABRE EL MAPA en modo edición
+//     (no edita el nombre en línea).
+//   - El botón "+ Añadir acceso" ABRE EL MAPA en modo edición.
+//   - Se elimina la edición inline del nombre.
+//   - Ambas acciones delegan en la nueva prop onEditSpot.
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -44,6 +43,8 @@ import type { FranjaUsuario } from '../state/store.ts';
 export interface SpotScreenProps {
   spotId: string;
   onClose: () => void;
+  /** Abre el mapa en modo edición para este punto. */
+  onEditSpot?: (spotId: string) => void;
   onAddAccess?: (spotId: string) => void;
 }
 
@@ -108,8 +109,6 @@ function formatearValorFactor(factor: keyof Umbral, h: HourlyPoint): string {
       return h.seaLevelHeight != null ? `${h.seaLevelHeight.toFixed(2)} m` : '—';
   }
 }
-
-// ─── Tabla reutilizable con cabecera fija y filas scrollables ────
 
 interface ColumnaTabla<T> {
   key: string;
@@ -358,17 +357,15 @@ const BotonAyuda: React.FC<BotonAyudaProps> = ({ tabId }) => {
   );
 };
 
-// ─── SpotScreen ───────────────────────────────────────────────────
-
 export const SpotScreen: React.FC<SpotScreenProps> = ({
-  spotId, onClose, onAddAccess,
+  spotId, onClose, onEditSpot, onAddAccess,
 }) => {
+  const handleEditSpot = onEditSpot ?? onAddAccess ?? (() => {});
   const { t, i18n } = useTranslation();
 
   const spots = useAppStore((s) => s.spots);
   const getWeatherEntry = useAppStore((s) => s.getWeatherEntry);
   const setWeather = useAppStore((s) => s.setWeather);
-  const updateSpot = useAppStore((s) => s.updateSpot);
   const ajustes = useAppStore((s) => s.ajustes);
   const setFranjaActiva = useAppStore((s) => s.setFranjaActiva);
 
@@ -376,8 +373,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 
   const [tabActiva, setTabActiva] = useState<TabId>('waves');
   const [coordsCopiedFeedback, setCoordsCopiedFeedback] = useState(false);
-  const [editingName, setEditingName] = useState(false);
-  const [nameDraft, setNameDraft] = useState('');
   const [loading, setLoading] = useState(false);
   const fetchTriggeredRef = useRef(false);
 
@@ -518,19 +513,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
       setCoordsCopiedFeedback(true);
       setTimeout(() => setCoordsCopiedFeedback(false), 1500);
     } catch { /* ignore */ }
-  };
-
-  const handleStartEditName = () => {
-    if (!spot) return;
-    setNameDraft(spot.name);
-    setEditingName(true);
-  };
-
-  const handleSaveName = () => {
-    if (!spot) return;
-    const trimmed = nameDraft.trim() || t('common.unnamed');
-    updateSpot(spot.id, { name: trimmed });
-    setEditingName(false);
   };
 
   const factorKeyMap: Record<keyof Umbral, string> = {
@@ -705,53 +687,27 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
             ← {t('common.back')}
           </button>
 
-          {editingName ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, margin: '0 8px' }}>
-              <input
-                value={nameDraft}
-                onChange={(e) => setNameDraft(e.target.value)}
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSaveName();
-                  if (e.key === 'Escape') setEditingName(false);
-                }}
-                style={{
-                  flex: 1, padding: '4px 8px',
-                  backgroundColor: 'var(--surface)',
-                  border: '1px solid var(--accent)',
-                  borderRadius: 4, color: 'var(--text)', fontSize: '0.9rem',
-                }}
-              />
-              <button onClick={handleSaveName} style={{
-                padding: '4px 8px', borderRadius: 4,
-                border: '1px solid var(--accent)', backgroundColor: 'transparent',
-                color: 'var(--accent)', fontSize: '0.75rem', cursor: 'pointer',
-              }}>✓</button>
-              <button onClick={() => setEditingName(false)} style={{
-                padding: '4px 8px', borderRadius: 4,
-                border: '1px solid var(--border)', backgroundColor: 'transparent',
-                color: 'var(--text-dim)', fontSize: '0.75rem', cursor: 'pointer',
-              }}>✕</button>
-            </div>
-          ) : (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              flex: 1, justifyContent: 'center', margin: '0 8px',
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            flex: 1, justifyContent: 'center', margin: '0 8px',
+          }}>
+            <h1 style={{
+              margin: 0, fontSize: '1rem', fontWeight: 600,
+              textAlign: 'center', color: 'var(--text)',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>
-              <h1 style={{
-                margin: 0, fontSize: '1rem', fontWeight: 600,
-                textAlign: 'center', color: 'var(--text)',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
-                {spot.name || t('common.unnamed')}
-              </h1>
-              <button onClick={handleStartEditName} title={t('detalle.editName')} style={{
+              {spot.name || t('common.unnamed')}
+            </h1>
+            <button
+              onClick={() => handleEditSpot(spot.id)}
+              title={t('detalle.editSpot')}
+              style={{
                 border: 'none', background: 'transparent',
                 color: 'var(--text-dim)', cursor: 'pointer',
                 fontSize: '0.85rem', padding: '2px 4px',
-              }}>✎</button>
-            </div>
-          )}
+              }}
+            >✎</button>
+          </div>
 
           <div style={{ width: 60 }} />
         </div>
@@ -867,7 +823,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
               <span style={{ color: 'var(--text-dim)' }}>{t('access.none')}</span>
               <button
                 type="button"
-                onClick={() => onAddAccess && onAddAccess(spot.id)}
+                onClick={() => handleEditSpot(spot.id)}
                 style={{
                   padding: '2px 8px', borderRadius: 4,
                   border: '1px solid var(--accent)', backgroundColor: 'transparent',
@@ -1350,8 +1306,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
   );
 };
 
-// ─── Tabla de Sol (30 días) ──────────────────────────────────────
-
 const TablaSol: React.FC<{ lang: string; lat: number; lon: number }> = ({
   lang, lat, lon,
 }) => {
@@ -1426,8 +1380,6 @@ const TablaSol: React.FC<{ lang: string; lat: number; lon: number }> = ({
     </div>
   );
 };
-
-// ─── Tabla de Luna (30 días) ─────────────────────────────────────
 
 const TablaLuna: React.FC<{ lang: string; lat: number; lon: number }> = ({
   lang, lat, lon,

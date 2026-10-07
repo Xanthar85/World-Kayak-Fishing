@@ -538,6 +538,7 @@ Por favor, explícame todo esto como si tuviera poca experiencia técnica. Qué 
   },
 
   detalle: {
+    editSpot: 'Editar punto',
     coords: 'Coordenadas',
     coordsCopied: 'Coordenadas copiadas',
     depth: 'Profundidad',
