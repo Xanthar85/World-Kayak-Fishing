@@ -53,6 +53,7 @@ const TIPOS_ACCESO: TipoAcceso[] = ['playa', 'roca', 'puerto_escollera', 'otro']
 
 export interface MapScreenProps {
   initialSpot?: Spot | null;
+  initialFocus?: 'general' | 'acceso';
   onCancel: () => void;
   onSave: (draft: Omit<Spot, 'id' | 'createdAt'>) => void;
 }
@@ -83,6 +84,7 @@ function MapController({ onMap }: { onMap: (map: L.Map) => void }) {
 
 export const MapScreen: React.FC<MapScreenProps> = ({
   initialSpot,
+  initialFocus = 'general',
   onCancel,
   onSave,
 }) => {
@@ -94,6 +96,17 @@ export const MapScreen: React.FC<MapScreenProps> = ({
   const [busqueda, setBusqueda] = useState('');
   const [buscando, setBuscando] = useState(false);
   const [errorBusqueda, setErrorBusqueda] = useState<string | null>(null);
+
+  const accessSectionRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (initialFocus === 'acceso') {
+      const timer = setTimeout(() => {
+        accessSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [initialFocus]);
 
   const [puntoPesca, setPuntoPesca] = useState<{ lat: number; lon: number } | null>(
     initialSpot ? { lat: initialSpot.lat, lon: initialSpot.lon } : null
@@ -252,6 +265,19 @@ export const MapScreen: React.FC<MapScreenProps> = ({
       mapInstance.flyTo([c.lat, c.lon], 7);
     }
   }
+
+  React.useEffect(() => {
+    if (!mapInstance || !puntoPesca) return;
+    if (puntoAcceso && (puntoAcceso.lat !== puntoPesca.lat || puntoAcceso.lon !== puntoPesca.lon)) {
+      const bounds = L.latLngBounds(
+        [puntoPesca.lat, puntoPesca.lon],
+        [puntoAcceso.lat, puntoAcceso.lon]
+      );
+      mapInstance.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
+    } else {
+      mapInstance.setView([puntoPesca.lat, puntoPesca.lon], 13);
+    }
+  }, [mapInstance]);
 
   function handleSave() {
     if (!puntoPesca) return;
@@ -460,6 +486,7 @@ export const MapScreen: React.FC<MapScreenProps> = ({
               position={[puntoAcceso.lat, puntoAcceso.lon]}
               icon={pinAccesoIcon}
               draggable={true}
+              zIndexOffset={500}
               eventHandlers={{
                 dragend: (e) => {
                   const marker = e.target as L.Marker;
@@ -585,16 +612,32 @@ export const MapScreen: React.FC<MapScreenProps> = ({
               </select>
             </div>
 
-            <div>
+            <div
+              ref={accessSectionRef}
+              style={{
+                borderRadius: 8,
+                padding: initialFocus === 'acceso' ? '8px 10px' : 0,
+                border: initialFocus === 'acceso' ? '1px solid var(--accent-2)' : 'none',
+                backgroundColor: initialFocus === 'acceso' ? 'rgba(0, 184, 255, 0.06)' : 'transparent',
+              }}
+            >
               <label
                 style={{
-                  display: 'block',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
                   fontSize: '0.75rem',
-                  color: 'var(--text-dim)',
+                  color: initialFocus === 'acceso' ? 'var(--accent-2)' : 'var(--text-dim)',
+                  fontWeight: initialFocus === 'acceso' ? 600 : 400,
                   marginBottom: 4,
                 }}
               >
-                {t('access.title')}
+                <span>{t('access.title')}</span>
+                {initialFocus === 'acceso' && (
+                  <span style={{ fontSize: '0.68rem', color: 'var(--accent-2)', fontWeight: 600 }}>
+                    {tipoAcceso == null ? '📍 Configurar acceso' : `✓ ${t(`access.${tipoAcceso}`)}`}
+                  </span>
+                )}
               </label>
               <div style={{ display: 'flex', gap: 6 }}>
                 {TIPOS_ACCESO.map((tipo) => {

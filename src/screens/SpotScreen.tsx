@@ -37,7 +37,7 @@ import type { FranjaUsuario } from '../state/store.ts';
 export interface SpotScreenProps {
   spotId: string;
   onClose: () => void;
-  onEditSpot: (spotId: string) => void;
+  onEditSpot: (spotId: string, focusSection?: 'general' | 'acceso') => void;
 }
 
 type TabId =
@@ -283,6 +283,19 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spot?.id]);
+
+  const handleRefresh = async () => {
+    if (!spot || loading) return;
+    setLoading(true);
+    try {
+      const data = await fetchSpotWeather(spot.lat, spot.lon);
+      setWeather(spot.id, data);
+    } catch (err) {
+      console.error('fetch spot weather', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const franjaActiva = ajustes.franjas.find((f) => f.id === ajustes.franjaActivaId)
     ?? ajustes.franjas[0] ?? null;
@@ -555,11 +568,19 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
               textAlign: 'center', color: 'var(--text)',
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}>{spot.name || t('common.unnamed')}</h1>
-            <button onClick={() => onEditSpot(spot.id)} title={t('detalle.editSpot')} style={{
-              border: 'none', background: 'transparent',
-              color: 'var(--text-dim)', cursor: 'pointer',
-              fontSize: '0.85rem', padding: '2px 4px',
-            }}>✎</button>
+            <button
+              type="button"
+              onClick={() => onEditSpot(spot.id, 'general')}
+              title={t('detalle.editSpot')}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--text-dim)',
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+                padding: '2px 4px',
+              }}
+            >✎</button>
           </div>
 
           <div style={{ width: 60 }} />
@@ -617,16 +638,42 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         </div>
 
         {stale && (
-          <div style={{
-            padding: '6px 10px', marginBottom: 6, borderRadius: 6,
-            border: '1px solid var(--verdict-aceptable)',
-            backgroundColor: 'rgba(229, 229, 0, 0.1)',
-            color: 'var(--verdict-aceptable)',
-            fontSize: '0.75rem', textAlign: 'center',
-          }}>{t('home.card.staleWarning', { min: ageMin })}</div>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={loading}
+            title={t('home.card.refresh')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              width: '100%',
+              padding: '7px 10px',
+              marginBottom: 6,
+              borderRadius: 6,
+              border: '1px solid var(--verdict-aceptable)',
+              backgroundColor: 'rgba(229, 229, 0, 0.12)',
+              color: 'var(--verdict-aceptable)',
+              fontSize: '0.75rem',
+              textAlign: 'center',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              fontWeight: 500,
+              boxSizing: 'border-box',
+            }}
+          >
+            {loading ? (
+              <span>⏳ {t('common.loading')}...</span>
+            ) : (
+              <>
+                <span>{t('home.card.staleWarning', { min: ageMin })}</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 700 }}>↻</span>
+              </>
+            )}
+          </button>
         )}
 
-        {loading && (
+        {loading && !stale && (
           <div style={{
             padding: '6px 10px', marginBottom: 6,
             color: 'var(--accent)', fontSize: '0.75rem', textAlign: 'center',
@@ -647,16 +694,33 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                 border: `1px solid ${colorSalida}`,
                 color: colorSalida, fontWeight: 600, fontSize: '0.72rem',
               }}>{textoSalida}</span>
+              <button
+                type="button"
+                onClick={() => onEditSpot(spot.id, 'acceso')}
+                title={t('detalle.editSpot')}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-dim)',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem',
+                  padding: '2px 4px',
+                }}
+              >✎</button>
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ color: 'var(--text-dim)' }}>{t('access.none')}</span>
-              <button type="button" onClick={() => onEditSpot(spot.id)} style={{
-                padding: '2px 8px', borderRadius: 4,
-                border: '1px solid var(--accent)', backgroundColor: 'transparent',
-                color: 'var(--accent)', fontSize: '0.72rem',
-                cursor: 'pointer', fontWeight: 500,
-              }}>+ {t('access.add')}</button>
+              <button
+                type="button"
+                onClick={() => onEditSpot(spot.id, 'acceso')}
+                style={{
+                  padding: '2px 8px', borderRadius: 4,
+                  border: '1px solid var(--accent)', backgroundColor: 'transparent',
+                  color: 'var(--accent)', fontSize: '0.72rem',
+                  cursor: 'pointer', fontWeight: 500,
+                }}
+              >+ {t('access.add')}</button>
             </div>
           )}
 

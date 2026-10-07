@@ -27,10 +27,13 @@ export const Home: React.FC = () => {
   const { t } = useTranslation();
 
   const [pestanaActiva, setPestanaActiva] = useState<'puntos' | 'prevision' | 'ajustes'>('puntos');
-  const [cerrando, setCerrando] = useState(false);
+  const [cerrandoSpot, setCerrandoSpot] = useState(false);
+  const [cerrandoMapa, setCerrandoMapa] = useState(false);
+  const [cerrandoTutorial, setCerrandoTutorial] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [viewingSpotId, setViewingSpotId] = useState<string | null>(null);
   const [mapMode, setMapMode] = useState<'new' | 'edit' | null>(null);
+  const [mapFocus, setMapFocus] = useState<'general' | 'acceso'>('general');
   const [mostrarMapa, setMostrarMapa] = useState(false);
   const [editSpot, setEditSpot] = useState<Spot | null>(null);
   const [refreshingMap, setRefreshingMap] = useState<Record<string, boolean>>({});
@@ -84,7 +87,8 @@ export const Home: React.FC = () => {
     setEditSpot(null);
     setViewingSpotId(null);
     setMostrarMapa(false);
-    setCerrando(false);
+    setCerrandoSpot(false);
+    setCerrandoMapa(false);
   };
 
   // Abrir un punto en concreto y, si aplica, activar una franja
@@ -97,13 +101,13 @@ export const Home: React.FC = () => {
   if (showTutorial) {
     return (
       <PantallaDeslizante
-        activa={!cerrando}
+        activa={!cerrandoTutorial}
         onClose={() => {
           setShowTutorial(false);
-          setCerrando(false);
+          setCerrandoTutorial(false);
         }}
       >
-        <TutorialScreen onClose={() => setCerrando(true)} />
+        <TutorialScreen onClose={() => setCerrandoTutorial(true)} />
       </PantallaDeslizante>
     );
   }
@@ -253,7 +257,9 @@ export const Home: React.FC = () => {
               <button
                 onClick={() => {
                   setEditSpot(null);
+                  setMapFocus('general');
                   setMapMode('new');
+                  setCerrandoMapa(false);
                   setMostrarMapa(true);
                 }}
                 style={{
@@ -326,7 +332,9 @@ export const Home: React.FC = () => {
           <button
             onClick={() => {
               setEditSpot(null);
+              setMapFocus('general');
               setMapMode('new');
+              setCerrandoMapa(false);
               setMostrarMapa(true);
             }}
             style={{
@@ -432,47 +440,61 @@ export const Home: React.FC = () => {
         </button>
       </nav>
 
-      {/* Superposición: MapScreen */}
-      {mostrarMapa && (
+      {/* Superposición: SpotScreen (zIndex 200) */}
+      {viewingSpotId !== null && (
         <PantallaDeslizante
-          activa={!cerrando}
+          activa={!cerrandoSpot}
+          zIndex={200}
           onClose={() => {
-            setMostrarMapa(false);
-            volverAHome();
+            setViewingSpotId(null);
+            setCerrandoSpot(false);
           }}
         >
-          <MapScreen
-            initialSpot={editSpot}
-            onCancel={() => setCerrando(true)}
-            onSave={(draft) => {
-              if (editSpot) updateSpot(editSpot.id, draft);
-              else addSpot(draft);
-              setCerrando(true);
+          <SpotScreen
+            spotId={viewingSpotId}
+            onClose={() => setCerrandoSpot(true)}
+            onEditSpot={(spotId, focus) => {
+              const s = spots.find((x) => x.id === spotId);
+              if (s) {
+                setEditSpot(s);
+                setMapFocus(focus ?? 'general');
+                setMapMode('edit');
+                setCerrandoMapa(false);
+                setMostrarMapa(true);
+              }
             }}
           />
         </PantallaDeslizante>
       )}
 
-      {/* Superposición: SpotScreen */}
-      {viewingSpotId !== null && (
+      {/* Superposición: MapScreen (zIndex 300, se abre encima de la ficha) */}
+      {mostrarMapa && (
         <PantallaDeslizante
-          activa={!cerrando}
+          activa={!cerrandoMapa}
+          zIndex={300}
           onClose={() => {
-            setViewingSpotId(null);
-            setCerrando(false);
+            setMostrarMapa(false);
+            setCerrandoMapa(false);
+            setEditSpot(null);
+            setMapMode(null);
           }}
         >
-          <SpotScreen
-            spotId={viewingSpotId}
-            onClose={() => setCerrando(true)}
-            onEditSpot={(spotId) => {
-              const s = spots.find((x) => x.id === spotId);
-              if (s) {
-                setViewingSpotId(null);
-                setEditSpot(s);
-                setMapMode('edit');
-                setMostrarMapa(true);
+          <MapScreen
+            initialSpot={editSpot}
+            initialFocus={mapFocus}
+            onCancel={() => setCerrandoMapa(true)}
+            onSave={(draft) => {
+              if (editSpot) {
+                const coordsChanged =
+                  editSpot.lat !== draft.lat || editSpot.lon !== draft.lon;
+                updateSpot(editSpot.id, draft);
+                if (coordsChanged) {
+                  void handleRefreshSpot(editSpot.id, draft.lat, draft.lon);
+                }
+              } else {
+                addSpot(draft);
               }
+              setCerrandoMapa(true);
             }}
           />
         </PantallaDeslizante>

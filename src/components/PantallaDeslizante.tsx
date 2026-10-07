@@ -10,12 +10,14 @@ interface PantallaDeslizanteProps {
   /** Si es true, la pantalla está en proceso de cierre. El padre debe
    *  mantenerla montada hasta que onClose se dispare de verdad. */
   activa: boolean;
+  zIndex?: number;
 }
 
 export const PantallaDeslizante: React.FC<PantallaDeslizanteProps> = ({
   children,
   onClose,
   activa,
+  zIndex,
 }) => {
   const [visible, setVisible] = useState(false);
 
@@ -39,7 +41,7 @@ export const PantallaDeslizante: React.FC<PantallaDeslizanteProps> = ({
     width: '100vw',
     height: '100vh',
     backgroundColor: 'var(--bg)',
-    zIndex: 200,
+    zIndex: zIndex ?? 200,
     transform: visible ? 'translateX(0)' : 'translateX(100%)',
     transition: 'transform 320ms cubic-bezier(0.16, 1, 0.3, 1)',
     willChange: 'transform',
