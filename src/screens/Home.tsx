@@ -468,6 +468,7 @@ export const Home: React.FC = () => {
             onEditSpot={(spotId) => {
               const s = spots.find((x) => x.id === spotId);
               if (s) {
+                setViewingSpotId(null);
                 setEditSpot(s);
                 setMapMode('edit');
                 setMostrarMapa(true);
