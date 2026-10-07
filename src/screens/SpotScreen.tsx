@@ -44,8 +44,7 @@ export interface SpotScreenProps {
   spotId: string;
   onClose: () => void;
   /** Abre el mapa en modo edición para este punto. */
-  onEditSpot?: (spotId: string) => void;
-  onAddAccess?: (spotId: string) => void;
+  onEditSpot: (spotId: string) => void;
 }
 
 type TabId =
@@ -358,9 +357,8 @@ const BotonAyuda: React.FC<BotonAyudaProps> = ({ tabId }) => {
 };
 
 export const SpotScreen: React.FC<SpotScreenProps> = ({
-  spotId, onClose, onEditSpot, onAddAccess,
+  spotId, onClose, onEditSpot,
 }) => {
-  const handleEditSpot = onEditSpot ?? onAddAccess ?? (() => {});
   const { t, i18n } = useTranslation();
 
   const spots = useAppStore((s) => s.spots);
@@ -699,7 +697,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
               {spot.name || t('common.unnamed')}
             </h1>
             <button
-              onClick={() => handleEditSpot(spot.id)}
+              onClick={() => onEditSpot(spot.id)}
               title={t('detalle.editSpot')}
               style={{
                 border: 'none', background: 'transparent',
@@ -823,7 +821,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
               <span style={{ color: 'var(--text-dim)' }}>{t('access.none')}</span>
               <button
                 type="button"
-                onClick={() => handleEditSpot(spot.id)}
+                onClick={() => onEditSpot(spot.id)}
                 style={{
                   padding: '2px 8px', borderRadius: 4,
                   border: '1px solid var(--accent)', backgroundColor: 'transparent',
