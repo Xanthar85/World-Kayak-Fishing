@@ -1,52 +1,39 @@
 // src/lib/openmeteo.ts
 // WKF — Cliente Open-Meteo (Marine + Forecast).
 // v1.010: 7 días completos, todas las variables útiles.
-// Variables marinas: wave_height (total), wind_wave_height,
-// swell_wave_height, wave_period, wind_wave_period,
-// swell_wave_period, wave_direction, wind_wave_direction,
-// swell_wave_direction, sea_surface_temperature,
-// sea_level_height_msl, ocean_current_velocity,
-// ocean_current_direction.
-// Variables atmosféricas: wind_speed_10m, wind_gusts_10m,
-// wind_direction_10m, temperature_2m, apparent_temperature,
-// precipitation, precipitation_probability, cloud_cover,
-// pressure_msl, visibility, weather_code.
-// v1.010: fetchSpotWeather acepta opcionalmente un flag para
-// reducir forecast_days y ahorrar ancho de banda cuando solo
-// se necesita hoy.
 
 export type HourlyPoint = {
   time: string;
   // Oleaje
-  waveHeight: number | null;         // total (m)
-  windWaveHeight: number | null;     // mar de viento (m)
-  swellWaveHeight: number | null;    // mar de fondo (m)
-  wavePeriod: number | null;         // periodo dominante (s)
+  waveHeight: number | null;
+  windWaveHeight: number | null;
+  swellWaveHeight: number | null;
+  wavePeriod: number | null;
   windWavePeriod: number | null;
   swellWavePeriod: number | null;
-  waveDirection: number | null;      // dir oleaje total (°)
+  waveDirection: number | null;
   windWaveDirection: number | null;
   swellWaveDirection: number | null;
-  // Viento
+  // Viento — SIEMPRE en km/h tal como lo devuelve Open-Meteo
   windSpeed: number | null;          // km/h
   windGusts: number | null;          // km/h
-  windDirection: number | null;      // °
+  windDirection: number | null;
   // Temperatura
-  temperature: number | null;        // °C aire
-  apparentTemperature: number | null; // °C sensación
-  seaSurfaceTemperature: number | null; // °C SST
+  temperature: number | null;
+  apparentTemperature: number | null;
+  seaSurfaceTemperature: number | null;
   // Tiempo
-  precipitation: number | null;      // mm
-  precipitationProbability: number | null; // %
-  cloudCover: number | null;         // %
+  precipitation: number | null;
+  precipitationProbability: number | null;
+  cloudCover: number | null;
   weatherCode: number | null;
-  visibility: number | null;         // m
+  visibility: number | null;
   // Presión
-  pressure: number | null;           // hPa
+  pressure: number | null;
   // Marea y corriente
-  seaLevelHeight: number | null;     // m
+  seaLevelHeight: number | null;
   currentVelocity: number | null;    // kn
-  currentDirection: number | null;   // °
+  currentDirection: number | null;
 };
 
 export type SpotWeather = {
@@ -165,15 +152,24 @@ export async function fetchSpotWeather(
   const marine = (await marineRes.json()) as MarineResponse;
   const atmos = (await atmosRes.json()) as AtmosResponse;
 
+  // Indexamos el array atmosférico por hora exacta "YYYY-MM-DDTHH:00".
   const atmosByTime = new Map<string, number>();
   atmos.hourly.time.forEach((t, i) => atmosByTime.set(t, i));
 
   const hourly: HourlyPoint[] = marine.hourly.time.map((t, i) => {
     const ai = atmosByTime.get(t);
+
     const rawVelocity = marine.hourly.ocean_current_velocity?.[i] ?? null;
-    // Open-Meteo da la corriente en m/s. Pasamos a nudos.
     const currentVelocity =
-      rawVelocity != null ? Math.round((rawVelocity / 0.514444) * 100) / 100 : null;
+      rawVelocity != null
+        ? Math.round((rawVelocity / 0.514444) * 100) / 100
+        : null;
+
+    // Viento atmosférico — ya viene en km/h gracias a wind_speed_unit=kmh.
+    const windKmh =
+      ai !== undefined ? atmos.hourly.wind_speed_10m[ai] ?? null : null;
+    const gustsKmh =
+      ai !== undefined ? atmos.hourly.wind_gusts_10m[ai] ?? null : null;
 
     return {
       time: t,
@@ -187,24 +183,36 @@ export async function fetchSpotWeather(
       waveDirection: marine.hourly.wave_direction?.[i] ?? null,
       windWaveDirection: marine.hourly.wind_wave_direction?.[i] ?? null,
       swellWaveDirection: marine.hourly.swell_wave_direction?.[i] ?? null,
-      // Viento (ya en km/h)
-      windSpeed: ai !== undefined ? atmos.hourly.wind_speed_10m[ai] ?? null : null,
-      windGusts: ai !== undefined ? atmos.hourly.wind_gusts_10m[ai] ?? null : null,
-      windDirection: ai !== undefined ? atmos.hourly.wind_direction_10m[ai] ?? null : null,
+      // Viento — en km/h
+      windSpeed: windKmh,
+      windGusts: gustsKmh,
+      windDirection:
+        ai !== undefined ? atmos.hourly.wind_direction_10m[ai] ?? null : null,
       // Temperatura
-      temperature: ai !== undefined ? atmos.hourly.temperature_2m[ai] ?? null : null,
+      temperature:
+        ai !== undefined ? atmos.hourly.temperature_2m[ai] ?? null : null,
       apparentTemperature:
-        ai !== undefined ? atmos.hourly.apparent_temperature?.[ai] ?? null : null,
-      seaSurfaceTemperature: marine.hourly.sea_surface_temperature?.[i] ?? null,
+        ai !== undefined
+          ? atmos.hourly.apparent_temperature?.[ai] ?? null
+          : null,
+      seaSurfaceTemperature:
+        marine.hourly.sea_surface_temperature?.[i] ?? null,
       // Tiempo
-      precipitation: ai !== undefined ? atmos.hourly.precipitation[ai] ?? null : null,
+      precipitation:
+        ai !== undefined ? atmos.hourly.precipitation[ai] ?? null : null,
       precipitationProbability:
-        ai !== undefined ? atmos.hourly.precipitation_probability?.[ai] ?? null : null,
-      cloudCover: ai !== undefined ? atmos.hourly.cloud_cover?.[ai] ?? null : null,
-      weatherCode: ai !== undefined ? atmos.hourly.weather_code?.[ai] ?? null : null,
-      visibility: ai !== undefined ? atmos.hourly.visibility?.[ai] ?? null : null,
+        ai !== undefined
+          ? atmos.hourly.precipitation_probability?.[ai] ?? null
+          : null,
+      cloudCover:
+        ai !== undefined ? atmos.hourly.cloud_cover?.[ai] ?? null : null,
+      weatherCode:
+        ai !== undefined ? atmos.hourly.weather_code?.[ai] ?? null : null,
+      visibility:
+        ai !== undefined ? atmos.hourly.visibility?.[ai] ?? null : null,
       // Presión
-      pressure: ai !== undefined ? atmos.hourly.pressure_msl?.[ai] ?? null : null,
+      pressure:
+        ai !== undefined ? atmos.hourly.pressure_msl?.[ai] ?? null : null,
       // Marea y corriente
       seaLevelHeight: marine.hourly.sea_level_height_msl?.[i] ?? null,
       currentVelocity,
@@ -223,26 +231,10 @@ export async function fetchSpotWeather(
 
 // ─── Helpers de conversión y presentación ──────────────────────────
 
-// m/s → nudos
-export function msAKn(ms: number | null): number | null {
-  if (ms == null) return null;
-  return Math.round(ms * 1.94384 * 10) / 10;
-}
-
-// m/s → km/h
-export function msAKmh(ms: number | null): number | null {
-  if (ms == null) return null;
-  return Math.round(ms * 3.6 * 10) / 10;
-}
-
-// m/s → Beaufort (0-12)
-export function msABf(ms: number | null): number | null {
-  if (ms == null) return null;
-  const umbrales = [0.3, 1.6, 3.4, 5.5, 8.0, 10.8, 13.9, 17.2, 20.8, 24.5, 28.5, 32.7];
-  for (let i = 0; i < umbrales.length; i++) {
-    if (ms < umbrales[i]) return i;
-  }
-  return 12;
+// km/h → nudos (la única conversión de viento que existe ya)
+export function kmhAKn(kmh: number | null): number | null {
+  if (kmh == null) return null;
+  return Math.round((kmh / 1.852) * 10) / 10;
 }
 
 // km/h → Beaufort (0-12)
@@ -255,7 +247,20 @@ export function kmhABf(kmh: number | null): number | null {
   return 12;
 }
 
-// Grados → punto cardinal de 16 rumbos (índice 0-15).
+// Alias mantenidos por compatibilidad con llamadas existentes.
+// Todos esperan recibir km/h.
+export function msAKn(v: number | null): number | null {
+  return kmhAKn(v);
+}
+export function msAKmh(v: number | null): number | null {
+  if (v == null) return null;
+  return Math.round(v * 10) / 10;
+}
+export function msABf(v: number | null): number | null {
+  return kmhABf(v);
+}
+
+// Grados → punto cardinal de 16 rumbos.
 export function gradosACardinal16(grados: number | null): string {
   if (grados == null) return '—';
   const puntos = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSO','SO','OSO','O','ONO','NO','NNO'];
@@ -263,7 +268,7 @@ export function gradosACardinal16(grados: number | null): string {
   return puntos[idx];
 }
 
-// weather_code WMO → emoji simplificado.
+// weather_code WMO → emoji.
 export function weatherCodeAIcono(code: number | null, isNight = false): string {
   if (code == null) return '—';
   if (code === 0) return isNight ? '🌙' : '☀️';
@@ -279,8 +284,6 @@ export function weatherCodeAIcono(code: number | null, isNight = false): string 
   return '—';
 }
 
-// Icono para el mini-gráfico (24 h). Mismo que arriba pero sin
-// distinguir noche para no complicar: el eje X ya marca la hora.
 export function weatherCodeAIconoGrafico(code: number | null): string {
   if (code == null) return '·';
   if (code === 0) return '☀';
