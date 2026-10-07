@@ -1,11 +1,10 @@
 // src/screens/SettingsScreen.tsx
 // WKF — Pantalla de Ajustes.
-// v1.010:
-//   - Bug 11: color de tabla por defecto = "todo" (DP-092). Ya en store.
-//   - Bug 12: "Ver todos los factores" desaparece. Sin cambios aquí.
-//   - Botón "Invitar a un café" se mantiene en Ajustes, y además
-//     hay uno arriba a la derecha en Home (bug 15, DP-094).
-//   - Sin cambios funcionales grandes.
+// v1.014:
+//   - Ficha técnica de kayak ampliada: certificaciones múltiples y
+//     techo absoluto. Requiere las claves i18n `kayak.techoAbsoluto`,
+//     `kayak.certificaciones`, `kayak.fuente`.
+//   - Resto de la pantalla intacta respecto a v1.010.
 
 import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,7 +13,12 @@ import {
   type FranjaUsuario,
   type ImportFailReason,
 } from '../state/store.ts';
-import { CATALOGO_KAYAKS, buscarKayakPorId, type Kayak } from '../lib/kayaks.ts';
+import {
+  CATALOGO_KAYAKS,
+  buscarKayakPorId,
+  type Kayak,
+  type CertificacionesKayak,
+} from '../lib/kayaks.ts';
 import {
   CATEGORIAS_KAYAK,
   NIVELES_EXPERIENCIA,
@@ -63,6 +67,29 @@ const MAPA_MOTIVO_A_CLAVE_I18N: Record<ImportFailReason, string> = {
   franjas_mal_formadas: 'import.errors.slotsMalformed',
   perfil_mal_formado: 'import.errors.profileMalformed',
 };
+
+interface FilaCertificacion {
+  labelKey: string;
+  activa: boolean;
+  valor?: string;
+}
+
+function construirFilasCertificaciones(
+  cert: CertificacionesKayak
+): FilaCertificacion[] {
+  return [
+    { labelKey: 'kayak.certCE', activa: cert.ce != null, valor: cert.ce ?? undefined },
+    { labelKey: 'kayak.certUKCA', activa: cert.ukca != null, valor: cert.ukca ?? undefined },
+    { labelKey: 'kayak.certUSCG', activa: cert.uscg },
+    { labelKey: 'kayak.certABYC', activa: cert.abyc },
+    { labelKey: 'kayak.certNMMA', activa: cert.nmma },
+    { labelKey: 'kayak.certASNZS', activa: cert.as_nzs },
+    { labelKey: 'kayak.certJCI', activa: cert.jci },
+    { labelKey: 'kayak.certISO12217', activa: cert.iso_12217 },
+    { labelKey: 'kayak.certISO14946', activa: cert.iso_14946 },
+    { labelKey: 'kayak.certISO10087', activa: cert.iso_10087 },
+  ];
+}
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onClose,
@@ -532,13 +559,25 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               />
               <div
                 style={{
-                  maxHeight: 180,
+                  maxHeight: 220,
                   overflowY: 'auto',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 4,
                 }}
               >
+                {filteredKayaks.length === 0 && (
+                  <div
+                    style={{
+                      fontSize: '0.8rem',
+                      fontStyle: 'italic',
+                      color: 'var(--text-muted)',
+                      padding: '8px 4px',
+                    }}
+                  >
+                    {t('kayak.notFound')}
+                  </div>
+                )}
                 {filteredKayaks.map((k) => (
                   <button
                     key={k.id}
@@ -1123,7 +1162,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 fontWeight: 600,
               }}
             >
-              v1.010
+              v1.014
             </span>
           </div>
           <a
@@ -1219,6 +1258,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 ✕
               </button>
             </div>
+
             {[
               {
                 label: t('kayak.length'),
@@ -1262,6 +1302,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 val: fichaTecnicaKayak.categoriaDirectiva,
               },
               {
+                label: t('kayak.techoAbsoluto'),
+                val: `${fichaTecnicaKayak.techoAbsoluto.vientoMaxBf} Bf / ${fichaTecnicaKayak.techoAbsoluto.olaMaxM.toFixed(1)} m`,
+              },
+              {
+                label: t('kayak.fuente'),
+                val: fichaTecnicaKayak.techoAbsoluto.fuente,
+              },
+              {
                 label: t('kayak.certificado'),
                 val: fichaTecnicaKayak.certificado ? '✓' : '—',
               },
@@ -1275,6 +1323,60 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 <span style={fichaValorStyle}>{val}</span>
               </div>
             ))}
+
+            <div style={{ marginTop: 14 }}>
+              <div
+                style={{
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  color: 'var(--text-muted)',
+                  marginBottom: 6,
+                }}
+              >
+                {t('kayak.certificaciones')}
+              </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gap: 6,
+                }}
+              >
+                {construirFilasCertificaciones(fichaTecnicaKayak.certificaciones).map(
+                  ({ labelKey, activa, valor }) => (
+                    <div
+                      key={labelKey}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '4px 8px',
+                        borderRadius: 4,
+                        border: `1px solid ${activa ? 'var(--accent)' : 'var(--border)'}`,
+                        backgroundColor: activa
+                          ? 'var(--accent-subtle, rgba(0, 229, 106, 0.10))'
+                          : 'transparent',
+                        fontSize: '0.75rem',
+                        color: activa ? 'var(--text)' : 'var(--text-muted)',
+                      }}
+                    >
+                      <span>{t(labelKey)}</span>
+                      <span
+                        style={{
+                          fontFamily: 'Fira Code, monospace',
+                          fontWeight: activa ? 700 : 400,
+                        }}
+                      >
+                        {activa ? (valor ?? '✓') : '—'}
+                      </span>
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+
             {!fichaTecnicaKayak.certificado && (
               <div
                 style={{
