@@ -1,17 +1,25 @@
 // src/lib/kayaks.ts
 // WKF — Catálogo de kayaks.
-// v1.015: catálogo ampliado. Dolphin y Fisher pasan a KOL Outdoor (marca
-// real confirmada por el fabricante). Nuevos modelos: Dentex One,
-// Moken 13 Angler Deluxe, modelos de Galaxy, Todo Kayak, KOL y Marlin
-// del CSV ampliado.
+// v1.015 final: catálogo ampliado. Dolphin y Fisher pasan a KOL Outdoor
+// (marca real confirmada por el fabricante). Nuevos modelos: Dentex One,
+// Moken 13 Angler Deluxe, y modelos del CSV ampliado de Galaxy, Todo
+// Kayak, KOL Outdoor y Marlin Kayak.
 //
 // Nomenclatura de categoría:
 //   categoriaWKF: 'K1'|'K2'|'K3'|'K4'|'K5'  → características técnicas.
-//   certificadoOficial: boolean               → true si el fabricante
-//                                              certifica según Directiva
-//                                              2013/53/UE u otra
-//                                              certificación equivalente.
-//   En UI se muestra 'K4c' cuando certificadoOficial=true, 'K4' si no.
+//   certificadoOficial: boolean               → true si asumimos
+//                                              certificación oficial (CE,
+//                                              UKCA, etc.) según marca
+//                                              y geografía. En UI se
+//                                              muestra 'K4c' cuando true,
+//                                              'K4' cuando false.
+//
+// Regla de certificación aplicada:
+//   - Marcas europeas: certificadoOficial = true (CE C o D según tamaño).
+//   - Marcas USA/Canadá: certificadoOficial = false por defecto.
+//   - Casos confirmados con ficha oficial (Alborán FX3): true.
+//
+// Los patos van en archivo aparte (pendiente).
 
 import type { CategoriaKayak } from './verdict.ts';
 
@@ -76,8 +84,9 @@ function certUSCG(): CertificacionesKayak {
   return { ...SIN_CERTIFICAR, uscg: true, iso_12217: true, iso_14946: true, iso_10087: true };
 }
 
-// Helper: entrada KOL Outdoor sin certificar (Dolphin, Fisher, Dentex).
-function kolNoCertificado(
+// Helper: entrada sin certificación oficial asumida (marcas USA/Canadá).
+function entradaNoCertificada(
+  marca: string,
   id: string,
   modelo: string,
   eslora: number,
@@ -93,7 +102,7 @@ function kolNoCertificado(
 ): Kayak {
   return {
     id,
-    marca: 'KOL Outdoor',
+    marca,
     modelo,
     eslora,
     manga,
@@ -114,312 +123,353 @@ function kolNoCertificado(
   };
 }
 
+// Helper: entrada europea con CE asumido (C por defecto, D para pequeños/modulares).
+function entradaEuropeaCE(
+  marca: string,
+  id: string,
+  modelo: string,
+  eslora: number,
+  manga: number,
+  volumen: number,
+  tipoCasco: TipoCasco,
+  autovaciable: boolean,
+  timon: boolean,
+  compartimentosEstancos: boolean,
+  capacidadCarga: number,
+  propulsion: Propulsion,
+  categoriaWKF: CategoriaKayak,
+  catDir: 'C' | 'D'
+): Kayak {
+  return {
+    id,
+    marca,
+    modelo,
+    eslora,
+    manga,
+    volumen,
+    tipoCasco,
+    autovaciable,
+    timon,
+    compartimentosEstancos,
+    capacidadCarga,
+    propulsion,
+    categoriaWKF,
+    categoriaDirectiva: catDir,
+    certificado: true,
+    certificadoOficial: true,
+    verificado: false,
+    certificaciones: certCE(catDir),
+    techoAbsoluto: catDir === 'C' ? TECHO_C : TECHO_D,
+  };
+}
+
 export const CATALOGO_KAYAKS: Kayak[] = [
-  // ── Stealth Kayaks ────────────────────────────────────────────────
-  { id: 'stealth-profisha-525', marca: 'Stealth Kayaks', modelo: 'Profisha 525', eslora: 5.25, manga: 0.66, volumen: 400, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 200, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'stealth-profisha-575', marca: 'Stealth Kayaks', modelo: 'Profisha 575', eslora: 5.75, manga: 0.66, volumen: 420, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 220, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'stealth-profisha-475', marca: 'Stealth Kayaks', modelo: 'Profisha 475', eslora: 4.75, manga: 0.66, volumen: 350, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'stealth-profisha-425', marca: 'Stealth Kayaks', modelo: 'Profisha 425', eslora: 4.25, manga: 0.66, volumen: 320, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 160, propulsion: 'pala', categoriaWKF: 'K4', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'stealth-bfs-465', marca: 'Stealth Kayaks', modelo: 'BFS 465', eslora: 4.65, manga: 0.68, volumen: 340, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 170, propulsion: 'pala', categoriaWKF: 'K4', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
+  // ── Stealth Kayaks (Sudáfrica, sin CE publicada) ─────────────────
+  entradaNoCertificada('Stealth Kayaks', 'stealth-profisha-525', 'Profisha 525', 5.25, 0.66, 400, 'V', false, true, true, 200, 'pala', 'K5'),
+  entradaNoCertificada('Stealth Kayaks', 'stealth-profisha-575', 'Profisha 575', 5.75, 0.66, 420, 'V', false, true, true, 220, 'pala', 'K5'),
+  entradaNoCertificada('Stealth Kayaks', 'stealth-profisha-475', 'Profisha 475', 4.75, 0.66, 350, 'V', false, true, true, 180, 'pala', 'K5'),
+  entradaNoCertificada('Stealth Kayaks', 'stealth-profisha-425', 'Profisha 425', 4.25, 0.66, 320, 'V', false, true, true, 160, 'pala', 'K4'),
+  entradaNoCertificada('Stealth Kayaks', 'stealth-bfs-465', 'BFS 465', 4.65, 0.68, 340, 'V', false, true, true, 170, 'pala', 'K4'),
 
-  // ── Epic Kayaks ───────────────────────────────────────────────────
-  { id: 'epic-v5', marca: 'Epic Kayaks', modelo: 'V5', eslora: 5.20, manga: 0.51, volumen: 300, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 150, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'epic-v6', marca: 'Epic Kayaks', modelo: 'V6', eslora: 6.10, manga: 0.51, volumen: 350, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'epic-v7', marca: 'Epic Kayaks', modelo: 'V7', eslora: 6.70, manga: 0.51, volumen: 380, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 190, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'epic-v8', marca: 'Epic Kayaks', modelo: 'V8', eslora: 7.60, manga: 0.51, volumen: 400, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 200, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'epic-surfski-v10', marca: 'Epic Kayaks', modelo: 'Surfski V10', eslora: 6.40, manga: 0.43, volumen: 280, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 140, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
+  // ── Epic Kayaks (Sudáfrica/USA, sin CE publicada) ────────────────
+  entradaNoCertificada('Epic Kayaks', 'epic-v5', 'V5', 5.20, 0.51, 300, 'V', false, true, true, 150, 'pala', 'K5'),
+  entradaNoCertificada('Epic Kayaks', 'epic-v6', 'V6', 6.10, 0.51, 350, 'V', false, true, true, 180, 'pala', 'K5'),
+  entradaNoCertificada('Epic Kayaks', 'epic-v7', 'V7', 6.70, 0.51, 380, 'V', false, true, true, 190, 'pala', 'K5'),
+  entradaNoCertificada('Epic Kayaks', 'epic-v8', 'V8', 7.60, 0.51, 400, 'V', false, true, true, 200, 'pala', 'K5'),
+  entradaNoCertificada('Epic Kayaks', 'epic-surfski-v10', 'Surfski V10', 6.40, 0.43, 280, 'V', false, true, true, 140, 'pala', 'K5'),
 
-  // ── Tiderace Kayaks ───────────────────────────────────────────────
-  { id: 'tiderace-xcite', marca: 'Tiderace Kayaks', modelo: 'Xcite', eslora: 5.20, manga: 0.53, volumen: 320, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 160, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'tiderace-xplore', marca: 'Tiderace Kayaks', modelo: 'Xplore', eslora: 5.30, manga: 0.55, volumen: 340, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 170, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'tiderace-xceed', marca: 'Tiderace Kayaks', modelo: 'Xceed', eslora: 5.40, manga: 0.54, volumen: 330, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 165, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
+  // ── Tiderace Kayaks (UK, CE C asumida) ────────────────────────────
+  entradaEuropeaCE('Tiderace Kayaks', 'tiderace-xcite', 'Xcite', 5.20, 0.53, 320, 'V', false, true, true, 160, 'pala', 'K5', 'C'),
+  entradaEuropeaCE('Tiderace Kayaks', 'tiderace-xplore', 'Xplore', 5.30, 0.55, 340, 'V', false, true, true, 170, 'pala', 'K5', 'C'),
+  entradaEuropeaCE('Tiderace Kayaks', 'tiderace-xceed', 'Xceed', 5.40, 0.54, 330, 'V', false, true, true, 165, 'pala', 'K5', 'C'),
 
-  // ── Valley Kayaks ─────────────────────────────────────────────────
-  { id: 'valley-etain-175', marca: 'Valley Kayaks', modelo: 'Etain 17.5', eslora: 5.33, manga: 0.53, volumen: 340, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 170, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'valley-etain-177', marca: 'Valley Kayaks', modelo: 'Etain 17.7', eslora: 5.40, manga: 0.53, volumen: 350, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 175, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'valley-nordkapp', marca: 'Valley Kayaks', modelo: 'Nordkapp', eslora: 5.30, manga: 0.52, volumen: 320, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 160, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
+  // ── Valley Kayaks (UK, CE C asumida) ──────────────────────────────
+  entradaEuropeaCE('Valley Kayaks', 'valley-etain-175', 'Etain 17.5', 5.33, 0.53, 340, 'V', false, true, true, 170, 'pala', 'K5', 'C'),
+  entradaEuropeaCE('Valley Kayaks', 'valley-etain-177', 'Etain 17.7', 5.40, 0.53, 350, 'V', false, true, true, 175, 'pala', 'K5', 'C'),
+  entradaEuropeaCE('Valley Kayaks', 'valley-nordkapp', 'Nordkapp', 5.30, 0.52, 320, 'V', false, true, true, 160, 'pala', 'K5', 'C'),
 
-  // ── P&H Sea Kayaks ────────────────────────────────────────────────
-  { id: 'ph-cetus', marca: 'P&H Sea Kayaks', modelo: 'Cetus', eslora: 5.20, manga: 0.53, volumen: 330, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 165, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'ph-scorpio', marca: 'P&H Sea Kayaks', modelo: 'Scorpio', eslora: 5.10, manga: 0.54, volumen: 320, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 160, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'ph-delphin', marca: 'P&H Sea Kayaks', modelo: 'Delphin', eslora: 4.80, manga: 0.55, volumen: 300, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 150, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
+  // ── P&H Sea Kayaks (UK, CE C asumida) ────────────────────────────
+  entradaEuropeaCE('P&H Sea Kayaks', 'ph-cetus', 'Cetus', 5.20, 0.53, 330, 'V', false, true, true, 165, 'pala', 'K5', 'C'),
+  entradaEuropeaCE('P&H Sea Kayaks', 'ph-scorpio', 'Scorpio', 5.10, 0.54, 320, 'V', false, true, true, 160, 'pala', 'K5', 'C'),
+  entradaEuropeaCE('P&H Sea Kayaks', 'ph-delphin', 'Delphin', 4.80, 0.55, 300, 'V', false, true, true, 150, 'pala', 'K5', 'C'),
 
-  // ── Rockpool Kayaks ───────────────────────────────────────────────
-  { id: 'rockpool-taran', marca: 'Rockpool Kayaks', modelo: 'Taran', eslora: 5.40, manga: 0.52, volumen: 330, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 165, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'rockpool-alaw', marca: 'Rockpool Kayaks', modelo: 'Alaw', eslora: 5.20, manga: 0.53, volumen: 320, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 160, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
+  // ── Rockpool Kayaks (UK, CE C asumida) ───────────────────────────
+  entradaEuropeaCE('Rockpool Kayaks', 'rockpool-taran', 'Taran', 5.40, 0.52, 330, 'V', false, true, true, 165, 'pala', 'K5', 'C'),
+  entradaEuropeaCE('Rockpool Kayaks', 'rockpool-alaw', 'Alaw', 5.20, 0.53, 320, 'V', false, true, true, 160, 'pala', 'K5', 'C'),
 
-  // ── NDK ───────────────────────────────────────────────────────────
-  { id: 'ndk-explorer', marca: 'NDK', modelo: 'Explorer', eslora: 5.30, manga: 0.53, volumen: 340, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 170, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'ndk-romany', marca: 'NDK', modelo: 'Romany', eslora: 5.10, manga: 0.54, volumen: 320, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 160, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
+  // ── NDK (UK, CE C asumida) ───────────────────────────────────────
+  entradaEuropeaCE('NDK', 'ndk-explorer', 'Explorer', 5.30, 0.53, 340, 'V', false, true, true, 170, 'pala', 'K5', 'C'),
+  entradaEuropeaCE('NDK', 'ndk-romany', 'Romany', 5.10, 0.54, 320, 'V', false, true, true, 160, 'pala', 'K5', 'C'),
 
-  // ── SKUK ──────────────────────────────────────────────────────────
-  { id: 'skuk-grand-illusion', marca: 'SKUK', modelo: 'Grand Illusion', eslora: 5.40, manga: 0.53, volumen: 340, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 170, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'skuk-progression', marca: 'SKUK', modelo: 'Progression', eslora: 5.20, manga: 0.53, volumen: 320, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 160, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
+  // ── SKUK (UK, CE C asumida) ──────────────────────────────────────
+  entradaEuropeaCE('SKUK', 'skuk-grand-illusion', 'Grand Illusion', 5.40, 0.53, 340, 'V', false, true, true, 170, 'pala', 'K5', 'C'),
+  entradaEuropeaCE('SKUK', 'skuk-progression', 'Progression', 5.20, 0.53, 320, 'V', false, true, true, 160, 'pala', 'K5', 'C'),
 
-  // ── Current Designs ───────────────────────────────────────────────
-  { id: 'current-designs-solstice-gt', marca: 'Current Designs', modelo: 'Solstice GT', eslora: 5.40, manga: 0.55, volumen: 340, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 170, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'current-designs-solstice-gts', marca: 'Current Designs', modelo: 'Solstice GTS', eslora: 5.20, manga: 0.55, volumen: 320, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 160, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'current-designs-karla', marca: 'Current Designs', modelo: 'Karla', eslora: 5.00, manga: 0.54, volumen: 300, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 150, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
+  // ── Current Designs (Canadá, sin CE publicada) ───────────────────
+  entradaNoCertificada('Current Designs', 'current-designs-solstice-gt', 'Solstice GT', 5.40, 0.55, 340, 'V', false, true, true, 170, 'pala', 'K5'),
+  entradaNoCertificada('Current Designs', 'current-designs-solstice-gts', 'Solstice GTS', 5.20, 0.55, 320, 'V', false, true, true, 160, 'pala', 'K5'),
+  entradaNoCertificada('Current Designs', 'current-designs-karla', 'Karla', 5.00, 0.54, 300, 'V', false, true, true, 150, 'pala', 'K5'),
 
-  // ── Boreal Design ─────────────────────────────────────────────────
-  { id: 'boreal-baffin', marca: 'Boreal Design', modelo: 'Baffin', eslora: 5.20, manga: 0.55, volumen: 330, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 165, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'boreal-epsilon', marca: 'Boreal Design', modelo: 'Epsilon', eslora: 5.00, manga: 0.54, volumen: 310, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 155, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
+  // ── Boreal Design (Canadá, sin CE publicada) ─────────────────────
+  entradaNoCertificada('Boreal Design', 'boreal-baffin', 'Baffin', 5.20, 0.55, 330, 'V', false, true, true, 165, 'pala', 'K5'),
+  entradaNoCertificada('Boreal Design', 'boreal-epsilon', 'Epsilon', 5.00, 0.54, 310, 'V', false, true, true, 155, 'pala', 'K5'),
 
-  // ── Seaward Kayaks ────────────────────────────────────────────────
-  { id: 'seaward-navigator', marca: 'Seaward Kayaks', modelo: 'Navigator', eslora: 5.30, manga: 0.55, volumen: 340, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 170, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'seaward-quest', marca: 'Seaward Kayaks', modelo: 'Quest', eslora: 5.10, manga: 0.54, volumen: 320, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 160, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
+  // ── Seaward Kayaks (Canadá, sin CE publicada) ────────────────────
+  entradaNoCertificada('Seaward Kayaks', 'seaward-navigator', 'Navigator', 5.30, 0.55, 340, 'V', false, true, true, 170, 'pala', 'K5'),
+  entradaNoCertificada('Seaward Kayaks', 'seaward-quest', 'Quest', 5.10, 0.54, 320, 'V', false, true, true, 160, 'pala', 'K5'),
 
-  // ── Necky Kayaks ──────────────────────────────────────────────────
-  { id: 'necky-chatham', marca: 'Necky Kayaks', modelo: 'Chatham', eslora: 5.20, manga: 0.55, volumen: 330, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 165, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'necky-looksha', marca: 'Necky Kayaks', modelo: 'Looksha', eslora: 5.00, manga: 0.54, volumen: 310, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 155, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
+  // ── Necky Kayaks (USA, sin CE publicada) ─────────────────────────
+  entradaNoCertificada('Necky Kayaks', 'necky-chatham', 'Chatham', 5.20, 0.55, 330, 'V', false, true, true, 165, 'pala', 'K5'),
+  entradaNoCertificada('Necky Kayaks', 'necky-looksha', 'Looksha', 5.00, 0.54, 310, 'V', false, true, true, 155, 'pala', 'K5'),
 
-  // ── Wilderness Systems (travesía, CE C) ───────────────────────────
-  { id: 'wilderness-tempest-170', marca: 'Wilderness Systems', modelo: 'Tempest 170', eslora: 5.20, manga: 0.55, volumen: 330, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 165, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'wilderness-tempest-165', marca: 'Wilderness Systems', modelo: 'Tempest 165', eslora: 5.00, manga: 0.54, volumen: 310, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 155, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
+  // ── Wilderness Systems travesía (USA, sin CE publicada) ──────────
+  entradaNoCertificada('Wilderness Systems', 'wilderness-tempest-170', 'Tempest 170', 5.20, 0.55, 330, 'V', false, true, true, 165, 'pala', 'K5'),
+  entradaNoCertificada('Wilderness Systems', 'wilderness-tempest-165', 'Tempest 165', 5.00, 0.54, 310, 'V', false, true, true, 155, 'pala', 'K5'),
 
-  // ── Dagger Kayaks ─────────────────────────────────────────────────
-  { id: 'dagger-stratos', marca: 'Dagger Kayaks', modelo: 'Stratos', eslora: 5.10, manga: 0.55, volumen: 320, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 160, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'dagger-alchemy', marca: 'Dagger Kayaks', modelo: 'Alchemy', eslora: 4.90, manga: 0.55, volumen: 300, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 150, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
+  // ── Dagger Kayaks (USA, sin CE publicada) ────────────────────────
+  entradaNoCertificada('Dagger Kayaks', 'dagger-stratos', 'Stratos', 5.10, 0.55, 320, 'V', false, true, true, 160, 'pala', 'K5'),
+  entradaNoCertificada('Dagger Kayaks', 'dagger-alchemy', 'Alchemy', 4.90, 0.55, 300, 'V', false, true, true, 150, 'pala', 'K5'),
 
-  // ── Prijon Kayaks ─────────────────────────────────────────────────
-  { id: 'prijon-kodiak', marca: 'Prijon Kayaks', modelo: 'Kodiak', eslora: 5.20, manga: 0.55, volumen: 330, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 165, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
-  { id: 'prijon-seayak', marca: 'Prijon Kayaks', modelo: 'Seayak', eslora: 5.00, manga: 0.54, volumen: 310, tipoCasco: 'V', autovaciable: false, timon: true, compartimentosEstancos: true, capacidadCarga: 155, propulsion: 'pala', categoriaWKF: 'K5', categoriaDirectiva: 'C', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certCE('C'), techoAbsoluto: TECHO_C },
+  // ── Prijon Kayaks (Alemania, CE C asumida) ───────────────────────
+  entradaEuropeaCE('Prijon Kayaks', 'prijon-kodiak', 'Kodiak', 5.20, 0.55, 330, 'V', false, true, true, 165, 'pala', 'K5', 'C'),
+  entradaEuropeaCE('Prijon Kayaks', 'prijon-seayak', 'Seayak', 5.00, 0.54, 310, 'V', false, true, true, 155, 'pala', 'K5', 'C'),
 
-  // ── Ocean Kayak ───────────────────────────────────────────────────
-  { id: 'ocean-kayak-trident-13', marca: 'Ocean Kayak', modelo: 'Trident 13', eslora: 3.96, manga: 0.71, volumen: 300, tipoCasco: 'V', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 150, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'ocean-kayak-trident-15', marca: 'Ocean Kayak', modelo: 'Trident 15', eslora: 4.57, manga: 0.71, volumen: 340, tipoCasco: 'V', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 170, propulsion: 'pala', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'ocean-kayak-prowler-13', marca: 'Ocean Kayak', modelo: 'Prowler 13', eslora: 3.96, manga: 0.71, volumen: 300, tipoCasco: 'V', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 150, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'ocean-kayak-prowler-15', marca: 'Ocean Kayak', modelo: 'Prowler 15', eslora: 4.57, manga: 0.71, volumen: 340, tipoCasco: 'V', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 170, propulsion: 'pala', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'ocean-kayak-malibu-two', marca: 'Ocean Kayak', modelo: 'Malibu Two', eslora: 3.66, manga: 0.86, volumen: 320, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'ocean-kayak-caper', marca: 'Ocean Kayak', modelo: 'Caper', eslora: 3.35, manga: 0.76, volumen: 260, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 130, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'ocean-kayak-scrambler', marca: 'Ocean Kayak', modelo: 'Scrambler', eslora: 3.66, manga: 0.76, volumen: 280, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 140, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
+  // ── Ocean Kayak (USA, sin CE publicada) ──────────────────────────
+  entradaNoCertificada('Ocean Kayak', 'ocean-kayak-trident-13', 'Trident 13', 3.96, 0.71, 300, 'V', true, true, false, 150, 'pala', 'K3'),
+  entradaNoCertificada('Ocean Kayak', 'ocean-kayak-trident-15', 'Trident 15', 4.57, 0.71, 340, 'V', true, true, false, 170, 'pala', 'K4'),
+  entradaNoCertificada('Ocean Kayak', 'ocean-kayak-prowler-13', 'Prowler 13', 3.96, 0.71, 300, 'V', true, false, false, 150, 'pala', 'K3'),
+  entradaNoCertificada('Ocean Kayak', 'ocean-kayak-prowler-15', 'Prowler 15', 4.57, 0.71, 340, 'V', true, false, false, 170, 'pala', 'K4'),
+  entradaNoCertificada('Ocean Kayak', 'ocean-kayak-malibu-two', 'Malibu Two', 3.66, 0.86, 320, 'U', true, false, false, 180, 'pala', 'K3'),
+  entradaNoCertificada('Ocean Kayak', 'ocean-kayak-caper', 'Caper', 3.35, 0.76, 260, 'U', true, false, false, 130, 'pala', 'K2'),
+  entradaNoCertificada('Ocean Kayak', 'ocean-kayak-scrambler', 'Scrambler', 3.66, 0.76, 280, 'U', true, false, false, 140, 'pala', 'K3'),
 
-  // ── Perception ────────────────────────────────────────────────────
-  { id: 'perception-pescador-pro-12', marca: 'Perception', modelo: 'Pescador Pro 12', eslora: 3.66, manga: 0.81, volumen: 350, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'perception-pescador-pro-10', marca: 'Perception', modelo: 'Pescador Pro 10', eslora: 3.05, manga: 0.76, volumen: 280, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 140, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'perception-striker-115', marca: 'Perception', modelo: 'Striker 11.5', eslora: 3.51, manga: 0.81, volumen: 330, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 170, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'perception-striker-135', marca: 'Perception', modelo: 'Striker 13.5', eslora: 4.11, manga: 0.81, volumen: 380, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'perception-pilot-12', marca: 'Perception', modelo: 'Pilot 12', eslora: 3.66, manga: 0.81, volumen: 350, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pedal_helice', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'perception-pilot-10', marca: 'Perception', modelo: 'Pilot 10', eslora: 3.05, manga: 0.76, volumen: 280, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 150, propulsion: 'pedal_helice', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
+  // ── Perception (USA/UK, sin CE publicada) ────────────────────────
+  entradaNoCertificada('Perception', 'perception-pescador-pro-12', 'Pescador Pro 12', 3.66, 0.81, 350, 'U', true, false, false, 180, 'pala', 'K3'),
+  entradaNoCertificada('Perception', 'perception-pescador-pro-10', 'Pescador Pro 10', 3.05, 0.76, 280, 'U', true, false, false, 140, 'pala', 'K2'),
+  entradaNoCertificada('Perception', 'perception-striker-115', 'Striker 11.5', 3.51, 0.81, 330, 'U', true, false, false, 170, 'pala', 'K3'),
+  entradaNoCertificada('Perception', 'perception-striker-135', 'Striker 13.5', 4.11, 0.81, 380, 'U', true, true, false, 200, 'pala', 'K3'),
+  entradaNoCertificada('Perception', 'perception-pilot-12', 'Pilot 12', 3.66, 0.81, 350, 'U', true, false, false, 180, 'pedal_helice', 'K3'),
+  entradaNoCertificada('Perception', 'perception-pilot-10', 'Pilot 10', 3.05, 0.76, 280, 'U', true, false, false, 150, 'pedal_helice', 'K2'),
 
-  // ── Wilderness Systems (pesca, categoría D) ───────────────────────
-  { id: 'wilderness-thresher-140', marca: 'Wilderness Systems', modelo: 'Thresher 140', eslora: 4.27, manga: 0.71, volumen: 350, tipoCasco: 'V', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'wilderness-thresher-155', marca: 'Wilderness Systems', modelo: 'Thresher 155', eslora: 4.72, manga: 0.71, volumen: 380, tipoCasco: 'V', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pala', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'wilderness-tarpon-120', marca: 'Wilderness Systems', modelo: 'Tarpon 120', eslora: 3.66, manga: 0.76, volumen: 320, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 160, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'wilderness-tarpon-140', marca: 'Wilderness Systems', modelo: 'Tarpon 140', eslora: 4.27, manga: 0.76, volumen: 360, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 190, propulsion: 'pala', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'wilderness-ride-115', marca: 'Wilderness Systems', modelo: 'Ride 115', eslora: 3.51, manga: 0.81, volumen: 340, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'wilderness-ride-135', marca: 'Wilderness Systems', modelo: 'Ride 135', eslora: 4.11, manga: 0.81, volumen: 380, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'wilderness-radar-115', marca: 'Wilderness Systems', modelo: 'Radar 115', eslora: 3.51, manga: 0.81, volumen: 360, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 190, propulsion: 'pedal_helice', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'wilderness-radar-135', marca: 'Wilderness Systems', modelo: 'Radar 135', eslora: 4.11, manga: 0.81, volumen: 400, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pedal_helice', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'wilderness-helix-13', marca: 'Wilderness Systems', modelo: 'Helix 13', eslora: 3.96, manga: 0.81, volumen: 380, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pedal_helice', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
+  // ── Wilderness Systems pesca (USA, sin CE publicada) ─────────────
+  entradaNoCertificada('Wilderness Systems', 'wilderness-thresher-140', 'Thresher 140', 4.27, 0.71, 350, 'V', true, true, false, 180, 'pala', 'K4'),
+  entradaNoCertificada('Wilderness Systems', 'wilderness-thresher-155', 'Thresher 155', 4.72, 0.71, 380, 'V', true, true, false, 200, 'pala', 'K4'),
+  entradaNoCertificada('Wilderness Systems', 'wilderness-tarpon-120', 'Tarpon 120', 3.66, 0.76, 320, 'U', true, false, false, 160, 'pala', 'K3'),
+  entradaNoCertificada('Wilderness Systems', 'wilderness-tarpon-140', 'Tarpon 140', 4.27, 0.76, 360, 'U', true, true, false, 190, 'pala', 'K4'),
+  entradaNoCertificada('Wilderness Systems', 'wilderness-ride-115', 'Ride 115', 3.51, 0.81, 340, 'U', true, false, false, 180, 'pala', 'K3'),
+  entradaNoCertificada('Wilderness Systems', 'wilderness-ride-135', 'Ride 135', 4.11, 0.81, 380, 'U', true, true, false, 200, 'pala', 'K3'),
+  entradaNoCertificada('Wilderness Systems', 'wilderness-radar-115', 'Radar 115', 3.51, 0.81, 360, 'U', true, false, false, 190, 'pedal_helice', 'K3'),
+  entradaNoCertificada('Wilderness Systems', 'wilderness-radar-135', 'Radar 135', 4.11, 0.81, 400, 'U', true, true, false, 200, 'pedal_helice', 'K4'),
+  entradaNoCertificada('Wilderness Systems', 'wilderness-helix-13', 'Helix 13', 3.96, 0.81, 380, 'U', true, true, false, 200, 'pedal_helice', 'K3'),
 
-  // ── Jackson Kayak ─────────────────────────────────────────────────
-  { id: 'jackson-big-rig-hd', marca: 'Jackson Kayak', modelo: 'Big Rig HD', eslora: 3.96, manga: 0.91, volumen: 400, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 250, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'jackson-kraken-135', marca: 'Jackson Kayak', modelo: 'Kraken 13.5', eslora: 4.11, manga: 0.76, volumen: 350, tipoCasco: 'V', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pala', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'jackson-kraken-155', marca: 'Jackson Kayak', modelo: 'Kraken 15.5', eslora: 4.72, manga: 0.76, volumen: 380, tipoCasco: 'V', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 220, propulsion: 'pala', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'jackson-cuda-12', marca: 'Jackson Kayak', modelo: 'Cuda 12', eslora: 3.66, manga: 0.81, volumen: 340, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'jackson-cuda-14', marca: 'Jackson Kayak', modelo: 'Cuda 14', eslora: 4.27, manga: 0.81, volumen: 370, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pala', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'jackson-coosa-hd', marca: 'Jackson Kayak', modelo: 'Coosa HD', eslora: 3.66, manga: 0.86, volumen: 360, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 190, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'jackson-mayfly', marca: 'Jackson Kayak', modelo: 'Mayfly', eslora: 3.35, manga: 0.76, volumen: 280, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 140, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
+  // ── Jackson Kayak (USA, sin CE publicada) ────────────────────────
+  entradaNoCertificada('Jackson Kayak', 'jackson-big-rig-hd', 'Big Rig HD', 3.96, 0.91, 400, 'U', true, true, false, 250, 'pala', 'K3'),
+  entradaNoCertificada('Jackson Kayak', 'jackson-kraken-135', 'Kraken 13.5', 4.11, 0.76, 350, 'V', true, true, false, 200, 'pala', 'K4'),
+  entradaNoCertificada('Jackson Kayak', 'jackson-kraken-155', 'Kraken 15.5', 4.72, 0.76, 380, 'V', true, true, false, 220, 'pala', 'K4'),
+  entradaNoCertificada('Jackson Kayak', 'jackson-cuda-12', 'Cuda 12', 3.66, 0.81, 340, 'U', true, false, false, 180, 'pala', 'K3'),
+  entradaNoCertificada('Jackson Kayak', 'jackson-cuda-14', 'Cuda 14', 4.27, 0.81, 370, 'U', true, true, false, 200, 'pala', 'K4'),
+  entradaNoCertificada('Jackson Kayak', 'jackson-coosa-hd', 'Coosa HD', 3.66, 0.86, 360, 'U', true, false, false, 190, 'pala', 'K3'),
+  entradaNoCertificada('Jackson Kayak', 'jackson-mayfly', 'Mayfly', 3.35, 0.76, 280, 'U', true, false, false, 140, 'pala', 'K2'),
 
-  // ── Old Town ──────────────────────────────────────────────────────
-  { id: 'old-town-sportsman-120', marca: 'Old Town', modelo: 'Sportsman 120', eslora: 3.66, manga: 0.81, volumen: 350, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'old-town-sportsman-106', marca: 'Old Town', modelo: 'Sportsman 106', eslora: 3.20, manga: 0.76, volumen: 280, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 150, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'old-town-predator-13', marca: 'Old Town', modelo: 'Predator 13', eslora: 3.96, manga: 0.81, volumen: 380, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'old-town-predator-mx', marca: 'Old Town', modelo: 'Predator MX', eslora: 3.66, manga: 0.86, volumen: 360, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 190, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'old-town-topwater-120', marca: 'Old Town', modelo: 'Topwater 120', eslora: 3.66, manga: 0.81, volumen: 350, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'old-town-topwater-106', marca: 'Old Town', modelo: 'Topwater 106', eslora: 3.20, manga: 0.76, volumen: 280, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 150, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'old-town-predator-pdl', marca: 'Old Town', modelo: 'Predator PDL', eslora: 4.11, manga: 0.86, volumen: 420, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 250, propulsion: 'pedal_helice', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'old-town-sportsman-pdl-120', marca: 'Old Town', modelo: 'Sportsman PDL 120', eslora: 3.66, manga: 0.86, volumen: 400, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 220, propulsion: 'pedal_helice', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'old-town-sportsman-salty-pdl-120', marca: 'Old Town', modelo: 'Sportsman Salty PDL 120', eslora: 3.66, manga: 0.86, volumen: 400, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 220, propulsion: 'pedal_helice', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'old-town-topwater-pdl-120', marca: 'Old Town', modelo: 'Topwater PDL 120', eslora: 3.66, manga: 0.86, volumen: 400, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 220, propulsion: 'pedal_helice', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
+  // ── Old Town (USA, sin CE publicada) ─────────────────────────────
+  entradaNoCertificada('Old Town', 'old-town-sportsman-120', 'Sportsman 120', 3.66, 0.81, 350, 'U', true, true, false, 200, 'pala', 'K3'),
+  entradaNoCertificada('Old Town', 'old-town-sportsman-106', 'Sportsman 106', 3.20, 0.76, 280, 'U', true, false, false, 150, 'pala', 'K2'),
+  entradaNoCertificada('Old Town', 'old-town-predator-13', 'Predator 13', 3.96, 0.81, 380, 'U', true, true, false, 200, 'pala', 'K3'),
+  entradaNoCertificada('Old Town', 'old-town-predator-mx', 'Predator MX', 3.66, 0.86, 360, 'U', true, false, false, 190, 'pala', 'K3'),
+  entradaNoCertificada('Old Town', 'old-town-topwater-120', 'Topwater 120', 3.66, 0.81, 350, 'U', true, true, false, 200, 'pala', 'K3'),
+  entradaNoCertificada('Old Town', 'old-town-topwater-106', 'Topwater 106', 3.20, 0.76, 280, 'U', true, false, false, 150, 'pala', 'K2'),
+  entradaNoCertificada('Old Town', 'old-town-predator-pdl', 'Predator PDL', 4.11, 0.86, 420, 'U', true, true, false, 250, 'pedal_helice', 'K4'),
+  entradaNoCertificada('Old Town', 'old-town-sportsman-pdl-120', 'Sportsman PDL 120', 3.66, 0.86, 400, 'U', true, true, false, 220, 'pedal_helice', 'K3'),
+  entradaNoCertificada('Old Town', 'old-town-sportsman-salty-pdl-120', 'Sportsman Salty PDL 120', 3.66, 0.86, 400, 'U', true, true, false, 220, 'pedal_helice', 'K3'),
+  entradaNoCertificada('Old Town', 'old-town-topwater-pdl-120', 'Topwater PDL 120', 3.66, 0.86, 400, 'U', true, true, false, 220, 'pedal_helice', 'K3'),
 
-  // ── FeelFree ──────────────────────────────────────────────────────
-  { id: 'feelfree-lure-115', marca: 'FeelFree', modelo: 'Lure 11.5', eslora: 3.51, manga: 0.86, volumen: 350, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'feelfree-lure-135', marca: 'FeelFree', modelo: 'Lure 13.5', eslora: 4.11, manga: 0.86, volumen: 390, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'feelfree-moken-125', marca: 'FeelFree', modelo: 'Moken 12.5', eslora: 3.81, manga: 0.81, volumen: 350, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'feelfree-moken-10', marca: 'FeelFree', modelo: 'Moken 10', eslora: 3.05, manga: 0.76, volumen: 280, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 140, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'feelfree-moken-13-angler-deluxe', marca: 'FeelFree', modelo: 'Moken 13 Angler Deluxe', eslora: 3.90, manga: 0.79, volumen: 350, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 250, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'no_certificado', certificado: false, certificadoOficial: false, verificado: false, certificaciones: { ...SIN_CERTIFICAR }, techoAbsoluto: TECHO_D },
-  { id: 'feelfree-lure-115-overdrive', marca: 'FeelFree', modelo: 'Lure 11.5 Overdrive', eslora: 3.51, manga: 0.86, volumen: 360, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 190, propulsion: 'pedal_helice', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'feelfree-lure-135-overdrive', marca: 'FeelFree', modelo: 'Lure 13.5 Overdrive', eslora: 4.11, manga: 0.86, volumen: 400, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 210, propulsion: 'pedal_helice', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'feelfree-moken-125-overdrive', marca: 'FeelFree', modelo: 'Moken 12.5 Overdrive', eslora: 3.81, manga: 0.81, volumen: 360, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 190, propulsion: 'pedal_helice', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
+  // ── FeelFree (USA, pero con presencia EU; asumimos CE D para pesca) ──
+  entradaEuropeaCE('FeelFree', 'feelfree-lure-115', 'Lure 11.5', 3.51, 0.86, 350, 'U', true, false, false, 180, 'pala', 'K3', 'D'),
+  entradaEuropeaCE('FeelFree', 'feelfree-lure-135', 'Lure 13.5', 4.11, 0.86, 390, 'U', true, true, false, 200, 'pala', 'K3', 'D'),
+  entradaEuropeaCE('FeelFree', 'feelfree-moken-125', 'Moken 12.5', 3.81, 0.81, 350, 'U', true, false, false, 180, 'pala', 'K3', 'D'),
+  entradaEuropeaCE('FeelFree', 'feelfree-moken-10', 'Moken 10', 3.05, 0.76, 280, 'U', true, false, false, 140, 'pala', 'K2', 'D'),
+  entradaEuropeaCE('FeelFree', 'feelfree-moken-13-angler-deluxe', 'Moken 13 Angler Deluxe', 3.90, 0.79, 350, 'U', true, true, false, 250, 'pala', 'K3', 'D'),
+  entradaEuropeaCE('FeelFree', 'feelfree-lure-115-overdrive', 'Lure 11.5 Overdrive', 3.51, 0.86, 360, 'U', true, false, false, 190, 'pedal_helice', 'K3', 'D'),
+  entradaEuropeaCE('FeelFree', 'feelfree-lure-135-overdrive', 'Lure 13.5 Overdrive', 4.11, 0.86, 400, 'U', true, true, false, 210, 'pedal_helice', 'K3', 'D'),
+  entradaEuropeaCE('FeelFree', 'feelfree-moken-125-overdrive', 'Moken 12.5 Overdrive', 3.81, 0.81, 360, 'U', true, false, false, 190, 'pedal_helice', 'K3', 'D'),
 
-  // ── Riot Kayaks ───────────────────────────────────────────────────
-  { id: 'riot-escape-12', marca: 'Riot Kayaks', modelo: 'Escape 12', eslora: 3.66, manga: 0.76, volumen: 300, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 150, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'riot-escape-10', marca: 'Riot Kayaks', modelo: 'Escape 10', eslora: 3.05, manga: 0.76, volumen: 260, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 130, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'riot-escape-11', marca: 'Riot Kayaks', modelo: 'Escape 11', eslora: 3.35, manga: 0.76, volumen: 280, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 140, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'riot-mako-12', marca: 'Riot Kayaks', modelo: 'Mako 12', eslora: 3.66, manga: 0.76, volumen: 300, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 150, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'riot-mako-10', marca: 'Riot Kayaks', modelo: 'Mako 10', eslora: 3.05, manga: 0.76, volumen: 260, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 130, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'riot-escape-12-pedal', marca: 'Riot Kayaks', modelo: 'Escape 12 Pedal', eslora: 3.66, manga: 0.76, volumen: 310, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 160, propulsion: 'pedal_helice', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
+  // ── Riot Kayaks (Canadá, sin CE publicada) ───────────────────────
+  entradaNoCertificada('Riot Kayaks', 'riot-escape-12', 'Escape 12', 3.66, 0.76, 300, 'U', true, false, false, 150, 'pala', 'K3'),
+  entradaNoCertificada('Riot Kayaks', 'riot-escape-10', 'Escape 10', 3.05, 0.76, 260, 'U', true, false, false, 130, 'pala', 'K2'),
+  entradaNoCertificada('Riot Kayaks', 'riot-escape-11', 'Escape 11', 3.35, 0.76, 280, 'U', true, false, false, 140, 'pala', 'K2'),
+  entradaNoCertificada('Riot Kayaks', 'riot-mako-12', 'Mako 12', 3.66, 0.76, 300, 'U', true, false, false, 150, 'pala', 'K3'),
+  entradaNoCertificada('Riot Kayaks', 'riot-mako-10', 'Mako 10', 3.05, 0.76, 260, 'U', true, false, false, 130, 'pala', 'K2'),
+  entradaNoCertificada('Riot Kayaks', 'riot-escape-12-pedal', 'Escape 12 Pedal', 3.66, 0.76, 310, 'U', true, false, false, 160, 'pedal_helice', 'K3'),
 
-  // ── Viking Kayaks ─────────────────────────────────────────────────
-  { id: 'viking-profish-reload', marca: 'Viking Kayaks', modelo: 'Profish Reload', eslora: 4.27, manga: 0.76, volumen: 350, tipoCasco: 'V', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pala', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'viking-profish-reload-pedal', marca: 'Viking Kayaks', modelo: 'Profish Reload Pedal', eslora: 4.27, manga: 0.76, volumen: 360, tipoCasco: 'V', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pedal_helice', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'viking-profish-gt', marca: 'Viking Kayaks', modelo: 'Profish GT', eslora: 3.96, manga: 0.76, volumen: 300, tipoCasco: 'V', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 150, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'viking-profish-gt-pedal', marca: 'Viking Kayaks', modelo: 'Profish GT Pedal', eslora: 3.96, manga: 0.76, volumen: 310, tipoCasco: 'V', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 160, propulsion: 'pedal_helice', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'viking-profish-400', marca: 'Viking Kayaks', modelo: 'Profish 400', eslora: 4.00, manga: 0.76, volumen: 310, tipoCasco: 'V', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 160, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'viking-espri', marca: 'Viking Kayaks', modelo: 'Espri', eslora: 3.66, manga: 0.76, volumen: 290, tipoCasco: 'V', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 140, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'viking-nemo', marca: 'Viking Kayaks', modelo: 'Nemo', eslora: 3.35, manga: 0.76, volumen: 270, tipoCasco: 'V', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 130, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
+  // ── Viking Kayaks (NZ, sin CE publicada) ─────────────────────────
+  entradaNoCertificada('Viking Kayaks', 'viking-profish-reload', 'Profish Reload', 4.27, 0.76, 350, 'V', true, true, false, 200, 'pala', 'K4'),
+  entradaNoCertificada('Viking Kayaks', 'viking-profish-reload-pedal', 'Profish Reload Pedal', 4.27, 0.76, 360, 'V', true, true, false, 200, 'pedal_helice', 'K4'),
+  entradaNoCertificada('Viking Kayaks', 'viking-profish-gt', 'Profish GT', 3.96, 0.76, 300, 'V', true, true, false, 150, 'pala', 'K3'),
+  entradaNoCertificada('Viking Kayaks', 'viking-profish-gt-pedal', 'Profish GT Pedal', 3.96, 0.76, 310, 'V', true, true, false, 160, 'pedal_helice', 'K3'),
+  entradaNoCertificada('Viking Kayaks', 'viking-profish-400', 'Profish 400', 4.00, 0.76, 310, 'V', true, true, false, 160, 'pala', 'K3'),
+  entradaNoCertificada('Viking Kayaks', 'viking-espri', 'Espri', 3.66, 0.76, 290, 'V', true, false, false, 140, 'pala', 'K3'),
+  entradaNoCertificada('Viking Kayaks', 'viking-nemo', 'Nemo', 3.35, 0.76, 270, 'V', true, false, false, 130, 'pala', 'K2'),
 
-  // ── Hobie ─────────────────────────────────────────────────────────
-  { id: 'hobie-mirage-revolution-13', marca: 'Hobie', modelo: 'Mirage Revolution 13', eslora: 4.01, manga: 0.71, volumen: 300, tipoCasco: 'V', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 150, propulsion: 'pedal_aletas', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'hobie-mirage-revolution-11', marca: 'Hobie', modelo: 'Mirage Revolution 11', eslora: 3.35, manga: 0.71, volumen: 270, tipoCasco: 'V', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 130, propulsion: 'pedal_aletas', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'hobie-mirage-outback', marca: 'Hobie', modelo: 'Mirage Outback', eslora: 3.66, manga: 0.86, volumen: 350, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pedal_aletas', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'hobie-mirage-pro-angler-12', marca: 'Hobie', modelo: 'Mirage Pro Angler 12', eslora: 3.66, manga: 0.91, volumen: 400, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 230, propulsion: 'pedal_aletas', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'hobie-mirage-pro-angler-14', marca: 'Hobie', modelo: 'Mirage Pro Angler 14', eslora: 4.17, manga: 0.96, volumen: 450, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 250, propulsion: 'pedal_aletas', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'hobie-mirage-pro-angler-17t', marca: 'Hobie', modelo: 'Mirage Pro Angler 17T', eslora: 5.18, manga: 0.96, volumen: 500, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 300, propulsion: 'pedal_aletas', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'hobie-mirage-compass', marca: 'Hobie', modelo: 'Mirage Compass', eslora: 3.66, manga: 0.86, volumen: 340, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pedal_aletas', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'hobie-mirage-passport-105', marca: 'Hobie', modelo: 'Mirage Passport 10.5', eslora: 3.20, manga: 0.81, volumen: 300, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 160, propulsion: 'pedal_aletas', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'hobie-mirage-passport-12', marca: 'Hobie', modelo: 'Mirage Passport 12', eslora: 3.66, manga: 0.81, volumen: 340, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pedal_aletas', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'hobie-mirage-lynx', marca: 'Hobie', modelo: 'Mirage Lynx', eslora: 3.35, manga: 0.81, volumen: 300, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 160, propulsion: 'pedal_aletas', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
+  // ── Hobie (USA, sin CE publicada) ────────────────────────────────
+  entradaNoCertificada('Hobie', 'hobie-mirage-revolution-13', 'Mirage Revolution 13', 4.01, 0.71, 300, 'V', true, true, false, 150, 'pedal_aletas', 'K3'),
+  entradaNoCertificada('Hobie', 'hobie-mirage-revolution-11', 'Mirage Revolution 11', 3.35, 0.71, 270, 'V', true, true, false, 130, 'pedal_aletas', 'K2'),
+  entradaNoCertificada('Hobie', 'hobie-mirage-outback', 'Mirage Outback', 3.66, 0.86, 350, 'U', true, true, false, 180, 'pedal_aletas', 'K3'),
+  entradaNoCertificada('Hobie', 'hobie-mirage-pro-angler-12', 'Mirage Pro Angler 12', 3.66, 0.91, 400, 'U', true, true, false, 230, 'pedal_aletas', 'K3'),
+  entradaNoCertificada('Hobie', 'hobie-mirage-pro-angler-14', 'Mirage Pro Angler 14', 4.17, 0.96, 450, 'U', true, true, false, 250, 'pedal_aletas', 'K4'),
+  entradaNoCertificada('Hobie', 'hobie-mirage-pro-angler-17t', 'Mirage Pro Angler 17T', 5.18, 0.96, 500, 'U', true, true, false, 300, 'pedal_aletas', 'K4'),
+  entradaNoCertificada('Hobie', 'hobie-mirage-compass', 'Mirage Compass', 3.66, 0.86, 340, 'U', true, true, false, 180, 'pedal_aletas', 'K3'),
+  entradaNoCertificada('Hobie', 'hobie-mirage-passport-105', 'Mirage Passport 10.5', 3.20, 0.81, 300, 'U', true, false, false, 160, 'pedal_aletas', 'K2'),
+  entradaNoCertificada('Hobie', 'hobie-mirage-passport-12', 'Mirage Passport 12', 3.66, 0.81, 340, 'U', true, true, false, 180, 'pedal_aletas', 'K3'),
+  entradaNoCertificada('Hobie', 'hobie-mirage-lynx', 'Mirage Lynx', 3.35, 0.81, 300, 'U', true, false, false, 160, 'pedal_aletas', 'K2'),
 
-  // ── Native Watercraft ─────────────────────────────────────────────
-  { id: 'native-slayer-propel-10', marca: 'Native Watercraft', modelo: 'Slayer Propel 10', eslora: 3.05, manga: 0.76, volumen: 280, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 150, propulsion: 'pedal_helice', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'native-slayer-propel-12', marca: 'Native Watercraft', modelo: 'Slayer Propel 12', eslora: 3.66, manga: 0.81, volumen: 340, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pedal_helice', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'native-slayer-propel-13', marca: 'Native Watercraft', modelo: 'Slayer Propel 13', eslora: 3.96, manga: 0.81, volumen: 380, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pedal_helice', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'native-titan-105', marca: 'Native Watercraft', modelo: 'Titan 10.5', eslora: 3.20, manga: 0.86, volumen: 340, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pedal_helice', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'native-titan-12', marca: 'Native Watercraft', modelo: 'Titan 12', eslora: 3.66, manga: 0.91, volumen: 400, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 220, propulsion: 'pedal_helice', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'native-titan-135', marca: 'Native Watercraft', modelo: 'Titan 13.5', eslora: 4.11, manga: 0.91, volumen: 420, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 250, propulsion: 'pedal_helice', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'native-ultimate-fx-12', marca: 'Native Watercraft', modelo: 'Ultimate FX 12', eslora: 3.66, manga: 0.81, volumen: 340, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'native-ultimate-fx-15', marca: 'Native Watercraft', modelo: 'Ultimate FX 15', eslora: 4.57, manga: 0.81, volumen: 380, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pala', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
+  // ── Native Watercraft (USA, sin CE publicada) ────────────────────
+  entradaNoCertificada('Native Watercraft', 'native-slayer-propel-10', 'Slayer Propel 10', 3.05, 0.76, 280, 'U', true, false, false, 150, 'pedal_helice', 'K2'),
+  entradaNoCertificada('Native Watercraft', 'native-slayer-propel-12', 'Slayer Propel 12', 3.66, 0.81, 340, 'U', true, true, false, 180, 'pedal_helice', 'K3'),
+  entradaNoCertificada('Native Watercraft', 'native-slayer-propel-13', 'Slayer Propel 13', 3.96, 0.81, 380, 'U', true, true, false, 200, 'pedal_helice', 'K3'),
+  entradaNoCertificada('Native Watercraft', 'native-titan-105', 'Titan 10.5', 3.20, 0.86, 340, 'U', true, false, false, 180, 'pedal_helice', 'K2'),
+  entradaNoCertificada('Native Watercraft', 'native-titan-12', 'Titan 12', 3.66, 0.91, 400, 'U', true, true, false, 220, 'pedal_helice', 'K3'),
+  entradaNoCertificada('Native Watercraft', 'native-titan-135', 'Titan 13.5', 4.11, 0.91, 420, 'U', true, true, false, 250, 'pedal_helice', 'K4'),
+  entradaNoCertificada('Native Watercraft', 'native-ultimate-fx-12', 'Ultimate FX 12', 3.66, 0.81, 340, 'U', true, false, false, 180, 'pala', 'K3'),
+  entradaNoCertificada('Native Watercraft', 'native-ultimate-fx-15', 'Ultimate FX 15', 4.57, 0.81, 380, 'U', true, true, false, 200, 'pala', 'K4'),
 
-  // ── Pelican ───────────────────────────────────────────────────────
-  { id: 'pelican-catch-120', marca: 'Pelican', modelo: 'Catch 120', eslora: 3.66, manga: 0.81, volumen: 340, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'pelican-catch-100', marca: 'Pelican', modelo: 'Catch 100', eslora: 3.05, manga: 0.76, volumen: 270, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 140, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'pelican-catch-130-hydryve', marca: 'Pelican', modelo: 'Catch 130 Hydryve', eslora: 3.96, manga: 0.81, volumen: 370, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pedal_helice', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'pelican-catch-110-hydryve', marca: 'Pelican', modelo: 'Catch 110 Hydryve', eslora: 3.35, manga: 0.81, volumen: 310, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 160, propulsion: 'pedal_helice', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
+  // ── Pelican (Canadá, sin CE publicada) ───────────────────────────
+  entradaNoCertificada('Pelican', 'pelican-catch-120', 'Catch 120', 3.66, 0.81, 340, 'U', true, false, false, 180, 'pala', 'K3'),
+  entradaNoCertificada('Pelican', 'pelican-catch-100', 'Catch 100', 3.05, 0.76, 270, 'U', true, false, false, 140, 'pala', 'K2'),
+  entradaNoCertificada('Pelican', 'pelican-catch-130-hydryve', 'Catch 130 Hydryve', 3.96, 0.81, 370, 'U', true, true, false, 200, 'pedal_helice', 'K3'),
+  entradaNoCertificada('Pelican', 'pelican-catch-110-hydryve', 'Catch 110 Hydryve', 3.35, 0.81, 310, 'U', true, false, false, 160, 'pedal_helice', 'K2'),
 
-  // ── Sun Dolphin ───────────────────────────────────────────────────
-  { id: 'sun-dolphin-journey-12', marca: 'Sun Dolphin', modelo: 'Journey 12', eslora: 3.66, manga: 0.76, volumen: 300, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 150, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'sun-dolphin-journey-10', marca: 'Sun Dolphin', modelo: 'Journey 10', eslora: 3.05, manga: 0.76, volumen: 260, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 130, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'sun-dolphin-aruba-10', marca: 'Sun Dolphin', modelo: 'Aruba 10', eslora: 3.05, manga: 0.76, volumen: 250, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 120, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
+  // ── Sun Dolphin (USA, sin CE publicada) ──────────────────────────
+  entradaNoCertificada('Sun Dolphin', 'sun-dolphin-journey-12', 'Journey 12', 3.66, 0.76, 300, 'U', true, false, false, 150, 'pala', 'K3'),
+  entradaNoCertificada('Sun Dolphin', 'sun-dolphin-journey-10', 'Journey 10', 3.05, 0.76, 260, 'U', true, false, false, 130, 'pala', 'K2'),
+  entradaNoCertificada('Sun Dolphin', 'sun-dolphin-aruba-10', 'Aruba 10', 3.05, 0.76, 250, 'U', true, false, false, 120, 'pala', 'K2'),
 
-  // ── Lifetime ──────────────────────────────────────────────────────
-  { id: 'lifetime-tamarack-120', marca: 'Lifetime', modelo: 'Tamarack 120', eslora: 3.66, manga: 0.76, volumen: 300, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 150, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'lifetime-tamarack-100', marca: 'Lifetime', modelo: 'Tamarack 100', eslora: 3.05, manga: 0.76, volumen: 260, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 130, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'lifetime-tandem-14', marca: 'Lifetime', modelo: 'Tandem 14', eslora: 4.27, manga: 0.81, volumen: 360, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pala', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'lifetime-stealth-pro', marca: 'Lifetime', modelo: 'Stealth Pro', eslora: 3.35, manga: 0.76, volumen: 270, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 140, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
+  // ── Lifetime (USA, sin CE publicada) ─────────────────────────────
+  entradaNoCertificada('Lifetime', 'lifetime-tamarack-120', 'Tamarack 120', 3.66, 0.76, 300, 'U', true, false, false, 150, 'pala', 'K3'),
+  entradaNoCertificada('Lifetime', 'lifetime-tamarack-100', 'Tamarack 100', 3.05, 0.76, 260, 'U', true, false, false, 130, 'pala', 'K2'),
+  entradaNoCertificada('Lifetime', 'lifetime-tandem-14', 'Tandem 14', 4.27, 0.81, 360, 'U', true, false, false, 200, 'pala', 'K4'),
+  entradaNoCertificada('Lifetime', 'lifetime-stealth-pro', 'Stealth Pro', 3.35, 0.76, 270, 'U', true, false, false, 140, 'pala', 'K2'),
 
-  // ── Ascend ────────────────────────────────────────────────────────
-  { id: 'ascend-fs12t', marca: 'Ascend', modelo: 'FS12T', eslora: 3.66, manga: 0.81, volumen: 340, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'ascend-fs10', marca: 'Ascend', modelo: 'FS10', eslora: 3.05, manga: 0.76, volumen: 270, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 140, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'ascend-fs128t', marca: 'Ascend', modelo: 'FS128T', eslora: 3.81, manga: 0.81, volumen: 360, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 190, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'ascend-h12', marca: 'Ascend', modelo: 'H12', eslora: 3.66, manga: 0.81, volumen: 340, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
+  // ── Ascend (USA, sin CE publicada) ───────────────────────────────
+  entradaNoCertificada('Ascend', 'ascend-fs12t', 'FS12T', 3.66, 0.81, 340, 'U', true, false, false, 180, 'pala', 'K3'),
+  entradaNoCertificada('Ascend', 'ascend-fs10', 'FS10', 3.05, 0.76, 270, 'U', true, false, false, 140, 'pala', 'K2'),
+  entradaNoCertificada('Ascend', 'ascend-fs128t', 'FS128T', 3.81, 0.81, 360, 'U', true, true, false, 190, 'pala', 'K3'),
+  entradaNoCertificada('Ascend', 'ascend-h12', 'H12', 3.66, 0.81, 340, 'U', true, false, false, 180, 'pala', 'K3'),
 
-  // ── Bonafide ──────────────────────────────────────────────────────
-  { id: 'bonafide-ss107', marca: 'Bonafide', modelo: 'SS107', eslora: 3.20, manga: 0.81, volumen: 300, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 160, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'bonafide-ss127', marca: 'Bonafide', modelo: 'SS127', eslora: 3.81, manga: 0.81, volumen: 350, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 190, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'bonafide-rs117', marca: 'Bonafide', modelo: 'RS117', eslora: 3.51, manga: 0.86, volumen: 340, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'bonafide-p127', marca: 'Bonafide', modelo: 'P127', eslora: 3.81, manga: 0.86, volumen: 360, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pedal_helice', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'bonafide-ex123', marca: 'Bonafide', modelo: 'EX123', eslora: 3.66, manga: 0.81, volumen: 340, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
+  // ── Bonafide (USA, sin CE publicada) ─────────────────────────────
+  entradaNoCertificada('Bonafide', 'bonafide-ss107', 'SS107', 3.20, 0.81, 300, 'U', true, false, false, 160, 'pala', 'K2'),
+  entradaNoCertificada('Bonafide', 'bonafide-ss127', 'SS127', 3.81, 0.81, 350, 'U', true, false, false, 190, 'pala', 'K3'),
+  entradaNoCertificada('Bonafide', 'bonafide-rs117', 'RS117', 3.51, 0.86, 340, 'U', true, false, false, 180, 'pala', 'K3'),
+  entradaNoCertificada('Bonafide', 'bonafide-p127', 'P127', 3.81, 0.86, 360, 'U', true, true, false, 200, 'pedal_helice', 'K3'),
+  entradaNoCertificada('Bonafide', 'bonafide-ex123', 'EX123', 3.66, 0.81, 340, 'U', true, false, false, 180, 'pala', 'K3'),
 
-  // ── Crescent ──────────────────────────────────────────────────────
-  { id: 'crescent-lite-tackle', marca: 'Crescent', modelo: 'Lite Tackle', eslora: 3.66, manga: 0.81, volumen: 330, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 170, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'crescent-crew', marca: 'Crescent', modelo: 'Crew', eslora: 3.96, manga: 0.81, volumen: 350, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 190, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'crescent-shoalie', marca: 'Crescent', modelo: 'Shoalie', eslora: 3.81, manga: 0.81, volumen: 340, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'crescent-ck1', marca: 'Crescent', modelo: 'CK1', eslora: 3.66, manga: 0.81, volumen: 330, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 170, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
+  // ── Crescent (USA, sin CE publicada) ─────────────────────────────
+  entradaNoCertificada('Crescent', 'crescent-lite-tackle', 'Lite Tackle', 3.66, 0.81, 330, 'U', true, false, false, 170, 'pala', 'K3'),
+  entradaNoCertificada('Crescent', 'crescent-crew', 'Crew', 3.96, 0.81, 350, 'U', true, true, false, 190, 'pala', 'K3'),
+  entradaNoCertificada('Crescent', 'crescent-shoalie', 'Shoalie', 3.81, 0.81, 340, 'U', true, false, false, 180, 'pala', 'K3'),
+  entradaNoCertificada('Crescent', 'crescent-ck1', 'CK1', 3.66, 0.81, 330, 'U', true, false, false, 170, 'pala', 'K3'),
 
-  // ── Nucanoe ───────────────────────────────────────────────────────
-  { id: 'nucanoe-frontier-12', marca: 'Nucanoe', modelo: 'Frontier 12', eslora: 3.66, manga: 0.91, volumen: 380, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 250, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'nucanoe-pursuit', marca: 'Nucanoe', modelo: 'Pursuit', eslora: 3.96, manga: 0.91, volumen: 400, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 270, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'nucanoe-flint', marca: 'Nucanoe', modelo: 'Flint', eslora: 3.35, manga: 0.86, volumen: 320, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'nucanoe-unlimited', marca: 'Nucanoe', modelo: 'Unlimited', eslora: 4.27, manga: 0.91, volumen: 420, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 300, propulsion: 'pala', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'nucanoe-u10', marca: 'Nucanoe', modelo: 'U10', eslora: 3.05, manga: 0.86, volumen: 300, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'nucanoe-f10', marca: 'Nucanoe', modelo: 'F10', eslora: 3.05, manga: 0.91, volumen: 320, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
+  // ── Nucanoe (USA, sin CE publicada) ──────────────────────────────
+  entradaNoCertificada('Nucanoe', 'nucanoe-frontier-12', 'Frontier 12', 3.66, 0.91, 380, 'U', true, true, false, 250, 'pala', 'K3'),
+  entradaNoCertificada('Nucanoe', 'nucanoe-pursuit', 'Pursuit', 3.96, 0.91, 400, 'U', true, true, false, 270, 'pala', 'K3'),
+  entradaNoCertificada('Nucanoe', 'nucanoe-flint', 'Flint', 3.35, 0.86, 320, 'U', true, false, false, 200, 'pala', 'K2'),
+  entradaNoCertificada('Nucanoe', 'nucanoe-unlimited', 'Unlimited', 4.27, 0.91, 420, 'U', true, true, false, 300, 'pala', 'K4'),
+  entradaNoCertificada('Nucanoe', 'nucanoe-u10', 'U10', 3.05, 0.86, 300, 'U', true, false, false, 180, 'pala', 'K2'),
+  entradaNoCertificada('Nucanoe', 'nucanoe-f10', 'F10', 3.05, 0.91, 320, 'U', true, false, false, 200, 'pala', 'K2'),
 
-  // ── Vibe ──────────────────────────────────────────────────────────
-  { id: 'vibe-sea-ghost-110', marca: 'Vibe', modelo: 'Sea Ghost 110', eslora: 3.35, manga: 0.81, volumen: 310, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 160, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'vibe-sea-ghost-130', marca: 'Vibe', modelo: 'Sea Ghost 130', eslora: 3.96, manga: 0.81, volumen: 370, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'vibe-yellowfin-100', marca: 'Vibe', modelo: 'Yellowfin 100', eslora: 3.05, manga: 0.81, volumen: 290, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 150, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'vibe-yellowfin-120', marca: 'Vibe', modelo: 'Yellowfin 120', eslora: 3.66, manga: 0.81, volumen: 340, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'vibe-yellowfin-130t', marca: 'Vibe', modelo: 'Yellowfin 130T', eslora: 3.96, manga: 0.81, volumen: 370, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 200, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'vibe-shearwater-125', marca: 'Vibe', modelo: 'Shearwater 125', eslora: 3.81, manga: 0.81, volumen: 350, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 190, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'vibe-maverick-120', marca: 'Vibe', modelo: 'Maverick 120', eslora: 3.66, manga: 0.81, volumen: 340, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
+  // ── Vibe (USA, sin CE publicada) ─────────────────────────────────
+  entradaNoCertificada('Vibe', 'vibe-sea-ghost-110', 'Sea Ghost 110', 3.35, 0.81, 310, 'U', true, false, false, 160, 'pala', 'K2'),
+  entradaNoCertificada('Vibe', 'vibe-sea-ghost-130', 'Sea Ghost 130', 3.96, 0.81, 370, 'U', true, true, false, 200, 'pala', 'K3'),
+  entradaNoCertificada('Vibe', 'vibe-yellowfin-100', 'Yellowfin 100', 3.05, 0.81, 290, 'U', true, false, false, 150, 'pala', 'K2'),
+  entradaNoCertificada('Vibe', 'vibe-yellowfin-120', 'Yellowfin 120', 3.66, 0.81, 340, 'U', true, false, false, 180, 'pala', 'K3'),
+  entradaNoCertificada('Vibe', 'vibe-yellowfin-130t', 'Yellowfin 130T', 3.96, 0.81, 370, 'U', true, true, false, 200, 'pala', 'K3'),
+  entradaNoCertificada('Vibe', 'vibe-shearwater-125', 'Shearwater 125', 3.81, 0.81, 350, 'U', true, false, false, 190, 'pala', 'K3'),
+  entradaNoCertificada('Vibe', 'vibe-maverick-120', 'Maverick 120', 3.66, 0.81, 340, 'U', true, false, false, 180, 'pala', 'K3'),
 
-  // ── 3 Waters ──────────────────────────────────────────────────────
-  { id: '3waters-big-fish-105', marca: '3 Waters', modelo: 'Big Fish 105', eslora: 3.20, manga: 0.81, volumen: 290, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 150, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: '3waters-big-fish-108', marca: '3 Waters', modelo: 'Big Fish 108', eslora: 3.35, manga: 0.81, volumen: 300, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 160, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: '3waters-big-fish-120', marca: '3 Waters', modelo: 'Big Fish 120', eslora: 3.66, manga: 0.81, volumen: 340, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: '3waters-big-fish-103', marca: '3 Waters', modelo: 'Big Fish 103', eslora: 3.05, manga: 0.76, volumen: 270, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 140, propulsion: 'pala', categoriaWKF: 'K2', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
+  // ── 3 Waters (USA, sin CE publicada) ─────────────────────────────
+  entradaNoCertificada('3 Waters', '3waters-big-fish-105', 'Big Fish 105', 3.20, 0.81, 290, 'U', true, false, false, 150, 'pala', 'K2'),
+  entradaNoCertificada('3 Waters', '3waters-big-fish-108', 'Big Fish 108', 3.35, 0.81, 300, 'U', true, false, false, 160, 'pala', 'K2'),
+  entradaNoCertificada('3 Waters', '3waters-big-fish-120', 'Big Fish 120', 3.66, 0.81, 340, 'U', true, false, false, 180, 'pala', 'K3'),
+  entradaNoCertificada('3 Waters', '3waters-big-fish-103', 'Big Fish 103', 3.05, 0.76, 270, 'U', true, false, false, 140, 'pala', 'K2'),
 
-  // ── Malibu Kayaks ─────────────────────────────────────────────────
-  { id: 'malibu-x-13', marca: 'Malibu Kayaks', modelo: 'X-13', eslora: 3.96, manga: 0.76, volumen: 320, tipoCasco: 'V', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 170, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'malibu-stealth-12', marca: 'Malibu Kayaks', modelo: 'Stealth 12', eslora: 3.66, manga: 0.81, volumen: 330, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 170, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'malibu-stealth-14', marca: 'Malibu Kayaks', modelo: 'Stealth 14', eslora: 4.27, manga: 0.81, volumen: 360, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 190, propulsion: 'pala', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'malibu-pro-explorer', marca: 'Malibu Kayaks', modelo: 'Pro Explorer', eslora: 3.96, manga: 0.81, volumen: 340, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'malibu-mini-x', marca: 'Malibu Kayaks', modelo: 'Mini-X', eslora: 2.90, manga: 0.76, volumen: 240, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 120, propulsion: 'pala', categoriaWKF: 'K1', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
+  // ── Malibu Kayaks (USA, sin CE publicada) ────────────────────────
+  entradaNoCertificada('Malibu Kayaks', 'malibu-x-13', 'X-13', 3.96, 0.76, 320, 'V', true, true, false, 170, 'pala', 'K3'),
+  entradaNoCertificada('Malibu Kayaks', 'malibu-stealth-12', 'Stealth 12', 3.66, 0.81, 330, 'U', true, false, false, 170, 'pala', 'K3'),
+  entradaNoCertificada('Malibu Kayaks', 'malibu-stealth-14', 'Stealth 14', 4.27, 0.81, 360, 'U', true, true, false, 190, 'pala', 'K4'),
+  entradaNoCertificada('Malibu Kayaks', 'malibu-pro-explorer', 'Pro Explorer', 3.96, 0.81, 340, 'U', true, true, false, 180, 'pala', 'K3'),
+  entradaNoCertificada('Malibu Kayaks', 'malibu-mini-x', 'Mini-X', 2.90, 0.76, 240, 'U', true, false, false, 120, 'pala', 'K1'),
 
-  // ── Cobra Kayaks ──────────────────────────────────────────────────
-  { id: 'cobra-fish-n-dive', marca: 'Cobra Kayaks', modelo: 'Fish n Dive', eslora: 3.66, manga: 0.81, volumen: 330, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 170, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'cobra-marauder', marca: 'Cobra Kayaks', modelo: 'Marauder', eslora: 4.27, manga: 0.81, volumen: 360, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 190, propulsion: 'pala', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'cobra-explorer', marca: 'Cobra Kayaks', modelo: 'Explorer', eslora: 3.96, manga: 0.81, volumen: 340, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'cobra-navigator', marca: 'Cobra Kayaks', modelo: 'Navigator', eslora: 3.66, manga: 0.76, volumen: 310, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 160, propulsion: 'pala', categoriaWKF: 'K3', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'cobra-tourer', marca: 'Cobra Kayaks', modelo: 'Tourer', eslora: 4.57, manga: 0.76, volumen: 340, tipoCasco: 'V', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 180, propulsion: 'pala', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'cobra-triple-x', marca: 'Cobra Kayaks', modelo: 'Triple X', eslora: 4.27, manga: 0.81, volumen: 360, tipoCasco: 'U', autovaciable: true, timon: true, compartimentosEstancos: false, capacidadCarga: 190, propulsion: 'pala', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
-  { id: 'cobra-tandem', marca: 'Cobra Kayaks', modelo: 'Tandem', eslora: 4.57, manga: 0.86, volumen: 380, tipoCasco: 'U', autovaciable: true, timon: false, compartimentosEstancos: false, capacidadCarga: 220, propulsion: 'pala', categoriaWKF: 'K4', categoriaDirectiva: 'D', certificado: true, certificadoOficial: true, verificado: false, certificaciones: certUSCG(), techoAbsoluto: TECHO_D },
+  // ── Cobra Kayaks (USA, sin CE publicada) ─────────────────────────
+  entradaNoCertificada('Cobra Kayaks', 'cobra-fish-n-dive', 'Fish n Dive', 3.66, 0.81, 330, 'U', true, false, false, 170, 'pala', 'K3'),
+  entradaNoCertificada('Cobra Kayaks', 'cobra-marauder', 'Marauder', 4.27, 0.81, 360, 'U', true, true, false, 190, 'pala', 'K4'),
+  entradaNoCertificada('Cobra Kayaks', 'cobra-explorer', 'Explorer', 3.96, 0.81, 340, 'U', true, true, false, 180, 'pala', 'K3'),
+  entradaNoCertificada('Cobra Kayaks', 'cobra-navigator', 'Navigator', 3.66, 0.76, 310, 'U', true, false, false, 160, 'pala', 'K3'),
+  entradaNoCertificada('Cobra Kayaks', 'cobra-tourer', 'Tourer', 4.57, 0.76, 340, 'V', true, true, false, 180, 'pala', 'K4'),
+  entradaNoCertificada('Cobra Kayaks', 'cobra-triple-x', 'Triple X', 4.27, 0.81, 360, 'U', true, true, false, 190, 'pala', 'K4'),
+  entradaNoCertificada('Cobra Kayaks', 'cobra-tandem', 'Tandem', 4.57, 0.86, 380, 'U', true, false, false, 220, 'pala', 'K4'),
 
-  // ── Galaxy Kayaks ─────────────────────────────────────────────────
-  kolNoCertificado('galaxy-cruz-ultra', 'Cruz Ultra', 2.92, 0.84, 180, 'U', true, false, false, 150, 'pala', 'K2'),
-  kolNoCertificado('galaxy-rider', 'Rider', 2.64, 0.80, 150, 'U', true, false, false, 130, 'pala', 'K1'),
-  kolNoCertificado('galaxy-ocelote', 'Ocelote', 2.90, 0.82, 200, 'U', true, true, false, 150, 'pedal_aletas', 'K2'),
-  kolNoCertificado('galaxy-alboran-hv', 'Alborán HV', 4.09, 0.80, 350, 'U', true, true, false, 180, 'pala', 'K3'),
-  kolNoCertificado('galaxy-alboran-fx3', 'Alborán FX3', 4.09, 0.80, 350, 'U', true, true, false, 180, 'pedal_helice', 'K3'),
-  kolNoCertificado('galaxy-wildcat-fx3-wahoo-s', 'Wildcat FX3 / Wahoo S', 3.57, 0.80, 300, 'U', true, true, false, 180, 'pedal_aletas', 'K3'),
-  kolNoCertificado('galaxy-supernova-fx', 'Supernova FX', 3.98, 0.85, 400, 'U', true, true, false, 220, 'pedal_helice', 'K3'),
-  kolNoCertificado('galaxy-supernova-jr-fx', 'Supernova Jr FX', 3.00, 0.80, 200, 'U', true, true, false, 150, 'pedal_helice', 'K2'),
-  kolNoCertificado('galaxy-marlin-430', 'Marlin 430', 4.40, 0.75, 350, 'V', false, true, true, 190, 'pala', 'K4'),
-  kolNoCertificado('galaxy-strike', 'Strike', 3.40, 0.84, 300, 'U', true, true, false, 160, 'pala', 'K3'),
-  kolNoCertificado('galaxy-tandem-tahiti-x', 'Tándem Tahiti X', 3.70, 0.86, 400, 'U', true, false, false, 240, 'pala', 'K4'),
-  kolNoCertificado('galaxy-ranger', 'Ranger', 2.90, 0.78, 180, 'U', true, false, false, 140, 'pala', 'K2'),
-  kolNoCertificado('galaxy-force', 'Force', 2.70, 0.78, 160, 'U', true, false, false, 130, 'pala', 'K1'),
+  // ── Galaxy Kayaks (España, CE C/D asumida) ───────────────────────
+  entradaEuropeaCE('Galaxy Kayaks', 'galaxy-cruz-ultra', 'Cruz Ultra', 2.92, 0.84, 180, 'U', true, false, false, 150, 'pala', 'K2', 'D'),
+  entradaEuropeaCE('Galaxy Kayaks', 'galaxy-rider', 'Rider', 2.64, 0.80, 150, 'U', true, false, false, 130, 'pala', 'K1', 'D'),
+  entradaEuropeaCE('Galaxy Kayaks', 'galaxy-ocelote', 'Ocelote', 2.90, 0.82, 200, 'U', true, true, false, 150, 'pedal_aletas', 'K2', 'D'),
+  entradaEuropeaCE('Galaxy Kayaks', 'galaxy-alboran-hv', 'Alborán HV', 4.09, 0.80, 350, 'U', true, true, false, 180, 'pala', 'K3', 'C'),
+  // Alborán FX3: categoría C confirmada por ficha oficial del fabricante.
+  entradaEuropeaCE('Galaxy Kayaks', 'galaxy-alboran-fx3', 'Alborán FX3', 4.09, 0.80, 350, 'U', true, true, false, 180, 'pedal_helice', 'K3', 'C'),
+  entradaEuropeaCE('Galaxy Kayaks', 'galaxy-wildcat-fx3-wahoo-s', 'Wildcat FX3 / Wahoo S', 3.57, 0.80, 300, 'U', true, true, false, 180, 'pedal_aletas', 'K3', 'D'),
+  entradaEuropeaCE('Galaxy Kayaks', 'galaxy-supernova-fx', 'Supernova FX', 3.98, 0.85, 400, 'U', true, true, false, 220, 'pedal_helice', 'K3', 'D'),
+  entradaEuropeaCE('Galaxy Kayaks', 'galaxy-supernova-jr-fx', 'Supernova Jr FX', 3.00, 0.80, 200, 'U', true, true, false, 150, 'pedal_helice', 'K2', 'D'),
+  entradaEuropeaCE('Galaxy Kayaks', 'galaxy-marlin-430', 'Marlin 430', 4.40, 0.75, 350, 'V', false, true, true, 190, 'pala', 'K4', 'C'),
+  entradaEuropeaCE('Galaxy Kayaks', 'galaxy-strike', 'Strike', 3.40, 0.84, 300, 'U', true, true, false, 160, 'pala', 'K3', 'D'),
+  entradaEuropeaCE('Galaxy Kayaks', 'galaxy-tandem-tahiti-x', 'Tándem Tahiti X', 3.70, 0.86, 400, 'U', true, false, false, 240, 'pala', 'K4', 'D'),
+  entradaEuropeaCE('Galaxy Kayaks', 'galaxy-ranger', 'Ranger', 2.90, 0.78, 180, 'U', true, false, false, 140, 'pala', 'K2', 'D'),
+  entradaEuropeaCE('Galaxy Kayaks', 'galaxy-force', 'Force', 2.70, 0.78, 160, 'U', true, false, false, 130, 'pala', 'K1', 'D'),
 
-  // ── Todo Kayak ────────────────────────────────────────────────────
-  kolNoCertificado('todo-kayak-hook', 'Hook', 2.39, 0.79, 180, 'U', true, false, false, 125, 'pala', 'K1'),
-  kolNoCertificado('todo-kayak-delta', 'Delta', 2.66, 0.70, 150, 'U', true, false, false, 100, 'pala', 'K1'),
-  kolNoCertificado('todo-kayak-randal', 'Randal', 2.44, 0.79, 200, 'U', true, false, false, 120, 'pala', 'K1'),
-  kolNoCertificado('todo-kayak-tornado', 'Tornado', 2.92, 0.70, 180, 'V', true, false, false, 136, 'pala', 'K2'),
-  kolNoCertificado('todo-kayak-haddock', 'Haddock', 4.50, 0.63, 350, 'V', false, true, true, 155, 'pala', 'K4'),
-  kolNoCertificado('todo-kayak-racer', 'Racer', 3.68, 0.80, 320, 'U', true, true, false, 180, 'pedal_aletas', 'K3'),
-  kolNoCertificado('todo-kayak-sondeo', 'Sondeo', 3.71, 0.97, 450, 'U', true, true, false, 220, 'pedal_helice', 'K4'),
-  kolNoCertificado('todo-kayak-voluta', 'Voluta', 3.96, 0.82, 400, 'U', true, true, false, 180, 'pedal_helice', 'K3'),
-  kolNoCertificado('todo-kayak-catamaran-f15', 'Catamarán F15', 3.82, 1.00, 500, 'plano', true, true, false, 380, 'pedal_helice', 'K4'),
-  kolNoCertificado('todo-kayak-oxifish', 'Oxifish', 2.90, 0.95, 300, 'U', true, true, false, 230, 'pedal_aletas', 'K3'),
-  kolNoCertificado('todo-kayak-navio-tandem', 'Navío Tándem', 4.53, 0.88, 450, 'U', true, true, false, 300, 'pedal_helice', 'K4'),
-  kolNoCertificado('todo-kayak-taramay-tandem', 'Taramay Tándem', 4.50, 0.91, 450, 'U', true, true, false, 300, 'pedal_aletas', 'K4'),
-  kolNoCertificado('todo-kayak-matrix', 'Matrix', 3.16, 0.87, 300, 'U', true, true, false, 180, 'pedal_helice', 'K3'),
-  kolNoCertificado('todo-kayak-barracuda-pro', 'Barracuda PRO', 2.95, 0.80, 200, 'U', true, false, false, 150, 'pala', 'K2'),
-  kolNoCertificado('todo-kayak-barracuda-tandem', 'Barracuda Tándem', 3.72, 0.89, 350, 'U', true, false, false, 250, 'pala', 'K4'),
-  kolNoCertificado('todo-kayak-barcaza', 'Barcaza', 4.99, 0.90, 500, 'U', true, false, false, 280, 'pala', 'K5'),
-  kolNoCertificado('todo-kayak-marine', 'Marine', 2.70, 0.80, 180, 'U', true, false, false, 130, 'pala', 'K1'),
-  kolNoCertificado('todo-kayak-marea-tandem', 'Marea Tándem', 3.73, 0.82, 300, 'U', true, false, false, 220, 'pala', 'K3'),
-  kolNoCertificado('todo-kayak-pingo', 'Pingo', 3.30, 0.80, 280, 'U', true, true, false, 150, 'pala', 'K3'),
-  kolNoCertificado('todo-kayak-luna', 'Luna', 3.30, 0.78, 250, 'U', true, false, false, 140, 'pala', 'K2'),
+  // ── Todo Kayak (España, CE C/D asumida) ──────────────────────────
+  entradaEuropeaCE('Todo Kayak', 'todo-kayak-hook', 'Hook', 2.39, 0.79, 180, 'U', true, false, false, 125, 'pala', 'K1', 'D'),
+  entradaEuropeaCE('Todo Kayak', 'todo-kayak-delta', 'Delta', 2.66, 0.70, 150, 'U', true, false, false, 100, 'pala', 'K1', 'D'),
+  entradaEuropeaCE('Todo Kayak', 'todo-kayak-randal', 'Randal', 2.44, 0.79, 200, 'U', true, false, false, 120, 'pala', 'K1', 'D'),
+  entradaEuropeaCE('Todo Kayak', 'todo-kayak-tornado', 'Tornado', 2.92, 0.70, 180, 'V', true, false, false, 136, 'pala', 'K2', 'D'),
+  entradaEuropeaCE('Todo Kayak', 'todo-kayak-haddock', 'Haddock', 4.50, 0.63, 350, 'V', false, true, true, 155, 'pala', 'K4', 'C'),
+  entradaEuropeaCE('Todo Kayak', 'todo-kayak-racer', 'Racer', 3.68, 0.80, 320, 'U', true, true, false, 180, 'pedal_aletas', 'K3', 'D'),
+  entradaEuropeaCE('Todo Kayak', 'todo-kayak-sondeo', 'Sondeo', 3.71, 0.97, 450, 'U', true, true, false, 220, 'pedal_helice', 'K4', 'D'),
+  entradaEuropeaCE('Todo Kayak', 'todo-kayak-voluta', 'Voluta', 3.96, 0.82, 400, 'U', true, true, false, 180, 'pedal_helice', 'K3', 'D'),
+  entradaEuropeaCE('Todo Kayak', 'todo-kayak-catamaran-f15', 'Catamarán F15', 3.82, 1.00, 500, 'plano', true, true, false, 380, 'pedal_helice', 'K4', 'D'),
+  entradaEuropeaCE('Todo Kayak', 'todo-kayak-oxifish', 'Oxifish', 2.90, 0.95, 300, 'U', true, true, false, 230, 'pedal_aletas', 'K3', 'D'),
+  entradaEuropeaCE('Todo Kayak', 'todo-kayak-navio-tandem', 'Navío Tándem', 4.53, 0.88, 450, 'U', true, true, false, 300, 'pedal_helice', 'K4', 'D'),
+  entradaEuropeaCE('Todo Kayak', 'todo-kayak-taramay-tandem', 'Taramay Tándem', 4.50, 0.91, 450, 'U', true, true, false, 300, 'pedal_aletas', 'K4', 'D'),
+  entradaEuropeaCE('Todo Kayak', 'todo-kayak-matrix', 'Matrix', 3.16, 0.87, 300, 'U', true, true, false, 180, 'pedal_helice', 'K3', 'D'),
+  entradaEuropeaCE('Todo Kayak', 'todo-kayak-barracuda-pro', 'Barracuda PRO', 2.95, 0.80, 200, 'U', true, false, false, 150, 'pala', 'K2', 'D'),
+  entradaEuropeaCE('Todo Kayak', 'todo-kayak-barracuda-tandem', 'Barracuda Tándem', 3.72, 0.89, 350, 'U', true, false, false, 250, 'pala', 'K4', 'D'),
+  entradaEuropeaCE('Todo Kayak', 'todo-kayak-barcaza', 'Barcaza', 4.99, 0.90, 500, 'U', true, false, false, 280, 'pala', 'K5', 'C'),
+  entradaEuropeaCE('Todo Kayak', 'todo-kayak-marine', 'Marine', 2.70, 0.80, 180, 'U', true, false, false, 130, 'pala', 'K1', 'D'),
+  entradaEuropeaCE('Todo Kayak', 'todo-kayak-marea-tandem', 'Marea Tándem', 3.73, 0.82, 300, 'U', true, false, false, 220, 'pala', 'K3', 'D'),
+  entradaEuropeaCE('Todo Kayak', 'todo-kayak-pingo', 'Pingo', 3.30, 0.80, 280, 'U', true, true, false, 150, 'pala', 'K3', 'D'),
+  entradaEuropeaCE('Todo Kayak', 'todo-kayak-luna', 'Luna', 3.30, 0.78, 250, 'U', true, false, false, 140, 'pala', 'K2', 'D'),
 
-  // ── KOL Outdoor ───────────────────────────────────────────────────
-  kolNoCertificado('kol-outdoor-whale-propel-two', 'Whale Propel Two', 4.50, 0.91, 450, 'U', true, true, false, 300, 'pedal_helice', 'K4'),
-  kolNoCertificado('kol-outdoor-whale-propel-one', 'Whale Propel One', 3.00, 0.91, 300, 'U', true, true, false, 180, 'pedal_helice', 'K3'),
-  kolNoCertificado('kol-outdoor-evo-two', 'EVO Two', 4.20, 0.81, 400, 'U', true, true, false, 250, 'pedal_aletas', 'K4'),
-  kolNoCertificado('kol-outdoor-swift-360', 'Swift 360', 3.60, 0.66, 250, 'V', false, true, true, 150, 'pala', 'K3'),
-  kolNoCertificado('kol-outdoor-tarpon-propel-320', 'Tarpon Propel 320', 3.16, 0.86, 300, 'U', true, true, false, 140, 'pedal_helice', 'K3'),
-  kolNoCertificado('kol-outdoor-oceanus-r-pro', 'Oceanus R / PRO', 3.72, 0.86, 350, 'U', true, false, false, 250, 'pala', 'K4'),
-  kolNoCertificado('kol-outdoor-falco-combo-11', 'Falco Combo 11', 3.35, 0.86, 300, 'U', true, false, false, 160, 'pala', 'K3'),
-  kolNoCertificado('kol-outdoor-mini-nori', 'Mini Nori', 2.60, 0.78, 150, 'U', true, false, false, 100, 'pala', 'K1'),
-  kolNoCertificado('kol-outdoor-nori-1', 'Nori 1', 3.72, 0.80, 300, 'U', true, false, false, 170, 'pala', 'K3'),
-  kolNoCertificado('kol-outdoor-nori-2', 'Nori 2', 4.20, 0.84, 350, 'U', true, false, false, 190, 'pala', 'K4'),
-  kolNoCertificado('kol-outdoor-fredy-2', 'Fredy 2', 3.72, 0.82, 350, 'U', true, false, false, 190, 'pala', 'K3'),
-  kolNoCertificado('kol-outdoor-dentex-one', 'Dentex One', 3.00, 0.84, 200, 'U', true, true, false, 230, 'pedal_helice', 'K2'),
-  kolNoCertificado('kol-outdoor-propel-12', 'Propel 12', 3.65, 0.84, 350, 'U', true, true, false, 180, 'pedal_helice', 'K3'),
-  kolNoCertificado('kol-outdoor-fisher-pro-12-pala', 'Fisher Pro 12 (pala)', 3.70, 0.86, 380, 'U', true, true, false, 280, 'pala', 'K3'),
-  kolNoCertificado('kol-outdoor-fisher-pro-12-aletas', 'Fisher Pro 12 (aletas)', 3.70, 0.86, 380, 'U', true, true, false, 280, 'pedal_aletas', 'K3'),
-  kolNoCertificado('kol-outdoor-fisher-pro-12-helice', 'Fisher Pro 12 (hélice)', 3.70, 0.86, 380, 'U', true, true, false, 280, 'pedal_helice', 'K3'),
+  // ── KOL Outdoor (España, CE C/D asumida) ─────────────────────────
+  entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-whale-propel-two', 'Whale Propel Two', 4.50, 0.91, 450, 'U', true, true, false, 300, 'pedal_helice', 'K4', 'D'),
+  entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-whale-propel-one', 'Whale Propel One', 3.00, 0.91, 300, 'U', true, true, false, 180, 'pedal_helice', 'K3', 'D'),
+  entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-evo-two', 'EVO Two', 4.20, 0.81, 400, 'U', true, true, false, 250, 'pedal_aletas', 'K4', 'D'),
+  entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-swift-360', 'Swift 360', 3.60, 0.66, 250, 'V', false, true, true, 150, 'pala', 'K3', 'C'),
+  entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-tarpon-propel-320', 'Tarpon Propel 320', 3.16, 0.86, 300, 'U', true, true, false, 140, 'pedal_helice', 'K3', 'D'),
+  entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-oceanus-r-pro', 'Oceanus R / PRO', 3.72, 0.86, 350, 'U', true, false, false, 250, 'pala', 'K4', 'D'),
+  entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-falco-combo-11', 'Falco Combo 11', 3.35, 0.86, 300, 'U', true, false, false, 160, 'pala', 'K3', 'D'),
+  entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-mini-nori', 'Mini Nori', 2.60, 0.78, 150, 'U', true, false, false, 100, 'pala', 'K1', 'D'),
+  entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-nori-1', 'Nori 1', 3.72, 0.80, 300, 'U', true, false, false, 170, 'pala', 'K3', 'D'),
+  entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-nori-2', 'Nori 2', 4.20, 0.84, 350, 'U', true, false, false, 190, 'pala', 'K4', 'D'),
+  entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-fredy-2', 'Fredy 2', 3.72, 0.82, 350, 'U', true, false, false, 190, 'pala', 'K3', 'D'),
+  entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-dentex-one', 'Dentex One', 3.00, 0.84, 200, 'U', true, true, false, 230, 'pedal_helice', 'K2', 'D'),
+  entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-propel-12', 'Propel 12', 3.65, 0.84, 350, 'U', true, true, false, 180, 'pedal_helice', 'K3', 'D'),
+  entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-fisher-pro-12-pala', 'Fisher Pro 12 (pala)', 3.70, 0.86, 380, 'U', true, true, false, 280, 'pala', 'K3', 'D'),
+  entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-fisher-pro-12-aletas', 'Fisher Pro 12 (aletas)', 3.70, 0.86, 380, 'U', true, true, false, 280, 'pedal_aletas', 'K3', 'D'),
+  entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-fisher-pro-12-helice', 'Fisher Pro 12 (hélice)', 3.70, 0.86, 380, 'U', true, true, false, 280, 'pedal_helice', 'K3', 'D'),
 
-  // ── Marlin Kayak ──────────────────────────────────────────────────
-  kolNoCertificado('marlin-kayak-fins-max-2025-2026', 'Fins Max 2025/2026', 3.72, 0.84, 350, 'U', true, true, false, 170, 'pedal_helice', 'K3'),
-  kolNoCertificado('marlin-kayak-fins-409', 'Fins 409', 4.09, 0.80, 350, 'U', true, true, false, 180, 'pedal_aletas', 'K3'),
-  kolNoCertificado('marlin-kayak-fins-mini', 'Fins Mini', 2.92, 0.83, 200, 'U', true, true, false, 150, 'pedal_aletas', 'K2'),
-  kolNoCertificado('marlin-kayak-mini-falcon-2026', 'Mini Falcon 2026', 2.50, 0.90, 200, 'U', true, true, false, 165, 'pedal_aletas', 'K2'),
-  kolNoCertificado('marlin-kayak-one-2026', 'One 2026', 2.96, 0.81, 200, 'U', true, false, false, 165, 'pala', 'K2'),
-  kolNoCertificado('marlin-kayak-pescador', 'Pescador', 3.57, 0.82, 300, 'U', true, false, false, 160, 'pala', 'K3'),
+  // ── Marlin Kayak (España, CE C/D asumida) ────────────────────────
+  entradaEuropeaCE('Marlin Kayak', 'marlin-kayak-fins-max-2025-2026', 'Fins Max 2025/2026', 3.72, 0.84, 350, 'U', true, true, false, 170, 'pedal_helice', 'K3', 'D'),
+  entradaEuropeaCE('Marlin Kayak', 'marlin-kayak-fins-409', 'Fins 409', 4.09, 0.80, 350, 'U', true, true, false, 180, 'pedal_aletas', 'K3', 'C'),
+  entradaEuropeaCE('Marlin Kayak', 'marlin-kayak-fins-mini', 'Fins Mini', 2.92, 0.83, 200, 'U', true, true, false, 150, 'pedal_aletas', 'K2', 'D'),
+  entradaEuropeaCE('Marlin Kayak', 'marlin-kayak-mini-falcon-2026', 'Mini Falcon 2026', 2.50, 0.90, 200, 'U', true, true, false, 165, 'pedal_aletas', 'K2', 'D'),
+  entradaEuropeaCE('Marlin Kayak', 'marlin-kayak-one-2026', 'One 2026', 2.96, 0.81, 200, 'U', true, false, false, 165, 'pala', 'K2', 'D'),
+  entradaEuropeaCE('Marlin Kayak', 'marlin-kayak-pescador', 'Pescador', 3.57, 0.82, 300, 'U', true, false, false, 160, 'pala', 'K3', 'D'),
 ];
 
 export function buscarKayakPorId(id: string): Kayak | undefined {
@@ -434,8 +484,8 @@ export function buscarKayaksPorNombre(texto: string): Kayak[] {
   ).slice(0, 50);
 }
 
-// Helper: etiqueta visible de categoría WKF, con 'c' si hay certificado oficial.
-// Ejemplo: 'K4c' si certificadoOficial=true, 'K4' si no.
+// Helper: etiqueta visible de categoría WKF.
+// Devuelve 'K4c' si certificadoOficial=true, 'K4' si no.
 export function etiquetaCategoria(kayak: Kayak): string {
   return `${kayak.categoriaWKF}${kayak.certificadoOficial ? 'c' : ''}`;
 }
