@@ -11,6 +11,7 @@ import {
   type FranjaDiaTabla,
   type TipoAccesoTabla,
 } from './verdict-tabla.ts';
+import type { Kayak, TechoAbsoluto } from './kayaks.ts';
 
 export type Zona = ZonaTabla;
 export type CategoriaKayak = CategoriaKayakTabla;
@@ -179,7 +180,8 @@ export function calcularVeredicto(
   categoria: CategoriaKayak,
   perfil: PerfilKayakista,
   franja: FranjaDia,
-  condiciones: Condiciones
+  condiciones: Condiciones,
+  kayak?: Kayak | TechoAbsoluto | null
 ): ResultadoVeredicto {
   const base = UMBRALES_BASE[zona][categoria];
   const ajPerfil = AJUSTE_PERFIL[perfil.experiencia];
@@ -210,8 +212,8 @@ export function calcularVeredicto(
     marea: aplicarAjuste(base.marea, ajPerfil.marea),
   };
 
-  const vViento = evaluarFactor(condiciones.viento, umbralAplicado.viento);
-  const vOla = evaluarFactor(condiciones.ola, umbralAplicado.ola);
+  let vViento = evaluarFactor(condiciones.viento, umbralAplicado.viento);
+  let vOla = evaluarFactor(condiciones.ola, umbralAplicado.ola);
   const vPeriodo = evaluarFactor(condiciones.periodo, umbralAplicado.periodo, true);
   const vCorriente = evaluarFactor(condiciones.corriente, umbralAplicado.corriente);
   const vMarea = evaluarFactor(condiciones.marea, umbralAplicado.marea);
@@ -230,6 +232,30 @@ export function calcularVeredicto(
     else if (vPeriodo === veredicto) factorDisparador = 'periodo';
     else if (vCorriente === veredicto) factorDisparador = 'corriente';
     else if (vMarea === veredicto) factorDisparador = 'marea';
+  }
+
+  // Techo absoluto del kayak (límite duro de diseño/certificación).
+  const techo: TechoAbsoluto | undefined =
+    kayak && 'techoAbsoluto' in kayak && kayak.techoAbsoluto
+      ? kayak.techoAbsoluto
+      : (kayak as TechoAbsoluto | undefined);
+
+  if (techo && typeof techo.vientoMaxBf === 'number' && typeof techo.olaMaxM === 'number') {
+    const superaViento = condiciones.viento > techo.vientoMaxBf;
+    const superaOla = condiciones.ola > techo.olaMaxM;
+    if (superaViento || superaOla) {
+      veredicto = 'DESACONSEJADO';
+      if (superaViento) {
+        vViento = 'DESACONSEJADO';
+        factorDisparador = 'viento';
+      }
+      if (superaOla) {
+        vOla = 'DESACONSEJADO';
+        if (!superaViento) {
+          factorDisparador = 'ola';
+        }
+      }
+    }
   }
 
   return {

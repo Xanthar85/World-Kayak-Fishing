@@ -6,7 +6,7 @@
 //     `kayak.certificaciones`, `kayak.fuente`.
 //   - Resto de la pantalla intacta respecto a v1.010.
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   useAppStore,
@@ -20,7 +20,6 @@ import {
   type CertificacionesKayak,
 } from '../lib/kayaks.ts';
 import {
-  CATEGORIAS_KAYAK,
   NIVELES_EXPERIENCIA,
   type CategoriaKayak,
   type NivelExperiencia,
@@ -105,7 +104,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const ajustes = useAppStore((s) => s.ajustes);
   const setFormatoCoords = useAppStore((s) => s.setFormatoCoords);
   const setKayakIds = useAppStore((s) => s.setKayakIds);
-  const setCategoriaKayak = useAppStore((s) => s.setCategoriaKayak);
   const setPerfil = useAppStore((s) => s.setPerfil);
   const setFranjas = useAppStore((s) => s.setFranjas);
   const toggleSubpestana = useAppStore((s) => s.toggleSubpestana);
@@ -131,7 +129,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     const current = [...ajustes.kayakIds];
     current[slotIndex] = kayak.id;
     setKayakIds(current.slice(0, 2));
-    setCategoriaKayak(kayak.categoriaWKF);
     setActiveSlotPicker(null);
     setKayakSearchQuery('');
   };
@@ -142,10 +139,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     setKayakIds(current);
   };
 
-  const filteredKayaks = CATALOGO_KAYAKS.filter((k) => {
-    const text = `${k.marca} ${k.modelo}`.toLowerCase();
-    return text.includes(kayakSearchQuery.toLowerCase());
-  });
+  const filteredKayaks = useMemo(() => {
+    const terms = kayakSearchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    return CATALOGO_KAYAKS.filter((k) => {
+      if (terms.length === 0) return true;
+      const text = `${k.marca} ${k.modelo}`.toLowerCase();
+      return terms.every((term) => text.includes(term));
+    }).sort((a, b) => {
+      const cmpMarca = a.marca.localeCompare(b.marca);
+      if (cmpMarca !== 0) return cmpMarca;
+      return a.modelo.localeCompare(b.modelo);
+    });
+  }, [kayakSearchQuery]);
 
   const handleFranjaChange = (
     index: number,
@@ -267,15 +272,20 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
     padding: '8px 0',
     borderBottom: '1px solid var(--border)',
     fontSize: '0.85rem',
   };
-  const fichaLabelStyle: React.CSSProperties = { color: 'var(--text-muted)' };
+  const fichaLabelStyle: React.CSSProperties = {
+    color: 'var(--text-muted)',
+    flexShrink: 0,
+  };
   const fichaValorStyle: React.CSSProperties = {
     fontFamily: 'Fira Code, monospace',
     color: 'var(--text)',
     fontWeight: 500,
+    textAlign: 'right',
   };
 
   return (
@@ -612,35 +622,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               </div>
             </div>
           )}
-        </div>
-
-        <div style={cardStyle}>
-          <div style={sectionTitleStyle}>{t('settings.kayakCategory')}</div>
-          {!ajustes.categoriaKayak && (
-            <div
-              style={{
-                fontSize: '0.8rem',
-                color: 'var(--accent)',
-                marginBottom: 8,
-              }}
-            >
-              {t('settings.kayakCategoryAssumed')}
-            </div>
-          )}
-          <div style={segmentedContainerStyle}>
-            {CATEGORIAS_KAYAK.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setCategoriaKayak(cat)}
-                style={{
-                  ...buttonOptionStyle(ajustes.categoriaKayak === cat),
-                  fontFamily: 'Fira Code, monospace',
-                }}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
         </div>
 
         <div style={cardStyle}>
@@ -1355,7 +1336,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               },
               {
                 label: t('kayak.certificado'),
-                val: fichaTecnicaKayak.certificado ? '✓' : '—',
+                val: fichaTecnicaKayak.certificado
+                  ? t('kayak.certificadoSiWkf')
+                  : t('kayak.certificadoNoWkf'),
               },
               {
                 label: t('kayak.verificado'),
@@ -1436,6 +1419,21 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 {t('kayak.noCertNote')}
               </div>
             )}
+
+            <div
+              style={{
+                marginTop: 12,
+                padding: '8px 10px',
+                backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                fontSize: '0.75rem',
+                lineHeight: 1.4,
+                color: 'var(--text-muted)',
+              }}
+            >
+              {t('kayak.certNotaPie')}
+            </div>
           </div>
         </div>
       )}

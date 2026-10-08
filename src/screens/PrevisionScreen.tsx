@@ -7,7 +7,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAppStore } from '../state/store.ts';
+import { useAppStore, getKayakActivo } from '../state/store.ts';
 import {
   calcularVeredictoFranjaDia,
   veredictoAColor,
@@ -414,6 +414,7 @@ interface Tabla72HorasProps {
 
 const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
   const ajustes = useAppStore((s) => s.ajustes);
+  const kayakActivo = getKayakActivo(ajustes.kayakIds);
 
   const actividadMap = useMemo(() => {
     if (!weather?.hourly || !spot) return new Map<string, ActividadHora>();
@@ -590,7 +591,8 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                         periodo: point.wavePeriod ?? 0,
                         corriente: 0,
                         marea: 0,
-                      }
+                      },
+                      kayakActivo
                     ).veredictoPorFactor.ola
                   : null;
               const colorOla = colorNumero(vOla, ajustes.colorTabla);
@@ -613,7 +615,8 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                         periodo: point.wavePeriod,
                         corriente: 0,
                         marea: 0,
-                      }
+                      },
+                      kayakActivo
                     ).veredictoPorFactor.periodo
                   : null;
               const colorPer = colorNumero(vPer, ajustes.colorTabla);
@@ -636,7 +639,8 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                         periodo: 0,
                         corriente: 0,
                         marea: 0,
-                      }
+                      },
+                      kayakActivo
                     ).veredictoPorFactor.viento
                   : null;
               const colorVmed = colorNumero(vVmed, ajustes.colorTabla);
@@ -659,7 +663,8 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                         periodo: 0,
                         corriente: 0,
                         marea: 0,
-                      }
+                      },
+                      kayakActivo
                     ).veredictoPorFactor.viento
                   : null;
               const colorVmax = colorNumero(vVmax, ajustes.colorTabla);
@@ -681,7 +686,8 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                         periodo: 0,
                         corriente: point.currentVelocity,
                         marea: 0,
-                      }
+                      },
+                      kayakActivo
                     ).veredictoPorFactor.corriente
                   : null;
               const colorKN = colorNumero(vKN, ajustes.colorTabla);
@@ -800,6 +806,7 @@ export const PrevisionScreen: React.FC = () => {
   const spots = useAppStore((s) => s.spots);
   const ajustes = useAppStore((s) => s.ajustes);
   const getFreshWeather = useAppStore((s) => s.getFreshWeather);
+  const kayakActivo = getKayakActivo(ajustes.kayakIds);
 
   const [spotActivoId, setSpotActivoId] = useState<string | null>(
     spots[0]?.id ?? null
@@ -833,11 +840,12 @@ export const PrevisionScreen: React.FC = () => {
         f,
         diaSeleccionado.fecha,
         ajustes.categoriaKayak,
-        ajustes.perfil
+        ajustes.perfil,
+        kayakActivo
       );
     }
     return out;
-  }, [spotActivo, weather, ajustes.franjas, ajustes.categoriaKayak, ajustes.perfil, diaSeleccionado]);
+  }, [spotActivo, weather, ajustes.franjas, ajustes.categoriaKayak, ajustes.perfil, diaSeleccionado, kayakActivo]);
 
   const puntosDia = useMemo(() => {
     if (!weather || !diaSeleccionado) return [];

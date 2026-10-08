@@ -45,6 +45,7 @@ export const stringsEs = {
 
   home: {
     counter: '{{count}} / {{max}}',
+    activeSpots: 'Puntos activos {{count}}/{{max}}',
     empty: {
       title: 'Sin puntos todavía',
       subtitle: 'Cuando añadas tu primer punto, aparecerá aquí.',
@@ -93,8 +94,8 @@ export const stringsEs = {
     advisedAgainst: 'Desaconsejado',
     triggeringFactor: 'Factor disparador',
     seeAllFactors: 'Ver todos los factores',
-    appliedThreshold: 'Umbral aplicado: categoría {{category}}, {{zone}}',
-    appliedThresholdPrefix: 'Umbral aplicado:',
+    appliedThreshold: 'Umbral: {{kayak}} · {{zone}}',
+    appliedThresholdPrefix: 'Umbral:',
     launch: {
       title: 'Salida / entrada',
       safe: 'Segura',
@@ -154,6 +155,9 @@ export const stringsEs = {
   },
 
   tabs: {
+    spots: 'Puntos',
+    forecast: 'Previsión',
+    settings: 'Ajustes',
     waves: 'Oleaje',
     wind: 'Viento',
     weather: 'Tiempo',
@@ -224,6 +228,7 @@ export const stringsEs = {
     behindText:
       'WKF no corre en un gran servidor. Corre en un Intel Pentium G3240 de 2014, dos núcleos, sin gráfica dedicada. Ni nube, ni cluster, ni equipo de DevOps. Solo un señor con un ordenador viejo y ganas de que la app te sirva.\n\nSi te sirve, invítame a un café. Ayuda a pagar la luz.',
     donate: 'Invitar a un café',
+    donateShort: 'Ko-fi',
     donateText:
       'WKF es gratis y sin anuncios. No hay cuentas, no hay nube, no hay empresas detrás. Hay una persona, un ordenador modesto y muchas horas. Si la app te sirve, invítame a un café. Se agradece de verdad.',
     version: 'Versión',
@@ -488,6 +493,10 @@ Por favor, explícame todo esto como si tuviera poca experiencia técnica. Qué 
     notFound: 'No encontrado en el catálogo',
     addCustom: 'Añadir kayak manualmente',
     certificado: 'Certificado',
+    certificadoSiWkf: 'Sí (según informe técnico WKF)',
+    certificadoNoWkf: 'No (según informe técnico WKF)',
+    certNotaPie:
+      'WKF no verifica las certificaciones de los kayaks una por una. La información proviene de un informe técnico interno del proyecto. Si tu kayak tiene datos diferentes en la placa del fabricante o en el manual, prevalecen siempre los del fabricante.',
     verificado: 'Verificado',
     noCertificado: 'Sin certificar',
     brand: 'Marca',
@@ -568,6 +577,8 @@ Por favor, explícame todo esto como si tuviera poca experiencia técnica. Qué 
   },
 
   errores: {
+    refreshFailed:
+      'No se han podido actualizar los datos. Vuelve a intentarlo en unos minutos.',
     networkError: 'Sin conexión o servidor no responde.',
     apiError: 'La API ha devuelto un error.',
     apiQuota: 'Límite de la API alcanzado. Prueba más tarde.',

@@ -40,6 +40,7 @@ export const stringsEn: StringsSchema = {
 
   home: {
     counter: '{{count}} / {{max}}',
+    activeSpots: 'Active spots {{count}}/{{max}}',
     empty: {
       title: 'No spots yet',
       subtitle: 'When you add your first spot, it will appear here.',
@@ -88,8 +89,8 @@ export const stringsEn: StringsSchema = {
     advisedAgainst: 'Advised against',
     triggeringFactor: 'Triggering factor',
     seeAllFactors: 'See all factors',
-    appliedThreshold: 'Applied threshold: category {{category}}, {{zone}}',
-    appliedThresholdPrefix: 'Applied threshold:',
+    appliedThreshold: 'Threshold: {{kayak}} · {{zone}}',
+    appliedThresholdPrefix: 'Threshold:',
     launch: {
       title: 'Launch / landing',
       safe: 'Safe',
@@ -148,6 +149,9 @@ export const stringsEn: StringsSchema = {
   },
 
   tabs: {
+    spots: 'Spots',
+    forecast: 'Forecast',
+    settings: 'Settings',
     waves: 'Waves',
     wind: 'Wind',
     weather: 'Weather',
@@ -218,6 +222,7 @@ export const stringsEn: StringsSchema = {
     behindText:
       "WKF doesn't run on a big server. It runs on a 2014 Intel Pentium G3240, two cores, no dedicated graphics. No cloud, no cluster, no DevOps team. Just one guy with an old computer and the will to make this app useful for you.\n\nIf it helps you, buy me a coffee. It helps pay the bills.",
     donate: 'Buy me a coffee',
+    donateShort: 'Ko-fi',
     donateText:
       'WKF is free and ad-free. No accounts, no cloud, no companies behind it. Just one person, a modest computer, and many hours. If the app is useful to you, buy me a coffee. It is genuinely appreciated.',
     version: 'Version',
@@ -481,6 +486,10 @@ Please explain all this to me as if I had little technical experience. What does
     notFound: 'Not found in catalogue',
     addCustom: 'Add kayak manually',
     certificado: 'Certified',
+    certificadoSiWkf: 'Yes (according to WKF technical report)',
+    certificadoNoWkf: 'No (according to WKF technical report)',
+    certNotaPie:
+      'WKF does not verify kayak certifications individually. The information comes from an internal project technical report. If your kayak shows different data on the manufacturer plate or manual, manufacturer data always prevails.',
     verificado: 'Verified',
     noCertificado: 'Not certified',
     brand: 'Brand',
@@ -561,6 +570,8 @@ Please explain all this to me as if I had little technical experience. What does
   },
 
   errores: {
+    refreshFailed:
+      'Could not update data. Please try again in a few minutes.',
     networkError: 'No connection or server not responding.',
     apiError: 'The API returned an error.',
     apiQuota: 'API limit reached. Try again later.',

@@ -47,6 +47,9 @@ export const Home: React.FC = () => {
   const [mostrarMapa, setMostrarMapa] = useState(false);
   const [editSpot, setEditSpot] = useState<Spot | null>(null);
   const [refreshingMap, setRefreshingMap] = useState<Record<string, boolean>>({});
+  const refreshingRef = useRef<Record<string, boolean>>({});
+  const [errorAviso, setErrorAviso] = useState<string | null>(null);
+  const errorTimeoutRef = useRef<number | null>(null);
 
   // Reordenar por arrastre (DP-083).
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -65,15 +68,37 @@ export const Home: React.FC = () => {
 
   const autoFetchDoneRef = useRef(false);
 
+  useEffect(() => {
+    return () => {
+      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+    };
+  }, []);
+
   const handleRefreshSpot = async (spotId: string, lat: number, lon: number) => {
-    if (refreshingMap[spotId]) return;
+    if (refreshingRef.current[spotId] || refreshingMap[spotId]) return;
+    refreshingRef.current[spotId] = true;
     setRefreshingMap((prev) => ({ ...prev, [spotId]: true }));
+    setErrorAviso(null);
+    if (errorTimeoutRef.current) {
+      clearTimeout(errorTimeoutRef.current);
+      errorTimeoutRef.current = null;
+    }
     try {
       const data = await fetchSpotWeather(lat, lon);
       setWeather(spotId, data);
     } catch (err) {
       console.error('Error refreshing weather for spot', spotId, err);
+      setErrorAviso(
+        t('errores.refreshFailed', {
+          defaultValue:
+            'No se han podido actualizar los datos. Vuelve a intentarlo en unos minutos.',
+        })
+      );
+      errorTimeoutRef.current = window.setTimeout(() => {
+        setErrorAviso(null);
+      }, 6000);
     } finally {
+      refreshingRef.current[spotId] = false;
       setRefreshingMap((prev) => ({ ...prev, [spotId]: false }));
     }
   };
@@ -170,6 +195,46 @@ export const Home: React.FC = () => {
           <PWAInstallButton />
         </div>
       </header>
+
+      {errorAviso && (
+        <div
+          role="alert"
+          style={{
+            maxWidth: '680px',
+            margin: '12px auto 0',
+            width: 'calc(100% - 40px)',
+            padding: '10px 14px',
+            borderRadius: 8,
+            border: '1px solid var(--verdict-desaconsejado)',
+            backgroundColor: 'rgba(255, 45, 85, 0.12)',
+            color: 'var(--verdict-desaconsejado)',
+            fontSize: '0.85rem',
+            lineHeight: 1.4,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 10,
+            boxSizing: 'border-box',
+          }}
+        >
+          <span>⚠️ {errorAviso}</span>
+          <button
+            type="button"
+            onClick={() => setErrorAviso(null)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--verdict-desaconsejado)',
+              cursor: 'pointer',
+              fontSize: '0.95rem',
+              padding: '0 4px',
+              lineHeight: 1,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <main
         style={{

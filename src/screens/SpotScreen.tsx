@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAppStore } from '../state/store.ts';
+import { useAppStore, getKayakActivo } from '../state/store.ts';
 import { formatearCoords } from '../lib/coords.ts';
 import {
   calcularVeredictoPorFranja,
@@ -259,10 +259,15 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
   const setFranjaActiva = useAppStore((s) => s.setFranjaActiva);
 
   const spot = spots.find((s) => s.id === spotId);
+  const kayakActivo = getKayakActivo(ajustes.kayakIds);
+  const nombreKayak = `${kayakActivo.marca} ${kayakActivo.modelo}`;
 
   const [tabActiva, setTabActiva] = useState<TabId>('waves');
   const [coordsCopiedFeedback, setCoordsCopiedFeedback] = useState(false);
   const [loading, setLoading] = useState(false);
+  const loadingRef = useRef(false);
+  const [errorAviso, setErrorAviso] = useState<string | null>(null);
+  const errorTimeoutRef = useRef<number | null>(null);
   const fetchTriggeredRef = useRef(false);
 
   const weatherEntry = spot ? getWeatherEntry(spot.id) : null;
@@ -272,27 +277,64 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
   const lang = i18n.language?.startsWith('en') ? 'en' : 'es';
 
   useEffect(() => {
+    return () => {
+      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!spot) return;
     if (fetchTriggeredRef.current) return;
     if (weatherEntry) return;
     fetchTriggeredRef.current = true;
     setLoading(true);
+    loadingRef.current = true;
     fetchSpotWeather(spot.lat, spot.lon)
       .then((data) => setWeather(spot.id, data))
-      .catch((err) => console.error('fetch spot weather', err))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        console.error('fetch spot weather', err);
+        setErrorAviso(
+          t('errores.refreshFailed', {
+            defaultValue:
+              'No se han podido actualizar los datos. Vuelve a intentarlo en unos minutos.',
+          })
+        );
+        errorTimeoutRef.current = window.setTimeout(() => {
+          setErrorAviso(null);
+        }, 6000);
+      })
+      .finally(() => {
+        loadingRef.current = false;
+        setLoading(false);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spot?.id]);
 
   const handleRefresh = async () => {
-    if (!spot || loading) return;
+    if (!spot || loading || loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
+    setErrorAviso(null);
+    if (errorTimeoutRef.current) {
+      clearTimeout(errorTimeoutRef.current);
+      errorTimeoutRef.current = null;
+    }
     try {
       const data = await fetchSpotWeather(spot.lat, spot.lon);
       setWeather(spot.id, data);
     } catch (err) {
       console.error('fetch spot weather', err);
+      setErrorAviso(
+        t('errores.refreshFailed', {
+          defaultValue:
+            'No se han podido actualizar los datos. Vuelve a intentarlo en unos minutos.',
+        })
+      );
+      errorTimeoutRef.current = window.setTimeout(() => {
+        setErrorAviso(null);
+      }, 6000);
     } finally {
+      loadingRef.current = false;
       setLoading(false);
     }
   };
@@ -304,9 +346,10 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     if (!spot) return {};
     return calcularVeredictoPorFranja(
       spot, weather, ajustes.franjas,
-      ajustes.categoriaKayak, ajustes.perfil
+      ajustes.categoriaKayak, ajustes.perfil,
+      kayakActivo
     );
-  }, [spot, weather, ajustes.franjas, ajustes.categoriaKayak, ajustes.perfil]);
+  }, [spot, weather, ajustes.franjas, ajustes.categoriaKayak, ajustes.perfil, kayakActivo]);
 
   const veredictoFranjaActiva = franjaActiva ? veredictos[franjaActiva.id] : null;
 
@@ -336,14 +379,15 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
       const res = calcularVeredicto(
         spot.zona ?? 'mediterraneo_espanol',
         ajustes.categoriaKayak, ajustes.perfil, franjaDia,
-        { viento: bf, ola: h.waveHeight, periodo: h.wavePeriod ?? 0, corriente: 0, marea: 0 }
+        { viento: bf, ola: h.waveHeight, periodo: h.wavePeriod ?? 0, corriente: 0, marea: 0 },
+        kayakActivo
       );
       const score = orden.indexOf(res.veredicto);
       if (score > peorScore) { peorScore = score; resultado = res; horaPeor = h; }
     }
     if (!resultado || !horaPeor) return null;
     return { resultado, horaPeor };
-  }, [weather, franjaActiva, spot, ajustes.categoriaKayak, ajustes.perfil]);
+  }, [weather, franjaActiva, spot, ajustes.categoriaKayak, ajustes.perfil, kayakActivo]);
 
   const { colorSalida, textoSalida } = useMemo(() => {
     if (!spot || spot.tipoAcceso == null) {
@@ -420,7 +464,8 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     return calcularVeredicto(
       spot.zona ?? 'mediterraneo_espanol',
       ajustes.categoriaKayak, ajustes.perfil, franjaDia,
-      { viento: 0, ola: h.waveHeight, periodo: h.wavePeriod ?? 0, corriente: 0, marea: 0 }
+      { viento: 0, ola: h.waveHeight, periodo: h.wavePeriod ?? 0, corriente: 0, marea: 0 },
+      kayakActivo
     ).veredictoPorFactor.ola;
   };
 
@@ -432,7 +477,8 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     return calcularVeredicto(
       spot.zona ?? 'mediterraneo_espanol',
       ajustes.categoriaKayak, ajustes.perfil, franjaDia,
-      { viento: kmhABf(h.windSpeed) ?? 0, ola: 0, periodo: 0, corriente: 0, marea: 0 }
+      { viento: kmhABf(h.windSpeed) ?? 0, ola: 0, periodo: 0, corriente: 0, marea: 0 },
+      kayakActivo
     ).veredictoPorFactor.viento;
   };
 
@@ -444,7 +490,8 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     return calcularVeredicto(
       spot.zona ?? 'mediterraneo_espanol',
       ajustes.categoriaKayak, ajustes.perfil, franjaDia,
-      { viento: kmhABf(h.windGusts) ?? 0, ola: 0, periodo: 0, corriente: 0, marea: 0 }
+      { viento: kmhABf(h.windGusts) ?? 0, ola: 0, periodo: 0, corriente: 0, marea: 0 },
+      kayakActivo
     ).veredictoPorFactor.viento;
   };
 
@@ -456,7 +503,8 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     return calcularVeredicto(
       spot.zona ?? 'mediterraneo_espanol',
       ajustes.categoriaKayak, ajustes.perfil, franjaDia,
-      { viento: 0, ola: 0, periodo: h.wavePeriod, corriente: 0, marea: 0 }
+      { viento: 0, ola: 0, periodo: h.wavePeriod, corriente: 0, marea: 0 },
+      kayakActivo
     ).veredictoPorFactor.periodo;
   };
 
@@ -468,7 +516,8 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     return calcularVeredicto(
       spot.zona ?? 'mediterraneo_espanol',
       ajustes.categoriaKayak, ajustes.perfil, franjaDia,
-      { viento: 0, ola: 0, periodo: 0, corriente: h.currentVelocity, marea: 0 }
+      { viento: 0, ola: 0, periodo: 0, corriente: h.currentVelocity, marea: 0 },
+      kayakActivo
     ).veredictoPorFactor.corriente;
   };
 
@@ -480,7 +529,8 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     return calcularVeredicto(
       spot.zona ?? 'mediterraneo_espanol',
       ajustes.categoriaKayak, ajustes.perfil, franjaDia,
-      { viento: 0, ola: 0, periodo: 0, corriente: 0, marea: h.seaLevelHeight }
+      { viento: 0, ola: 0, periodo: 0, corriente: 0, marea: h.seaLevelHeight },
+      kayakActivo
     ).veredictoPorFactor.marea;
   };
 
@@ -637,6 +687,45 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
           )}
         </div>
 
+        {errorAviso && (
+          <div
+            role="alert"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+              width: '100%',
+              padding: '7px 10px',
+              marginBottom: 6,
+              borderRadius: 6,
+              border: '1px solid var(--verdict-desaconsejado)',
+              backgroundColor: 'rgba(255, 45, 85, 0.12)',
+              color: 'var(--verdict-desaconsejado)',
+              fontSize: '0.75rem',
+              lineHeight: 1.4,
+              boxSizing: 'border-box',
+            }}
+          >
+            <span>⚠️ {errorAviso}</span>
+            <button
+              type="button"
+              onClick={() => setErrorAviso(null)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--verdict-desaconsejado)',
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+                padding: '0 4px',
+                lineHeight: 1,
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {stale && (
           <button
             type="button"
@@ -728,8 +817,8 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
             fontSize: '0.68rem', color: 'var(--text-dim)', textAlign: 'center',
           }}>
             {t('verdict.appliedThresholdPrefix')}{' '}
-            <span style={{ color: colorVeredictoFranja, fontWeight: 700 }}>{ajustes.categoriaKayak}</span>
-            {' / '}
+            <span style={{ color: colorVeredictoFranja, fontWeight: 700 }}>{nombreKayak}</span>
+            {' · '}
             <span style={{ color: colorVeredictoFranja, fontWeight: 700 }}>
               {t(`zones.${spot.zona ?? 'mediterraneo_espanol'}`)}
             </span>

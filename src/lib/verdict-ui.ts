@@ -10,6 +10,7 @@
 //   - olaMax / vientoMax: máximo usado para escalar.
 
 import type { SpotWeather } from './openmeteo.ts';
+import type { Kayak, TechoAbsoluto } from './kayaks.ts';
 import {
   calcularVeredicto,
   type Veredicto,
@@ -94,7 +95,8 @@ export function calcularVeredictoPorFranja(
   weather: SpotWeather | null,
   franjas: FranjaUsuario[],
   categoria: CategoriaKayak,
-  perfil: PerfilKayakista
+  perfil: PerfilKayakista,
+  kayak?: Kayak | TechoAbsoluto | null
 ): Record<string, Veredicto | null> {
   const res: Record<string, Veredicto | null> = {};
   for (const f of franjas) {
@@ -145,7 +147,8 @@ export function calcularVeredictoPorFranja(
         categoria,
         perfil,
         franjaDia,
-        condiciones
+        condiciones,
+        kayak
       );
 
       peor = peor ? peorVeredicto(peor, resultado.veredicto) : resultado.veredicto;
@@ -167,7 +170,8 @@ export function calcularVeredictoFranjaDia(
   franja: FranjaUsuario,
   fechaBase: Date,
   categoria: CategoriaKayak,
-  perfil: PerfilKayakista
+  perfil: PerfilKayakista,
+  kayak?: Kayak | TechoAbsoluto | null
 ): Veredicto | null {
   if (!weather) return null;
   const y = fechaBase.getFullYear();
@@ -184,7 +188,7 @@ export function calcularVeredictoFranjaDia(
   if (horas.length === 0) return null;
 
   const sub: SpotWeather = { ...weather, hourly: horas };
-  const r = calcularVeredictoPorFranja(spot, sub, [franja], categoria, perfil);
+  const r = calcularVeredictoPorFranja(spot, sub, [franja], categoria, perfil, kayak);
   return r[franja.id] ?? null;
 }
 

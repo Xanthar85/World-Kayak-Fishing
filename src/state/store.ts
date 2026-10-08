@@ -11,6 +11,7 @@ import { persist } from 'zustand/middleware';
 import i18n, { detectInitialLanguage, STORAGE_KEY } from '../i18n/index.ts';
 import type { SpotWeather } from '../lib/openmeteo.ts';
 import type { NivelColorTabla } from '../lib/verdict-color.ts';
+import { CATALOGO_KAYAKS, buscarKayakPorId, type Kayak } from '../lib/kayaks.ts';
 import type {
   CategoriaKayak,
   FranjaDia,
@@ -110,6 +111,46 @@ const COLORES_TABLA_VALIDOS: NivelColorTabla[] = [
   'rna',
   'todo',
 ];
+
+export function sanearKayakIds(ids: string[] | undefined): {
+  kayakIds: string[];
+  categoriaKayak?: CategoriaKayak;
+} {
+  const defaultKayak = CATALOGO_KAYAKS[0];
+  if (!defaultKayak) {
+    return { kayakIds: ids ?? [] };
+  }
+
+  if (!ids || ids.length === 0) {
+    return {
+      kayakIds: [defaultKayak.id],
+      categoriaKayak: defaultKayak.categoriaWKF,
+    };
+  }
+
+  // Si algún kayak seleccionado ya no existe en el catálogo, se sustituye por el por defecto.
+  const mapeados = ids.map((id) => (buscarKayakPorId(id) ? id : defaultKayak.id));
+  const unicos = Array.from(new Set(mapeados)).slice(0, 2);
+  const resultado = unicos.length > 0 ? unicos : [defaultKayak.id];
+  const primerKayak = buscarKayakPorId(resultado[0]);
+
+  return {
+    kayakIds: resultado,
+    categoriaKayak: primerKayak?.categoriaWKF,
+  };
+}
+
+export function getKayakActivo(kayakIds?: string[]): Kayak {
+  const defaultKayak = CATALOGO_KAYAKS[0];
+  if (!kayakIds || kayakIds.length === 0) {
+    return defaultKayak;
+  }
+  const k1 = kayakIds[0] ? buscarKayakPorId(kayakIds[0]) : null;
+  if (k1) return k1;
+  const k2 = kayakIds[1] ? buscarKayakPorId(kayakIds[1]) : null;
+  if (k2) return k2;
+  return defaultKayak;
+}
 
 function esObjeto(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -238,6 +279,7 @@ export interface AppState {
   setFormatoCoords: (f: FormatoCoords) => void;
   setKayakIds: (ids: string[]) => void;
   setCategoriaKayak: (c: CategoriaKayak) => void;
+  getKayakActivo: () => Kayak;
   setPerfil: (patch: Partial<PerfilKayakista>) => void;
   setFranjas: (franjas: FranjaUsuario[]) => void;
   setFranjaActiva: (id: string | null) => void;
@@ -260,8 +302,8 @@ export const useAppStore = create<AppState>()(
       weather: {},
       ajustes: {
         formatoCoords: 'dd',
-        kayakIds: [],
-        categoriaKayak: 'K3',
+        kayakIds: CATALOGO_KAYAKS[0] ? [CATALOGO_KAYAKS[0].id] : [],
+        categoriaKayak: CATALOGO_KAYAKS[0]?.categoriaWKF ?? 'K3',
         perfil: PERFIL_DEFECTO,
         franjas: FRANJAS_DEFECTO,
         franjaActivaId: 'manana',
@@ -355,11 +397,20 @@ export const useAppStore = create<AppState>()(
       setFormatoCoords: (f) =>
         set((state) => ({ ajustes: { ...state.ajustes, formatoCoords: f } })),
       setKayakIds: (ids) =>
-        set((state) => ({
-          ajustes: { ...state.ajustes, kayakIds: ids.slice(0, 2) },
-        })),
+        set((state) => {
+          const saneado = sanearKayakIds(ids);
+          const kayakActivo = getKayakActivo(saneado.kayakIds);
+          return {
+            ajustes: {
+              ...state.ajustes,
+              kayakIds: saneado.kayakIds,
+              categoriaKayak: kayakActivo.categoriaWKF,
+            },
+          };
+        }),
       setCategoriaKayak: (c) =>
         set((state) => ({ ajustes: { ...state.ajustes, categoriaKayak: c } })),
+      getKayakActivo: () => getKayakActivo(get().ajustes.kayakIds),
       setPerfil: (patch) =>
         set((state) => ({
           ajustes: {
@@ -390,8 +441,8 @@ export const useAppStore = create<AppState>()(
           weather: {},
           ajustes: {
             formatoCoords: 'dd',
-            kayakIds: [],
-            categoriaKayak: 'K3',
+            kayakIds: CATALOGO_KAYAKS[0] ? [CATALOGO_KAYAKS[0].id] : [],
+            categoriaKayak: CATALOGO_KAYAKS[0]?.categoriaWKF ?? 'K3',
             perfil: PERFIL_DEFECTO,
             franjas: FRANJAS_DEFECTO,
             franjaActivaId: 'manana',
@@ -445,8 +496,14 @@ export const useAppStore = create<AppState>()(
             : undefined;
 
         const ajustesImportados = data.ajustes as AjustesApp;
+        const saneadoKayaks = sanearKayakIds(ajustesImportados.kayakIds);
         const ajustesConDefaults: AjustesApp = {
           ...ajustesImportados,
+          kayakIds: saneadoKayaks.kayakIds,
+          categoriaKayak:
+            ajustesImportados.categoriaKayak ??
+            saneadoKayaks.categoriaKayak ??
+            'K3',
           colorTabla: ajustesImportados.colorTabla ?? 'todo',
           filtroFranja: ajustesImportados.filtroFranja ?? true,
         };
@@ -467,6 +524,52 @@ export const useAppStore = create<AppState>()(
     {
       name: STORAGE_KEY,
       version: PERSIST_VERSION,
+      merge: (persistedState: unknown, currentState: AppState): AppState => {
+        const persisted = (persistedState as Partial<AppState>) ?? {};
+        const state: AppState = {
+          ...currentState,
+          ...persisted,
+          ajustes: {
+            ...currentState.ajustes,
+            ...(persisted.ajustes ?? {}),
+          },
+        };
+
+        const saneado = sanearKayakIds(state.ajustes.kayakIds);
+        state.ajustes.kayakIds = saneado.kayakIds;
+        state.ajustes.categoriaKayak = getKayakActivo(saneado.kayakIds).categoriaWKF;
+
+        return state;
+      },
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        const currentIds = state.ajustes?.kayakIds;
+        const saneado = sanearKayakIds(currentIds);
+        const kayakActivo = getKayakActivo(saneado.kayakIds);
+        state.setKayakIds(saneado.kayakIds);
+        state.setCategoriaKayak(kayakActivo.categoriaWKF);
+      },
     }
   )
 );
+
+// En carga de la app, si los kayaks seleccionados están vacíos o contienen modelos
+// que ya no existen en el catálogo, se asigna automáticamente el primer kayak del catálogo
+// y la categoría WKF se calcula siempre a partir del kayak activo.
+(() => {
+  try {
+    const estadoInicial = useAppStore.getState();
+    const currentIds = estadoInicial.ajustes?.kayakIds;
+    const saneado = sanearKayakIds(currentIds);
+    const kayakActivo = getKayakActivo(saneado.kayakIds);
+    useAppStore.setState((prev) => ({
+      ajustes: {
+        ...prev.ajustes,
+        kayakIds: saneado.kayakIds,
+        categoriaKayak: kayakActivo.categoriaWKF,
+      },
+    }));
+  } catch {
+    // ignore
+  }
+})();
