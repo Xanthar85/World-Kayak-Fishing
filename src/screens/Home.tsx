@@ -1,13 +1,14 @@
 // src/screens/Home.tsx — completo
-// v1.010 (bugs 5, 6, 7, 15, 17, 20):
-//   - SpotCard rediseñada (delegada).
-//   - Home 7 días (DP-079), ya en SpotCard.
-//   - Franjas clicables desde Home (bug 6): abre SpotScreen con
-//     la franja activa y el día elegido.
-//   - Botón "Invitar a un café" reubicado arriba a la derecha,
-//     debajo de Ajustes (bug 15, DP-094).
-//   - Reordenar por arrastre (DP-083).
-//   - El aviso de actualización se mantiene. Sin cambios.
+// v1.014+ (pre-auditoría):
+//   - Contador X/6 movido de la cabecera al final del scroll de
+//     Puntos, como bloque ancho con color por tramos (DP nueva).
+//   - ShareButton integrado en la cabecera.
+//   - Ko-fi movido de la cabecera a la barra inferior como 3er
+//     botón (Puntos | Previsión | Ko-fi | Ajustes).
+//   - Icono de "Puntos" en la barra inferior: símbolo WKF en lugar
+//     de la chincheta.
+//   - Resto igual que en v1.010: Home 7 días, franjas clicables,
+//     reordenar por arrastre, aviso de actualización.
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,9 +20,18 @@ import { MapScreen } from './MapScreen.tsx';
 import { TutorialScreen } from './TutorialScreen.tsx';
 import { SpotCard } from '../components/SpotCard.tsx';
 import { PWAInstallButton } from '../components/PWAInstallButton.tsx';
+import { ShareButton } from '../components/ShareButton.tsx';
 import { PantallaDeslizante } from '../components/PantallaDeslizante.tsx';
 import { fetchSpotWeather } from '../lib/openmeteo.ts';
 import { PrevisionScreen } from './PrevisionScreen.tsx';
+
+// Color del contador X/6 según cuántos puntos haya.
+function colorContador(count: number): string {
+  if (count <= 1) return 'var(--verdict-favorable)';
+  if (count <= 3) return 'var(--verdict-aceptable)';
+  if (count <= 5) return 'var(--verdict-exigente)';
+  return 'var(--verdict-desaconsejado)';
+}
 
 export const Home: React.FC = () => {
   const { t } = useTranslation();
@@ -82,17 +92,7 @@ export const Home: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spots.length]);
 
-  const volverAHome = () => {
-    setMapMode(null);
-    setEditSpot(null);
-    setViewingSpotId(null);
-    setMostrarMapa(false);
-    setCerrandoSpot(false);
-    setCerrandoMapa(false);
-  };
-
-  // Abrir un punto en concreto y, si aplica, activar una franja
-  // y el día elegido.
+  // Abrir un punto en concreto y, si aplica, activar una franja.
   const abrirPunto = (spotId: string, franjaId?: string) => {
     if (franjaId) setFranjaActiva(franjaId);
     setViewingSpotId(spotId);
@@ -166,43 +166,8 @@ export const Home: React.FC = () => {
       >
         <Logo size="md" />
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span
-            style={{
-              fontFamily: 'var(--font-mono, Fira Code, monospace)',
-              fontSize: '0.85rem',
-              color: 'var(--text-dim)',
-              backgroundColor: 'var(--bg)',
-              padding: '4px 10px',
-              borderRadius: 6,
-              border: '1px solid var(--border)',
-            }}
-          >
-            {t('home.counter', { count: spots.length, max: 6 })}
-          </span>
+          <ShareButton size="md" />
           <PWAInstallButton />
-          {/* Ko-fi arriba a la derecha, debajo de Ajustes (bug 15,
-              DP-094). */}
-          <a
-            href="https://ko-fi.com/xanthar"
-            target="_blank"
-            rel="noopener noreferrer"
-            title={t('settings.donate')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: '8px 10px',
-              backgroundColor: 'var(--bg)',
-              border: '1px solid var(--border)',
-              borderRadius: 8,
-              color: 'var(--accent)',
-              fontSize: '0.85rem',
-              fontWeight: 500,
-              textDecoration: 'none',
-            }}
-          >
-            <span style={{ fontSize: '1rem', lineHeight: 1 }}>☕</span>
-          </a>
         </div>
       </header>
 
@@ -300,6 +265,30 @@ export const Home: React.FC = () => {
                   onDrop={handleDrop(spot.id)}
                 />
               ))}
+
+              {/* Contador X/6 al final del scroll, ancho completo,
+                  color por tramos. */}
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  backgroundColor: 'var(--surface)',
+                  border: `1px solid ${colorContador(spots.length)}`,
+                  color: colorContador(spots.length),
+                  fontFamily: 'var(--font-mono, Fira Code, monospace)',
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                  textAlign: 'center',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                {t('home.activeSpots', {
+                  count: spots.length,
+                  max: 6,
+                  defaultValue: `Puntos activos ${spots.length}/6`,
+                })}
+              </div>
             </div>
           ))}
 
@@ -360,7 +349,7 @@ export const Home: React.FC = () => {
         </div>
       )}
 
-      {/* Barra inferior fija */}
+      {/* Barra inferior fija: Puntos | Previsión | Ko-fi | Ajustes */}
       <nav
         style={{
           position: 'fixed',
@@ -384,7 +373,7 @@ export const Home: React.FC = () => {
             flexDirection: 'column',
             alignItems: 'center',
             gap: 2,
-            padding: '8px 16px',
+            padding: '4px 12px',
             border: 'none',
             background: 'transparent',
             cursor: 'pointer',
@@ -393,8 +382,12 @@ export const Home: React.FC = () => {
             fontSize: '0.75rem',
           }}
         >
-          <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>📍</span>
-          <span>Puntos</span>
+          <Logo
+            variant="icon"
+            size="sm"
+            scheme={pestanaActiva === 'puntos' ? 'neon' : 'white-on-black'}
+          />
+          <span>{t('tabs.spots', { defaultValue: 'Puntos' })}</span>
         </button>
 
         <button
@@ -415,8 +408,28 @@ export const Home: React.FC = () => {
           }}
         >
           <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>🌊</span>
-          <span>Previsión</span>
+          <span>{t('tabs.forecast', { defaultValue: 'Previsión' })}</span>
         </button>
+
+        <a
+          href="https://ko-fi.com/xanthar"
+          target="_blank"
+          rel="noopener noreferrer"
+          title={t('settings.donate')}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 2,
+            padding: '8px 16px',
+            textDecoration: 'none',
+            color: 'var(--text-dim)',
+            fontSize: '0.75rem',
+          }}
+        >
+          <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>☕</span>
+          <span>{t('settings.donateShort', { defaultValue: 'Ko-fi' })}</span>
+        </a>
 
         <button
           type="button"
@@ -436,7 +449,7 @@ export const Home: React.FC = () => {
           }}
         >
           <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>⚙</span>
-          <span>Ajustes</span>
+          <span>{t('tabs.settings', { defaultValue: 'Ajustes' })}</span>
         </button>
       </nav>
 
