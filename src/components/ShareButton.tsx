@@ -116,7 +116,3 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
 };
 
 export default ShareButton;
---- FIN DEL ARCHIVO ---
-
-Al terminar, indica en el chat qué archivo has creado y confirma
-que no has tocado ningún otro.
