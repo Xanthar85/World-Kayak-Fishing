@@ -214,9 +214,12 @@ export const stringsEn: StringsSchema = {
     about: 'About',
     aboutText:
       'World Kayak Fishing (WKF). Free webapp for kayak and shore fishing. No accounts, no cloud. Everything stays on your device.',
+    behindTitle: 'Behind WKF',
+    behindText:
+      "WKF doesn't run on a big server. It runs on a 2014 Intel Pentium G3240, two cores, no dedicated graphics. No cloud, no cluster, no DevOps team. Just one guy with an old computer and the will to make this app useful for you.\n\nIf it helps you, buy me a coffee. It helps pay the bills.",
     donate: 'Buy me a coffee',
     donateText:
-      'WKF is free and ad-free. If it helps you, you can support the project.',
+      'WKF is free and ad-free. No accounts, no cloud, no companies behind it. Just one person, a modest computer, and many hours. If the app is useful to you, buy me a coffee. It is genuinely appreciated.',
     version: 'Version',
     colorTabla: 'Table colouring',
     colorTablaDesc:

@@ -1136,11 +1136,44 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               fontSize: '0.85rem',
               color: 'var(--text-muted)',
               lineHeight: 1.5,
-              margin: '0 0 12px 0',
+              margin: '0 0 14px 0',
             }}
           >
             {t('settings.aboutText')}
           </p>
+
+          <div
+            style={{
+              paddingTop: 12,
+              borderTop: '1px solid var(--border)',
+              marginBottom: 14,
+            }}
+          >
+            <div
+              style={{
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                color: 'var(--text-muted)',
+                marginBottom: 8,
+              }}
+            >
+              {t('settings.behindTitle')}
+            </div>
+            <p
+              style={{
+                fontSize: '0.85rem',
+                color: 'var(--text-muted)',
+                lineHeight: 1.5,
+                margin: 0,
+                whiteSpace: 'pre-line',
+              }}
+            >
+              {t('settings.behindText')}
+            </p>
+          </div>
+
           <div
             style={{
               display: 'flex',
@@ -1165,6 +1198,17 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               v1.014
             </span>
           </div>
+
+          <p
+            style={{
+              fontSize: '0.85rem',
+              color: 'var(--text-muted)',
+              lineHeight: 1.5,
+              margin: '0 0 10px 0',
+            }}
+          >
+            {t('settings.donateText')}
+          </p>
           <a
             href="https://ko-fi.com/xanthar"
             target="_blank"

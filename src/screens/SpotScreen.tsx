@@ -854,22 +854,25 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {tabActiva === 'wind' && weather && (
           <TablaDatos tabId="wind" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
             columnas={[
-              { key: 'wd', label: t('factors.windDirection'),
+              { key: 'wd', label: 'Dir',
                 render: (h) => {
                   const nv = nombreViento(h.windDirection, spot.zona ?? 'mediterraneo_espanol', lang);
                   return nv.grados != null ? `${nv.nombre} (${nv.cardinal})` : '—';
                 },
                 veredicto: subVeredictoWind },
-              { key: 'wk', label: t('factors.windSpeedKn'),
+              { key: 'bf', label: 'Bf',
+                render: (h) => { const b = kmhABf(h.windSpeed); return b != null ? `${b}` : '—'; },
+                veredicto: subVeredictoWind },
+              { key: 'wk', label: 'kt',
                 render: (h) => { const v = kmhAKn(h.windSpeed); return v != null ? `${v}` : '—'; },
                 veredicto: subVeredictoWind },
-              { key: 'wkh', label: t('factors.windSpeedKmh'),
+              { key: 'wkh', label: 'km/h',
                 render: (h) => h.windSpeed != null ? `${Math.round(h.windSpeed * 10) / 10}` : '—',
                 veredicto: subVeredictoWind },
-              { key: 'gk', label: t('factors.windGustsKn'),
+              { key: 'gk', label: 'R.kt',
                 render: (h) => { const v = kmhAKn(h.windGusts); return v != null ? `${v}` : '—'; },
                 veredicto: subVeredictoWindGust },
-              { key: 'gkh', label: t('factors.windGustsKmh'),
+              { key: 'gkh', label: 'R.km/h',
                 render: (h) => {
                   const v = h.windGusts;
                   if (v == null) return '—';

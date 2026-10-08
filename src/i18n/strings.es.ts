@@ -220,9 +220,12 @@ export const stringsEs = {
     about: 'Acerca de',
     aboutText:
       'World Kayak Fishing (WKF). Webapp gratuita de pesca en kayak y desde costa. Sin cuentas, sin nubes. Todo se queda en tu dispositivo.',
+    behindTitle: 'Detrás de WKF',
+    behindText:
+      'WKF no corre en un gran servidor. Corre en un Intel Pentium G3240 de 2014, dos núcleos, sin gráfica dedicada. Ni nube, ni cluster, ni equipo de DevOps. Solo un señor con un ordenador viejo y ganas de que la app te sirva.\n\nSi te sirve, invítame a un café. Ayuda a pagar la luz.',
     donate: 'Invitar a un café',
     donateText:
-      'WKF es gratis y sin anuncios. Si te sirve, puedes apoyar el proyecto.',
+      'WKF es gratis y sin anuncios. No hay cuentas, no hay nube, no hay empresas detrás. Hay una persona, un ordenador modesto y muchas horas. Si la app te sirve, invítame a un café. Se agradece de verdad.',
     version: 'Versión',
     colorTabla: 'Color de tabla',
     colorTablaDesc:

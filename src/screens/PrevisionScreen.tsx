@@ -333,7 +333,7 @@ const ResumenDia: React.FC<ResumenDiaProps> = ({ puntos }) => {
   const dirVientoCount: Record<string, number> = {};
   for (const p of puntos) {
     if (p.waveHeight != null && p.waveHeight > olaMax) olaMax = p.waveHeight;
-    const v = msAKmh(p.windSpeed);
+    const v = msAKmh(p.windGusts ?? p.windSpeed);
     if (v != null && v > vientoMax) vientoMax = v;
     if (p.windDirection != null) {
       const card = Math.round(p.windDirection / 22.5) % 16;
