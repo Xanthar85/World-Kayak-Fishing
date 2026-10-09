@@ -26,6 +26,7 @@ import type { CategoriaKayak } from './verdict.ts';
 export type Propulsion = 'pala' | 'pedal_aletas' | 'pedal_helice';
 export type CategoriaDirectiva = 'A' | 'B' | 'C' | 'D' | 'no_certificado';
 export type TipoCasco = 'V' | 'U' | 'plano';
+export type CategoriaHinchable = 'HI1' | 'HI2';
 
 export interface CertificacionesKayak {
   ce: 'A' | 'B' | 'C' | 'D' | null;
@@ -46,7 +47,7 @@ export interface TechoAbsoluto {
   fuente: 'CE' | 'UKCA' | 'ABYC' | 'NMMA' | 'AS/NZS' | 'JCI' | 'ISO' | 'estimado';
 }
 
-export interface Kayak {
+export interface Kayak<C = any> {
   id: string;
   marca: string;
   modelo: string;
@@ -59,7 +60,7 @@ export interface Kayak {
   compartimentosEstancos: boolean;
   capacidadCarga: number;
   propulsion: Propulsion;
-  categoriaWKF: CategoriaKayak;
+  categoriaWKF: C extends CategoriaKayak | CategoriaHinchable ? C : CategoriaKayak | CategoriaHinchable;
   categoriaDirectiva: CategoriaDirectiva;
   certificado: boolean;
   certificadoOficial: boolean;
@@ -98,7 +99,7 @@ function entradaNoCertificada(
   compartimentosEstancos: boolean,
   capacidadCarga: number,
   propulsion: Propulsion,
-  categoriaWKF: CategoriaKayak
+  categoriaWKF: CategoriaKayak | CategoriaHinchable
 ): Kayak {
   return {
     id,
@@ -137,7 +138,7 @@ function entradaEuropeaCE(
   compartimentosEstancos: boolean,
   capacidadCarga: number,
   propulsion: Propulsion,
-  categoriaWKF: CategoriaKayak,
+  categoriaWKF: CategoriaKayak | CategoriaHinchable,
   catDir: 'C' | 'D'
 ): Kayak {
   return {
@@ -470,6 +471,77 @@ export const CATALOGO_KAYAKS: Kayak[] = [
   entradaEuropeaCE('Marlin Kayak', 'marlin-kayak-mini-falcon-2026', 'Mini Falcon 2026', 2.50, 0.90, 200, 'U', true, true, false, 165, 'pedal_aletas', 'K2', 'D'),
   entradaEuropeaCE('Marlin Kayak', 'marlin-kayak-one-2026', 'One 2026', 2.96, 0.81, 200, 'U', true, false, false, 165, 'pala', 'K2', 'D'),
   entradaEuropeaCE('Marlin Kayak', 'marlin-kayak-pescador', 'Pescador', 3.57, 0.82, 300, 'U', true, false, false, 160, 'pala', 'K3', 'D'),
+
+  // ── Vicking ──────────────────────────────────────────────────────
+  entradaEuropeaCE('Vicking', 'vicking-vk-09-evo', 'VK-09 EVO', 3.80, 0.80, 350, 'U', true, true, false, 200, 'pala', 'K3', 'D'),
+
+  // ── Kayaks hinchables ────────────────────────────────────────────
+  // Cámaras independientes. Homologado para navegación costera hasta 2 mn de abrigo.
+  {
+    id: 'tribord-100-confort-hinchable',
+    marca: 'Tribord (Decathlon)',
+    modelo: '100 Confort Hinchable',
+    eslora: 3.65,
+    manga: 1.00,
+    volumen: 250,
+    tipoCasco: 'U',
+    autovaciable: true,
+    timon: false,
+    compartimentosEstancos: false,
+    capacidadCarga: 195,
+    propulsion: 'pala',
+    categoriaWKF: 'HI2',
+    categoriaDirectiva: 'no_certificado',
+    certificado: false,
+    certificadoOficial: false,
+    verificado: false,
+    certificaciones: { ...SIN_CERTIFICAR },
+    techoAbsoluto: TECHO_D,
+  },
+  // Dropstitch 7 PSI, autovaciado, apto mar y río hasta Clase III.
+  {
+    id: 'aqua-marina-steam-412-hinchable',
+    marca: 'Aqua Marina',
+    modelo: 'Steam 412 Hinchable',
+    eslora: 4.12,
+    manga: 0.90,
+    volumen: 300,
+    tipoCasco: 'U',
+    autovaciable: true,
+    timon: false,
+    compartimentosEstancos: false,
+    capacidadCarga: 180,
+    propulsion: 'pala',
+    categoriaWKF: 'HI2',
+    categoriaDirectiva: 'no_certificado',
+    certificado: false,
+    certificadoOficial: false,
+    verificado: false,
+    certificaciones: { ...SIN_CERTIFICAR },
+    techoAbsoluto: TECHO_D,
+  },
+  // Dropstitch 8 PSI, quilla en V, hidrodinámico.
+  {
+    id: 'wattsup-beluga-dropstitch-hinchable',
+    marca: 'Wattsup',
+    modelo: 'Beluga Dropstitch Hinchable',
+    eslora: 4.30,
+    manga: 0.80,
+    volumen: 280,
+    tipoCasco: 'V',
+    autovaciable: true,
+    timon: false,
+    compartimentosEstancos: false,
+    capacidadCarga: 200,
+    propulsion: 'pala',
+    categoriaWKF: 'HI2',
+    categoriaDirectiva: 'no_certificado',
+    certificado: false,
+    certificadoOficial: false,
+    verificado: false,
+    certificaciones: { ...SIN_CERTIFICAR },
+    techoAbsoluto: TECHO_D,
+  },
 ];
 
 export function buscarKayakPorId(id: string): Kayak | undefined {

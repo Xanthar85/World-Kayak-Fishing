@@ -183,7 +183,40 @@ export function calcularVeredicto(
   condiciones: Condiciones,
   kayak?: Kayak | TechoAbsoluto | null
 ): ResultadoVeredicto {
-  const base = UMBRALES_BASE[zona][categoria];
+  // Techo absoluto del kayak (límite duro de diseño/certificación).
+  const techo: TechoAbsoluto | undefined =
+    kayak && 'techoAbsoluto' in kayak && kayak.techoAbsoluto
+      ? kayak.techoAbsoluto
+      : (kayak as TechoAbsoluto | undefined);
+
+  const baseOriginal = UMBRALES_BASE[zona][categoria];
+  const base: Umbral = {
+    viento: { ...baseOriginal.viento },
+    ola: { ...baseOriginal.ola },
+    periodo: { ...baseOriginal.periodo },
+    corriente: { ...baseOriginal.corriente },
+    marea: { ...baseOriginal.marea },
+  };
+
+  // Recorte de umbrales de la tabla para no superar el techo absoluto del kayak
+  if (techo && typeof techo.vientoMaxBf === 'number') {
+    if (base.viento.des > techo.vientoMaxBf) {
+      base.viento.des = techo.vientoMaxBf;
+    }
+    if (base.viento.exi > base.viento.des) {
+      base.viento.exi = base.viento.des;
+    }
+  }
+
+  if (techo && typeof techo.olaMaxM === 'number') {
+    if (base.ola.des > techo.olaMaxM) {
+      base.ola.des = techo.olaMaxM;
+    }
+    if (base.ola.exi > base.ola.des) {
+      base.ola.exi = base.ola.des;
+    }
+  }
+
   const ajPerfil = AJUSTE_PERFIL[perfil.experiencia];
   const ajFranja = AJUSTE_FRANJA[franja];
 
@@ -212,6 +245,24 @@ export function calcularVeredicto(
     marea: aplicarAjuste(base.marea, ajPerfil.marea),
   };
 
+  if (techo && typeof techo.vientoMaxBf === 'number') {
+    if (umbralAplicado.viento.des > techo.vientoMaxBf) {
+      umbralAplicado.viento.des = techo.vientoMaxBf;
+    }
+    if (umbralAplicado.viento.exi > umbralAplicado.viento.des) {
+      umbralAplicado.viento.exi = umbralAplicado.viento.des;
+    }
+  }
+
+  if (techo && typeof techo.olaMaxM === 'number') {
+    if (umbralAplicado.ola.des > techo.olaMaxM) {
+      umbralAplicado.ola.des = techo.olaMaxM;
+    }
+    if (umbralAplicado.ola.exi > umbralAplicado.ola.des) {
+      umbralAplicado.ola.exi = umbralAplicado.ola.des;
+    }
+  }
+
   let vViento = evaluarFactor(condiciones.viento, umbralAplicado.viento);
   let vOla = evaluarFactor(condiciones.ola, umbralAplicado.ola);
   const vPeriodo = evaluarFactor(condiciones.periodo, umbralAplicado.periodo, true);
@@ -235,11 +286,6 @@ export function calcularVeredicto(
   }
 
   // Techo absoluto del kayak (límite duro de diseño/certificación).
-  const techo: TechoAbsoluto | undefined =
-    kayak && 'techoAbsoluto' in kayak && kayak.techoAbsoluto
-      ? kayak.techoAbsoluto
-      : (kayak as TechoAbsoluto | undefined);
-
   if (techo && typeof techo.vientoMaxBf === 'number' && typeof techo.olaMaxM === 'number') {
     const superaViento = condiciones.viento > techo.vientoMaxBf;
     const superaOla = condiciones.ola > techo.olaMaxM;
