@@ -459,7 +459,7 @@ export const CATALOGO_KAYAKS: Kayak[] = [
   entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-nori-2', 'Nori 2', 4.20, 0.84, 350, 'U', true, false, false, 190, 'pala', 'K4', 'D'),
   entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-fredy-2', 'Fredy 2', 3.72, 0.82, 350, 'U', true, false, false, 190, 'pala', 'K3', 'D'),
   entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-dentex-one', 'Dentex One', 3.00, 0.84, 200, 'U', true, true, false, 230, 'pedal_helice', 'K2', 'D'),
-  entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-propel-12', 'Propel 12', 3.65, 0.84, 350, 'U', true, true, false, 180, 'pedal_helice', 'K3', 'D'),
+  entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-dolphin-propel-12', 'Propel 12', 3.65, 0.84, 350, 'U', true, true, false, 180, 'pedal_helice', 'K3', 'D'),
   entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-fisher-pro-12-pala', 'Fisher Pro 12 (pala)', 3.70, 0.86, 380, 'U', true, true, false, 280, 'pala', 'K3', 'D'),
   entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-fisher-pro-12-aletas', 'Fisher Pro 12 (aletas)', 3.70, 0.86, 380, 'U', true, true, false, 280, 'pedal_aletas', 'K3', 'D'),
   entradaEuropeaCE('KOL Outdoor', 'kol-outdoor-fisher-pro-12-helice', 'Fisher Pro 12 (hélice)', 3.70, 0.86, 380, 'U', true, true, false, 280, 'pedal_helice', 'K3', 'D'),
