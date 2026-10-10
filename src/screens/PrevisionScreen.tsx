@@ -7,7 +7,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAppStore, getKayakActivo } from '../state/store.ts';
+import { useAppStore, getKayakActivo, getEmbarcacionParaSpot } from '../state/store.ts';
 import {
   calcularVeredictoFranjaDia,
   veredictoAColor,
@@ -414,7 +414,8 @@ interface Tabla72HorasProps {
 
 const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
   const ajustes = useAppStore((s) => s.ajustes);
-  const kayakActivo = getKayakActivo(ajustes.kayakIds);
+  const kayakActivo = getEmbarcacionParaSpot(spot, ajustes);
+  const categoriaKayak = kayakActivo.categoriaWKF;
 
   const actividadMap = useMemo(() => {
     if (!weather?.hourly || !spot) return new Map<string, ActividadHora>();
@@ -582,7 +583,7 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                 point?.waveHeight != null && spot
                   ? calcularVeredicto(
                       spot.zona ?? 'mediterraneo_espanol',
-                      ajustes.categoriaKayak,
+                      categoriaKayak,
                       ajustes.perfil,
                       franjaDia,
                       {
@@ -606,7 +607,7 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                 point?.wavePeriod != null && spot
                   ? calcularVeredicto(
                       spot.zona ?? 'mediterraneo_espanol',
-                      ajustes.categoriaKayak,
+                      categoriaKayak,
                       ajustes.perfil,
                       franjaDia,
                       {
@@ -630,7 +631,7 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                 point?.windSpeed != null && spot
                   ? calcularVeredicto(
                       spot.zona ?? 'mediterraneo_espanol',
-                      ajustes.categoriaKayak,
+                      categoriaKayak,
                       ajustes.perfil,
                       franjaDia,
                       {
@@ -654,7 +655,7 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                 point?.windGusts != null && spot
                   ? calcularVeredicto(
                       spot.zona ?? 'mediterraneo_espanol',
-                      ajustes.categoriaKayak,
+                      categoriaKayak,
                       ajustes.perfil,
                       franjaDia,
                       {
@@ -677,7 +678,7 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                 point?.currentVelocity != null && spot
                   ? calcularVeredicto(
                       spot.zona ?? 'mediterraneo_espanol',
-                      ajustes.categoriaKayak,
+                      categoriaKayak,
                       ajustes.perfil,
                       franjaDia,
                       {
@@ -815,6 +816,8 @@ export const PrevisionScreen: React.FC = () => {
 
   const spotActivo = spots.find((s) => s.id === spotActivoId) ?? spots[0] ?? null;
   const weather = spotActivo ? getFreshWeather(spotActivo.id) : null;
+  const embarcacionSpot = getEmbarcacionParaSpot(spotActivo, ajustes);
+  const categoriaSpot = embarcacionSpot.categoriaWKF;
 
   const lang = i18n.language?.startsWith('en') ? 'en' : 'es';
 
@@ -839,13 +842,13 @@ export const PrevisionScreen: React.FC = () => {
         weather,
         f,
         diaSeleccionado.fecha,
-        ajustes.categoriaKayak,
+        categoriaSpot,
         ajustes.perfil,
-        kayakActivo
+        embarcacionSpot
       );
     }
     return out;
-  }, [spotActivo, weather, ajustes.franjas, ajustes.categoriaKayak, ajustes.perfil, diaSeleccionado, kayakActivo]);
+  }, [spotActivo, weather, ajustes.franjas, categoriaSpot, ajustes.perfil, diaSeleccionado, embarcacionSpot]);
 
   const puntosDia = useMemo(() => {
     if (!weather || !diaSeleccionado) return [];

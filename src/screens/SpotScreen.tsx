@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAppStore, getKayakActivo } from '../state/store.ts';
+import { useAppStore, getKayakActivo, getEmbarcacionParaSpot } from '../state/store.ts';
 import { formatearCoords } from '../lib/coords.ts';
 import {
   calcularVeredictoPorFranja,
@@ -259,7 +259,8 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
   const setFranjaActiva = useAppStore((s) => s.setFranjaActiva);
 
   const spot = spots.find((s) => s.id === spotId);
-  const kayakActivo = getKayakActivo(ajustes.kayakIds);
+  const kayakActivo = getEmbarcacionParaSpot(spot, ajustes);
+  const categoriaKayak = kayakActivo.categoriaWKF;
   const nombreKayak = `${kayakActivo.marca} ${kayakActivo.modelo}`;
 
   const [tabActiva, setTabActiva] = useState<TabId>('waves');
@@ -346,10 +347,10 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     if (!spot) return {};
     return calcularVeredictoPorFranja(
       spot, weather, ajustes.franjas,
-      ajustes.categoriaKayak, ajustes.perfil,
+      categoriaKayak, ajustes.perfil,
       kayakActivo
     );
-  }, [spot, weather, ajustes.franjas, ajustes.categoriaKayak, ajustes.perfil, kayakActivo]);
+  }, [spot, weather, ajustes.franjas, categoriaKayak, ajustes.perfil, kayakActivo]);
 
   const veredictoFranjaActiva = franjaActiva ? veredictos[franjaActiva.id] : null;
 
@@ -378,7 +379,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
       const bf = kmhABf(h.windSpeed) ?? 0;
       const res = calcularVeredicto(
         spot.zona ?? 'mediterraneo_espanol',
-        ajustes.categoriaKayak, ajustes.perfil, franjaDia,
+        categoriaKayak, ajustes.perfil, franjaDia,
         { viento: bf, ola: h.waveHeight, periodo: h.wavePeriod ?? 0, corriente: 0, marea: 0 },
         kayakActivo
       );
@@ -387,7 +388,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     }
     if (!resultado || !horaPeor) return null;
     return { resultado, horaPeor };
-  }, [weather, franjaActiva, spot, ajustes.categoriaKayak, ajustes.perfil, kayakActivo]);
+  }, [weather, franjaActiva, spot, categoriaKayak, ajustes.perfil, kayakActivo]);
 
   const { colorSalida, textoSalida } = useMemo(() => {
     if (!spot || spot.tipoAcceso == null) {
@@ -413,13 +414,24 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     };
   }, [spot, weather, franjaActiva, t]);
 
-  const subpestanasVisibles = useMemo(
-    () => ALL_TABS.filter((tab) => {
+  const subpestanasVisibles = useMemo(() => {
+    const baseTabs = ALL_TABS.filter((tab) => {
       if (tab === 'waves' || tab === 'wind') return true;
       return !ajustes.subpestanasOcultas.includes(tab);
-    }),
-    [ajustes.subpestanasOcultas]
-  );
+    });
+
+    const orden = ajustes.ordenSubpestanas || [];
+    if (orden.length === 0) return baseTabs;
+
+    // Ordenar respetando el orden elegido por el usuario
+    return [...baseTabs].sort((a, b) => {
+      const idxA = orden.indexOf(a);
+      const idxB = orden.indexOf(b);
+      const posA = idxA === -1 ? ALL_TABS.indexOf(a) + 100 : idxA;
+      const posB = idxB === -1 ? ALL_TABS.indexOf(b) + 100 : idxB;
+      return posA - posB;
+    });
+  }, [ajustes.subpestanasOcultas, ajustes.ordenSubpestanas]);
 
   const horasFiltradas = useMemo(() => {
     if (!weather?.hourly) return [];
@@ -463,7 +475,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
       : new Date(h.time).getHours() < 20 ? 'tarde' : 'noche';
     return calcularVeredicto(
       spot.zona ?? 'mediterraneo_espanol',
-      ajustes.categoriaKayak, ajustes.perfil, franjaDia,
+      categoriaKayak, ajustes.perfil, franjaDia,
       { viento: 0, ola: h.waveHeight, periodo: h.wavePeriod ?? 0, corriente: 0, marea: 0 },
       kayakActivo
     ).veredictoPorFactor.ola;
@@ -476,7 +488,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
       : new Date(h.time).getHours() < 20 ? 'tarde' : 'noche';
     return calcularVeredicto(
       spot.zona ?? 'mediterraneo_espanol',
-      ajustes.categoriaKayak, ajustes.perfil, franjaDia,
+      categoriaKayak, ajustes.perfil, franjaDia,
       { viento: kmhABf(h.windSpeed) ?? 0, ola: 0, periodo: 0, corriente: 0, marea: 0 },
       kayakActivo
     ).veredictoPorFactor.viento;
@@ -489,7 +501,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
       : new Date(h.time).getHours() < 20 ? 'tarde' : 'noche';
     return calcularVeredicto(
       spot.zona ?? 'mediterraneo_espanol',
-      ajustes.categoriaKayak, ajustes.perfil, franjaDia,
+      categoriaKayak, ajustes.perfil, franjaDia,
       { viento: kmhABf(h.windGusts) ?? 0, ola: 0, periodo: 0, corriente: 0, marea: 0 },
       kayakActivo
     ).veredictoPorFactor.viento;
@@ -502,7 +514,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
       : new Date(h.time).getHours() < 20 ? 'tarde' : 'noche';
     return calcularVeredicto(
       spot.zona ?? 'mediterraneo_espanol',
-      ajustes.categoriaKayak, ajustes.perfil, franjaDia,
+      categoriaKayak, ajustes.perfil, franjaDia,
       { viento: 0, ola: 0, periodo: h.wavePeriod, corriente: 0, marea: 0 },
       kayakActivo
     ).veredictoPorFactor.periodo;
@@ -515,7 +527,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
       : new Date(h.time).getHours() < 20 ? 'tarde' : 'noche';
     return calcularVeredicto(
       spot.zona ?? 'mediterraneo_espanol',
-      ajustes.categoriaKayak, ajustes.perfil, franjaDia,
+      categoriaKayak, ajustes.perfil, franjaDia,
       { viento: 0, ola: 0, periodo: 0, corriente: h.currentVelocity, marea: 0 },
       kayakActivo
     ).veredictoPorFactor.corriente;
@@ -528,7 +540,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
       : new Date(h.time).getHours() < 20 ? 'tarde' : 'noche';
     return calcularVeredicto(
       spot.zona ?? 'mediterraneo_espanol',
-      ajustes.categoriaKayak, ajustes.perfil, franjaDia,
+      categoriaKayak, ajustes.perfil, franjaDia,
       { viento: 0, ola: 0, periodo: 0, corriente: 0, marea: h.seaLevelHeight },
       kayakActivo
     ).veredictoPorFactor.marea;
@@ -952,15 +964,9 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
               { key: 'bf', label: 'Bf',
                 render: (h) => { const b = kmhABf(h.windSpeed); return b != null ? `${b}` : '—'; },
                 veredicto: subVeredictoWind },
-              { key: 'wk', label: 'kt',
-                render: (h) => { const v = kmhAKn(h.windSpeed); return v != null ? `${v}` : '—'; },
-                veredicto: subVeredictoWind },
               { key: 'wkh', label: 'km/h',
                 render: (h) => h.windSpeed != null ? `${Math.round(h.windSpeed * 10) / 10}` : '—',
                 veredicto: subVeredictoWind },
-              { key: 'gk', label: 'R.kt',
-                render: (h) => { const v = kmhAKn(h.windGusts); return v != null ? `${v}` : '—'; },
-                veredicto: subVeredictoWindGust },
               { key: 'gkh', label: 'R.km/h',
                 render: (h) => {
                   const v = h.windGusts;
@@ -977,6 +983,12 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                     </span>
                   );
                 },
+                veredicto: subVeredictoWindGust },
+              { key: 'wk', label: 'kt',
+                render: (h) => { const v = kmhAKn(h.windSpeed); return v != null ? `${v}` : '—'; },
+                veredicto: subVeredictoWind },
+              { key: 'gk', label: 'R.kt',
+                render: (h) => { const v = kmhAKn(h.windGusts); return v != null ? `${v}` : '—'; },
                 veredicto: subVeredictoWindGust },
             ]}
           />

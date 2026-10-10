@@ -12,6 +12,8 @@ import {
   useAppStore,
   type FranjaUsuario,
   type ImportFailReason,
+  type Embarcacion,
+  buscarEmbarcacionPorId,
 } from '../state/store.ts';
 import {
   CATALOGO_KAYAKS,
@@ -19,6 +21,12 @@ import {
   type Kayak,
   type CertificacionesKayak,
 } from '../lib/kayaks.ts';
+import {
+  CATALOGO_PATOS,
+  buscarPatoPorId,
+  type Pato,
+  TECHOS_PATOS,
+} from '../lib/patos.ts';
 import {
   NIVELES_EXPERIENCIA,
   type CategoriaKayak,
@@ -107,6 +115,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const setPerfil = useAppStore((s) => s.setPerfil);
   const setFranjas = useAppStore((s) => s.setFranjas);
   const toggleSubpestana = useAppStore((s) => s.toggleSubpestana);
+  const setOrdenSubpestanas = useAppStore((s) => s.setOrdenSubpestanas);
   const setColorTabla = useAppStore((s) => s.setColorTabla);
   const setFiltroFranja = useAppStore((s) => s.setFiltroFranja);
   const resetAll = useAppStore((s) => s.resetAll);
@@ -115,19 +124,19 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   const [activeSlotPicker, setActiveSlotPicker] = useState<number | null>(null);
   const [kayakSearchQuery, setKayakSearchQuery] = useState('');
-  const [fichaTecnicaKayak, setFichaTecnicaKayak] = useState<Kayak | null>(null);
+  const [fichaTecnicaKayak, setFichaTecnicaKayak] = useState<Embarcacion | null>(null);
   const [feedbackImport, setFeedbackImport] = useState<FeedbackImport>(null);
 
   const kayakSlot1 = ajustes.kayakIds[0]
-    ? buscarKayakPorId(ajustes.kayakIds[0])
+    ? buscarEmbarcacionPorId(ajustes.kayakIds[0])
     : null;
   const kayakSlot2 = ajustes.kayakIds[1]
-    ? buscarKayakPorId(ajustes.kayakIds[1])
+    ? buscarEmbarcacionPorId(ajustes.kayakIds[1])
     : null;
 
-  const handleSelectKayak = (slotIndex: number, kayak: Kayak) => {
+  const handleSelectKayak = (slotIndex: number, embarcacion: Embarcacion) => {
     const current = [...ajustes.kayakIds];
-    current[slotIndex] = kayak.id;
+    current[slotIndex] = embarcacion.id;
     setKayakIds(current.slice(0, 2));
     setActiveSlotPicker(null);
     setKayakSearchQuery('');
@@ -139,18 +148,54 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     setKayakIds(current);
   };
 
+  type EmbarcacionConTipo = (Kayak & { tipoVaso: 'kayak' }) | (Pato & { tipoVaso: 'pato' });
+
+  const catalogoUnificado: EmbarcacionConTipo[] = useMemo(() => [
+    ...CATALOGO_KAYAKS.map((k) => ({ ...k, tipoVaso: 'kayak' as const })),
+    ...CATALOGO_PATOS.map((p) => ({ ...p, tipoVaso: 'pato' as const })),
+  ], []);
+
   const filteredKayaks = useMemo(() => {
     const terms = kayakSearchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
-    return CATALOGO_KAYAKS.filter((k) => {
+    return catalogoUnificado.filter((k) => {
       if (terms.length === 0) return true;
-      const text = `${k.marca} ${k.modelo}`.toLowerCase();
+      const text = `${k.marca} ${k.modelo} ${k.tipoVaso}`.toLowerCase();
       return terms.every((term) => text.includes(term));
     }).sort((a, b) => {
       const cmpMarca = a.marca.localeCompare(b.marca);
       if (cmpMarca !== 0) return cmpMarca;
       return a.modelo.localeCompare(b.modelo);
     });
-  }, [kayakSearchQuery]);
+  }, [catalogoUnificado, kayakSearchQuery]);
+
+  const listaSubpestanasOrdenadas = useMemo(() => {
+    const orden = ajustes.ordenSubpestanas || [];
+    const baseMap = new Map(SUBPESTANAS.map((s) => [s.id, s]));
+    const result: typeof SUBPESTANAS = [];
+    for (const id of orden) {
+      const item = baseMap.get(id);
+      if (item) {
+        result.push(item);
+        baseMap.delete(id);
+      }
+    }
+    for (const s of SUBPESTANAS) {
+      if (baseMap.has(s.id)) {
+        result.push(s);
+      }
+    }
+    return result;
+  }, [ajustes.ordenSubpestanas]);
+
+  const handleMoveSubpestana = (index: number, delta: -1 | 1) => {
+    const targetIndex = index + delta;
+    if (targetIndex < 0 || targetIndex >= listaSubpestanasOrdenadas.length) return;
+    const nuevo = [...listaSubpestanasOrdenadas.map((s) => s.id)];
+    const temp = nuevo[index];
+    nuevo[index] = nuevo[targetIndex];
+    nuevo[targetIndex] = temp;
+    setOrdenSubpestanas(nuevo);
+  };
 
   const handleFranjaChange = (
     index: number,
@@ -424,27 +469,62 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 }}
               >
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div
-                    style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}
-                  >
-                    Slot {slotIndex + 1}
-                  </div>
                   {kayak ? (
                     <div
                       style={{
-                        fontWeight: 600,
+                        fontWeight: 700,
                         fontSize: '0.95rem',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
                       }}
+                      title={`${kayak.marca} ${kayak.modelo}`}
                     >
-                      {kayak.marca} {kayak.modelo}{' '}
+                      <span
+                        style={{
+                          fontSize: '0.65rem',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          padding: '1px 5px',
+                          borderRadius: 4,
+                          flexShrink: 0,
+                          backgroundColor:
+                            'tipoEmbarcacion' in kayak && kayak.tipoEmbarcacion === 'pato'
+                              ? 'rgba(56, 189, 248, 0.15)'
+                              : 'rgba(0, 229, 106, 0.15)',
+                          color:
+                            'tipoEmbarcacion' in kayak && kayak.tipoEmbarcacion === 'pato'
+                              ? 'var(--info, #38bdf8)'
+                              : 'var(--accent)',
+                          border: `1px solid ${
+                            'tipoEmbarcacion' in kayak && kayak.tipoEmbarcacion === 'pato'
+                              ? 'rgba(56, 189, 248, 0.3)'
+                              : 'rgba(0, 229, 106, 0.3)'
+                          }`,
+                        }}
+                      >
+                        {'tipoEmbarcacion' in kayak && kayak.tipoEmbarcacion === 'pato'
+                          ? 'Pato'
+                          : 'Kayak'}
+                      </span>
+                      <span
+                        style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {kayak.marca} {kayak.modelo}
+                      </span>
                       <span
                         style={{
                           fontFamily: 'Fira Code, monospace',
                           fontSize: '0.85rem',
                           color: 'var(--accent)',
+                          flexShrink: 0,
                         }}
                       >
                         ({kayak.categoriaWKF})
@@ -453,11 +533,15 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   ) : (
                     <div
                       style={{
-                        fontStyle: 'italic',
+                        fontWeight: 700,
+                        fontSize: '0.95rem',
                         color: 'var(--text-muted)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
                       }}
                     >
-                      {t('kayak.notFound')}
+                      Slot {slotIndex + 1}
                     </div>
                   )}
                 </div>
@@ -605,14 +689,40 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                       alignItems: 'center',
                     }}
                   >
-                    <span>
-                      {k.marca} {k.modelo}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                      <span
+                        style={{
+                          fontSize: '0.65rem',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          flexShrink: 0,
+                          backgroundColor:
+                            k.tipoVaso === 'pato'
+                              ? 'rgba(56, 189, 248, 0.15)'
+                              : 'rgba(0, 229, 106, 0.15)',
+                          color: k.tipoVaso === 'pato' ? '#38bdf8' : 'var(--accent)',
+                          border: `1px solid ${
+                            k.tipoVaso === 'pato'
+                              ? 'rgba(56, 189, 248, 0.3)'
+                              : 'rgba(0, 229, 106, 0.3)'
+                          }`,
+                        }}
+                      >
+                        {k.tipoVaso === 'pato' ? 'Pato' : 'Kayak'}
+                      </span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {k.marca} {k.modelo}
+                      </span>
+                    </div>
                     <span
                       style={{
                         fontFamily: 'Fira Code, monospace',
                         fontSize: '0.8rem',
                         color: 'var(--accent)',
+                        marginLeft: 8,
+                        flexShrink: 0,
                       }}
                     >
                       {k.categoriaWKF}
@@ -933,21 +1043,25 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           <div style={sectionTitleStyle}>{t('settings.tabsVisibility')}</div>
           <div
             style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-              gap: 8,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
             }}
           >
-            {SUBPESTANAS.map(({ id, labelKey, locked }) => {
+            {listaSubpestanasOrdenadas.map(({ id, labelKey, locked }, idx) => {
               const isHidden = ajustes.subpestanasOcultas.includes(id);
               const isVisible = locked ? true : !isHidden;
+              const isFirst = idx === 0;
+              const isLast = idx === listaSubpestanasOrdenadas.length - 1;
+
               return (
-                <button
+                <div
                   key={id}
-                  disabled={locked}
-                  onClick={() => !locked && toggleSubpestana(id)}
                   style={{
-                    padding: '10px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '6px 10px',
                     borderRadius: 6,
                     border: `1px solid ${
                       isVisible ? 'var(--accent)' : 'var(--border)'
@@ -955,39 +1069,92 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     backgroundColor: isVisible
                       ? 'var(--accent-subtle, rgba(56, 189, 248, 0.12))'
                       : 'var(--bg)',
-                    color: isVisible ? 'var(--text)' : 'var(--text-muted)',
-                    cursor: locked ? 'default' : 'pointer',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    fontSize: '0.85rem',
-                    opacity: locked ? 0.8 : 1,
                   }}
                 >
-                  <span>{t(labelKey)}</span>
-                  {locked ? (
-                    <span
+                  <div style={{ display: 'flex', flexDirection: 'row', gap: 2 }}>
+                    <button
+                      type="button"
+                      disabled={isFirst}
+                      onClick={() => handleMoveSubpestana(idx, -1)}
+                      title="Mover arriba"
                       style={{
-                        fontSize: '0.7rem',
-                        color: 'var(--text-muted)',
-                        padding: '2px 6px',
-                        borderRadius: 4,
                         border: '1px solid var(--border)',
+                        backgroundColor: 'var(--surface)',
+                        color: isFirst ? 'var(--text-muted)' : 'var(--text)',
+                        borderRadius: 4,
+                        padding: '3px 6px',
+                        fontSize: '0.75rem',
+                        cursor: isFirst ? 'default' : 'pointer',
+                        opacity: isFirst ? 0.35 : 1,
+                        lineHeight: 1,
                       }}
                     >
-                      {t('settings.tabLocked')}
-                    </span>
-                  ) : (
-                    <span
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isLast}
+                      onClick={() => handleMoveSubpestana(idx, 1)}
+                      title="Mover abajo"
                       style={{
-                        fontFamily: 'Fira Code, monospace',
-                        fontSize: '0.8rem',
+                        border: '1px solid var(--border)',
+                        backgroundColor: 'var(--surface)',
+                        color: isLast ? 'var(--text-muted)' : 'var(--text)',
+                        borderRadius: 4,
+                        padding: '3px 6px',
+                        fontSize: '0.75rem',
+                        cursor: isLast ? 'default' : 'pointer',
+                        opacity: isLast ? 0.35 : 1,
+                        lineHeight: 1,
                       }}
                     >
-                      {isVisible ? '✓' : '✕'}
-                    </span>
-                  )}
-                </button>
+                      ▼
+                    </button>
+                  </div>
+
+                  <button
+                    disabled={locked}
+                    onClick={() => !locked && toggleSubpestana(id)}
+                    style={{
+                      flex: 1,
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      color: isVisible ? 'var(--text)' : 'var(--text-muted)',
+                      cursor: locked ? 'default' : 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      fontSize: '0.85rem',
+                      opacity: locked ? 0.8 : 1,
+                      padding: 0,
+                    }}
+                  >
+                    <span>{t(labelKey)}</span>
+                    {locked ? (
+                      <span
+                        style={{
+                          fontSize: '0.7rem',
+                          color: 'var(--text-muted)',
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          border: '1px solid var(--border)',
+                        }}
+                      >
+                        {t('settings.tabLocked')}
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          fontFamily: 'Fira Code, monospace',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {isVisible ? '✓' : '✕'}
+                      </span>
+                    )}
+                  </button>
+                </div>
               );
             })}
           </div>
@@ -1284,106 +1451,140 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               </button>
             </div>
 
-            {[
-              {
-                label: t('kayak.length'),
-                val: `${fichaTecnicaKayak.eslora.toFixed(2)} m`,
-              },
-              {
-                label: t('kayak.beam'),
-                val: `${fichaTecnicaKayak.manga.toFixed(2)} m`,
-              },
-              {
-                label: t('kayak.volume'),
-                val: `${fichaTecnicaKayak.volumen} L`,
-              },
-              { label: t('kayak.hull'), val: fichaTecnicaKayak.tipoCasco },
-              {
-                label: t('kayak.sitOnTop'),
-                val: fichaTecnicaKayak.autovaciable ? '✓' : '—',
-              },
-              {
-                label: t('kayak.rudder'),
-                val: fichaTecnicaKayak.timon ? '✓' : '—',
-              },
-              {
-                label: t('kayak.bulkheads'),
-                val: fichaTecnicaKayak.compartimentosEstancos ? '✓' : '—',
-              },
-              {
-                label: t('kayak.capacity'),
-                val: `${fichaTecnicaKayak.capacidadCarga} kg`,
-              },
-              {
-                label: t('kayak.propulsion'),
-                val: fichaTecnicaKayak.propulsion,
-              },
-              {
-                label: t('kayak.category'),
-                val: fichaTecnicaKayak.categoriaWKF,
-              },
-              {
-                label: t('kayak.directiveCategory'),
-                val: fichaTecnicaKayak.categoriaDirectiva,
-              },
-              {
-                label: t('kayak.techoAbsoluto'),
-                val: `${fichaTecnicaKayak.techoAbsoluto.vientoMaxBf} Bf / ${fichaTecnicaKayak.techoAbsoluto.olaMaxM.toFixed(1)} m`,
-              },
-              {
-                label: t('kayak.fuente'),
-                val: fichaTecnicaKayak.techoAbsoluto.fuente,
-              },
-              {
-                label: t('kayak.certificado'),
-                val: fichaTecnicaKayak.certificado
-                  ? t('kayak.certificadoSiWkf')
-                  : t('kayak.certificadoNoWkf'),
-              },
-              {
-                label: t('kayak.verificado'),
-                val: fichaTecnicaKayak.verificado ? '✓' : '—',
-              },
-            ].map(({ label, val }) => (
+            {(() => {
+              const esPato = 'tipoEmbarcacion' in fichaTecnicaKayak && fichaTecnicaKayak.tipoEmbarcacion === 'pato';
+              if (esPato) {
+                const pato = fichaTecnicaKayak as Pato;
+                const tp = TECHOS_PATOS[pato.categoriaWKF] ?? TECHOS_PATOS.P1;
+                return [
+                  { label: t('kayak.length'), val: `${pato.eslora.toFixed(2)} m` },
+                  { label: t('kayak.beam'), val: `${pato.manga.toFixed(2)} m` },
+                  { label: 'Peso', val: `${pato.peso} kg` },
+                  { label: t('kayak.capacity'), val: `${pato.capacidadCarga} kg` },
+                  { label: 'Estructura', val: pato.tipoEstructura },
+                  { label: 'Material', val: pato.material },
+                  { label: t('kayak.category'), val: pato.categoriaWKF },
+                  {
+                    label: t('kayak.techoAbsoluto'),
+                    val: `${tp.vientoMaxBf} Bf / ${tp.olaMaxM.toFixed(1)} m`,
+                  },
+                  { label: t('kayak.fuente'), val: 'estimado' },
+                  {
+                    label: t('kayak.certificado'),
+                    val: pato.certificado
+                      ? t('kayak.certificadoSiWkf')
+                      : t('kayak.certificadoNoWkf'),
+                  },
+                  {
+                    label: t('kayak.verificado'),
+                    val: pato.verificado ? '✓' : '—',
+                  },
+                ];
+              }
+
+              const kayak = fichaTecnicaKayak as Kayak;
+              return [
+                {
+                  label: t('kayak.length'),
+                  val: `${kayak.eslora.toFixed(2)} m`,
+                },
+                {
+                  label: t('kayak.beam'),
+                  val: `${kayak.manga.toFixed(2)} m`,
+                },
+                {
+                  label: t('kayak.volume'),
+                  val: `${kayak.volumen} L`,
+                },
+                { label: t('kayak.hull'), val: kayak.tipoCasco },
+                {
+                  label: t('kayak.sitOnTop'),
+                  val: kayak.autovaciable ? '✓' : '—',
+                },
+                {
+                  label: t('kayak.rudder'),
+                  val: kayak.timon ? '✓' : '—',
+                },
+                {
+                  label: t('kayak.bulkheads'),
+                  val: kayak.compartimentosEstancos ? '✓' : '—',
+                },
+                {
+                  label: t('kayak.capacity'),
+                  val: `${kayak.capacidadCarga} kg`,
+                },
+                {
+                  label: t('kayak.propulsion'),
+                  val: kayak.propulsion,
+                },
+                {
+                  label: t('kayak.category'),
+                  val: kayak.categoriaWKF,
+                },
+                {
+                  label: t('kayak.directiveCategory'),
+                  val: kayak.categoriaDirectiva,
+                },
+                {
+                  label: t('kayak.techoAbsoluto'),
+                  val: `${kayak.techoAbsoluto.vientoMaxBf} Bf / ${kayak.techoAbsoluto.olaMaxM.toFixed(1)} m`,
+                },
+                {
+                  label: t('kayak.fuente'),
+                  val: kayak.techoAbsoluto.fuente,
+                },
+                {
+                  label: t('kayak.certificado'),
+                  val: kayak.certificado
+                    ? t('kayak.certificadoSiWkf')
+                    : t('kayak.certificadoNoWkf'),
+                },
+                {
+                  label: t('kayak.verificado'),
+                  val: kayak.verificado ? '✓' : '—',
+                },
+              ];
+            })().map(({ label, val }) => (
               <div key={label} style={fichaRowStyle}>
                 <span style={fichaLabelStyle}>{label}</span>
                 <span style={fichaValorStyle}>{val}</span>
               </div>
             ))}
 
-            <div style={{ marginTop: 14 }}>
-              <div
-                style={{
-                  fontSize: '0.8rem',
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
-                  color: 'var(--text-muted)',
-                  marginBottom: 6,
-                }}
-              >
-                {t('kayak.certificaciones')}
-              </div>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, 1fr)',
-                  gap: 6,
-                }}
-              >
-                {construirFilasCertificaciones(fichaTecnicaKayak.certificaciones).map(
-                  ({ labelKey, activa, valor }) => (
-                    <div
-                      key={labelKey}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '4px 8px',
-                        borderRadius: 4,
-                        border: `1px solid ${activa ? 'var(--accent)' : 'var(--border)'}`,
-                        backgroundColor: activa
-                          ? 'var(--accent-subtle, rgba(0, 229, 106, 0.10))'
+            {'certificaciones' in fichaTecnicaKayak && fichaTecnicaKayak.certificaciones && (
+              <div style={{ marginTop: 14 }}>
+                <div
+                  style={{
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    color: 'var(--text-muted)',
+                    marginBottom: 6,
+                  }}
+                >
+                  {t('kayak.certificaciones')}
+                </div>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: 6,
+                  }}
+                >
+                  {construirFilasCertificaciones(fichaTecnicaKayak.certificaciones).map(
+                    ({ labelKey, activa, valor }) => (
+                      <div
+                        key={labelKey}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '4px 8px',
+                          borderRadius: 4,
+                          border: `1px solid ${activa ? 'var(--accent)' : 'var(--border)'}`,
+                          backgroundColor: activa
+                            ? 'var(--accent-subtle, rgba(0, 229, 106, 0.10))'
                           : 'transparent',
                         fontSize: '0.75rem',
                         color: activa ? 'var(--text)' : 'var(--text-muted)',
@@ -1403,6 +1604,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 )}
               </div>
             </div>
+          )}
 
             {!fichaTecnicaKayak.certificado && (
               <div

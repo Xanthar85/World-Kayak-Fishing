@@ -25,7 +25,13 @@ import {
   veredictoAColor,
 } from '../lib/verdict-ui.ts';
 import { MiniGrafico } from './MiniGrafico.tsx';
-import type { Spot, FranjaUsuario } from '../state/store.ts';
+import {
+  useAppStore,
+  getEmbarcacionParaSpot,
+  buscarEmbarcacionPorId,
+  type Spot,
+  type FranjaUsuario,
+} from '../state/store.ts';
 import type {
   CategoriaKayak,
   PerfilKayakista,
@@ -118,6 +124,18 @@ export const SpotCard: React.FC<SpotCardProps> = ({
     return h >= inicio;
   }
 
+  const ajustes = useAppStore((s) => s.ajustes);
+  const updateSpot = useAppStore((s) => s.updateSpot);
+  const [modalKayakAbierto, setModalKayakAbierto] = useState(false);
+
+  const embarcacionSpot = getEmbarcacionParaSpot(spot, ajustes);
+  const categoriaSpot = embarcacionSpot.categoriaWKF;
+  const nombreEmbarcacion = `${embarcacionSpot.marca} ${embarcacionSpot.modelo}`;
+
+  // Opciones de slots 1 y 2
+  const slot1 = ajustes.kayakIds[0] ? buscarEmbarcacionPorId(ajustes.kayakIds[0]) : null;
+  const slot2 = ajustes.kayakIds[1] ? buscarEmbarcacionPorId(ajustes.kayakIds[1]) : null;
+
   // Veredicto por franja y día, cacheado por key+id.
   const veredictosCache = React.useMemo(() => {
     const out: Record<string, Veredicto | null> = {};
@@ -125,12 +143,12 @@ export const SpotCard: React.FC<SpotCardProps> = ({
       for (const f of franjas) {
         const k = `${d.key}__${f.id}`;
         out[k] = calcularVeredictoFranjaDia(
-          spot, weather, f, d.fecha, categoria, perfil
+          spot, weather, f, d.fecha, categoriaSpot, perfil, embarcacionSpot
         );
       }
     }
     return out;
-  }, [spot, weather, franjas, categoria, perfil, dias]);
+  }, [spot, weather, franjas, categoriaSpot, perfil, dias, embarcacionSpot]);
 
   // Veredictos de HOY por franja (para el mini-gráfico).
   const veredictosHoy = React.useMemo(() => {

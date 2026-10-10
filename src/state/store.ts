@@ -12,8 +12,10 @@ import i18n, { detectInitialLanguage, STORAGE_KEY } from '../i18n/index.ts';
 import type { SpotWeather } from '../lib/openmeteo.ts';
 import type { NivelColorTabla } from '../lib/verdict-color.ts';
 import { CATALOGO_KAYAKS, buscarKayakPorId, type Kayak } from '../lib/kayaks.ts';
+import { CATALOGO_PATOS, buscarPatoPorId, type Pato } from '../lib/patos.ts';
 import type {
   CategoriaKayak,
+  CategoriaPato,
   FranjaDia,
   NivelExperiencia,
   TipoAcceso,
@@ -21,6 +23,12 @@ import type {
   PerfilKayakista,
 } from '../lib/verdict.ts';
 import type { FormatoCoords } from '../lib/coords.ts';
+
+export type Embarcacion = Kayak | Pato;
+
+export function buscarEmbarcacionPorId(id: string): Embarcacion | undefined {
+  return buscarKayakPorId(id) ?? buscarPatoPorId(id);
+}
 
 export interface Spot {
   id: string;
@@ -32,6 +40,18 @@ export interface Spot {
   tipoAcceso?: TipoAcceso | null;
   accesoLat?: number | null;
   accesoLon?: number | null;
+  embarcacionId?: string;
+}
+
+export function getEmbarcacionParaSpot(
+  spot?: Spot | null,
+  ajustes?: Pick<AjustesApp, 'kayakIds'> | null
+): Embarcacion {
+  if (spot?.embarcacionId) {
+    const emb = buscarEmbarcacionPorId(spot.embarcacionId);
+    if (emb) return emb;
+  }
+  return getKayakActivo(ajustes?.kayakIds);
 }
 
 export type FranjaUsuario = {
@@ -49,6 +69,7 @@ export interface AjustesApp {
   franjas: FranjaUsuario[];
   franjaActivaId: string | null;
   subpestanasOcultas: string[];
+  ordenSubpestanas: string[];
   colorTabla: NivelColorTabla;
   filtroFranja: boolean;
 }
@@ -128,29 +149,31 @@ export function sanearKayakIds(ids: string[] | undefined): {
     };
   }
 
-  // Si algún kayak seleccionado ya no existe en el catálogo, se sustituye por el por defecto.
-  const mapeados = ids.map((id) => (buscarKayakPorId(id) ? id : defaultKayak.id));
+  // Si alguna embarcación seleccionada ya no existe en el catálogo, se sustituye por la por defecto.
+  const mapeados = ids.map((id) => (buscarEmbarcacionPorId(id) ? id : defaultKayak.id));
   const unicos = Array.from(new Set(mapeados)).slice(0, 2);
   const resultado = unicos.length > 0 ? unicos : [defaultKayak.id];
-  const primerKayak = buscarKayakPorId(resultado[0]);
+  const primeraEmbarcacion = buscarEmbarcacionPorId(resultado[0]);
 
   return {
     kayakIds: resultado,
-    categoriaKayak: primerKayak?.categoriaWKF,
+    categoriaKayak: primeraEmbarcacion?.categoriaWKF as CategoriaKayak,
   };
 }
 
-export function getKayakActivo(kayakIds?: string[]): Kayak {
+export function getKayakActivo(kayakIds?: string[]): Embarcacion {
   const defaultKayak = CATALOGO_KAYAKS[0];
   if (!kayakIds || kayakIds.length === 0) {
     return defaultKayak;
   }
-  const k1 = kayakIds[0] ? buscarKayakPorId(kayakIds[0]) : null;
-  if (k1) return k1;
-  const k2 = kayakIds[1] ? buscarKayakPorId(kayakIds[1]) : null;
-  if (k2) return k2;
+  const e1 = kayakIds[0] ? buscarEmbarcacionPorId(kayakIds[0]) : null;
+  if (e1) return e1;
+  const e2 = kayakIds[1] ? buscarEmbarcacionPorId(kayakIds[1]) : null;
+  if (e2) return e2;
   return defaultKayak;
 }
+
+export const getEmbarcacionActiva = getKayakActivo;
 
 function esObjeto(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -186,6 +209,12 @@ function validarSpot(raw: unknown): raw is Spot {
     raw.accesoLon !== undefined &&
     raw.accesoLon !== null &&
     !esNumeroFinito(raw.accesoLon)
+  )
+    return false;
+  if (
+    raw.embarcacionId !== undefined &&
+    raw.embarcacionId !== null &&
+    typeof raw.embarcacionId !== 'string'
   )
     return false;
   return true;
@@ -239,6 +268,12 @@ function validarAjustes(raw: unknown): raw is AjustesApp {
   if (!Array.isArray(raw.subpestanasOcultas)) return false;
   if (!raw.subpestanasOcultas.every((id) => typeof id === 'string')) return false;
   if (
+    raw.ordenSubpestanas !== undefined &&
+    (!Array.isArray(raw.ordenSubpestanas) ||
+      !raw.ordenSubpestanas.every((id) => typeof id === 'string'))
+  )
+    return false;
+  if (
     raw.colorTabla !== undefined &&
     (typeof raw.colorTabla !== 'string' ||
       !COLORES_TABLA_VALIDOS.includes(raw.colorTabla as NivelColorTabla))
@@ -279,11 +314,13 @@ export interface AppState {
   setFormatoCoords: (f: FormatoCoords) => void;
   setKayakIds: (ids: string[]) => void;
   setCategoriaKayak: (c: CategoriaKayak) => void;
-  getKayakActivo: () => Kayak;
+  getKayakActivo: () => Embarcacion;
+  getEmbarcacionActiva: () => Embarcacion;
   setPerfil: (patch: Partial<PerfilKayakista>) => void;
   setFranjas: (franjas: FranjaUsuario[]) => void;
   setFranjaActiva: (id: string | null) => void;
   toggleSubpestana: (id: string) => void;
+  setOrdenSubpestanas: (orden: string[]) => void;
   setColorTabla: (nivel: NivelColorTabla) => void;
   setFiltroFranja: (activo: boolean) => void;
 
@@ -308,6 +345,7 @@ export const useAppStore = create<AppState>()(
         franjas: FRANJAS_DEFECTO,
         franjaActivaId: 'manana',
         subpestanasOcultas: [],
+        ordenSubpestanas: [],
         // DP-092: color de tabla por defecto = "todo".
         colorTabla: 'todo',
         filtroFranja: true,
@@ -411,6 +449,7 @@ export const useAppStore = create<AppState>()(
       setCategoriaKayak: (c) =>
         set((state) => ({ ajustes: { ...state.ajustes, categoriaKayak: c } })),
       getKayakActivo: () => getKayakActivo(get().ajustes.kayakIds),
+      getEmbarcacionActiva: () => getKayakActivo(get().ajustes.kayakIds),
       setPerfil: (patch) =>
         set((state) => ({
           ajustes: {
@@ -430,6 +469,8 @@ export const useAppStore = create<AppState>()(
             : [...ocultas, id];
           return { ajustes: { ...state.ajustes, subpestanasOcultas: nuevas } };
         }),
+      setOrdenSubpestanas: (orden) =>
+        set((state) => ({ ajustes: { ...state.ajustes, ordenSubpestanas: orden } })),
       setColorTabla: (nivel) =>
         set((state) => ({ ajustes: { ...state.ajustes, colorTabla: nivel } })),
       setFiltroFranja: (activo) =>
@@ -447,6 +488,7 @@ export const useAppStore = create<AppState>()(
             franjas: FRANJAS_DEFECTO,
             franjaActivaId: 'manana',
             subpestanasOcultas: [],
+            ordenSubpestanas: [],
             colorTabla: 'todo',
             filtroFranja: true,
           },
@@ -506,6 +548,7 @@ export const useAppStore = create<AppState>()(
             'K3',
           colorTabla: ajustesImportados.colorTabla ?? 'todo',
           filtroFranja: ajustesImportados.filtroFranja ?? true,
+          ordenSubpestanas: ajustesImportados.ordenSubpestanas ?? [],
         };
 
         set(() => ({
@@ -538,6 +581,9 @@ export const useAppStore = create<AppState>()(
         const saneado = sanearKayakIds(state.ajustes.kayakIds);
         state.ajustes.kayakIds = saneado.kayakIds;
         state.ajustes.categoriaKayak = getKayakActivo(saneado.kayakIds).categoriaWKF;
+        if (!Array.isArray(state.ajustes.ordenSubpestanas)) {
+          state.ajustes.ordenSubpestanas = [];
+        }
 
         return state;
       },

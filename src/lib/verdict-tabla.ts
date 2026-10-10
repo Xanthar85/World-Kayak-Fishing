@@ -827,3 +827,36 @@ export const UMBRALES_BASE: Record<
     K5: { viento: { fav: 0, ace: 3, exi: 5, des: 6 }, ola: { fav: 0.0, ace: 0.7, exi: 1.3, des: 1.9 }, periodo: { fav: 8, ace: 6, exi: 5, des: 4 }, corriente: { fav: 0.0, ace: 1.2, exi: 1.8, des: 2.5 }, marea: { fav: 0.0, ace: 2.0, exi: 3.0, des: 4.0 } },
   },
 };
+
+export type CategoriaPatoTabla = 'P1' | 'P2' | 'P3' | 'P4';
+
+export const UMBRALES_PATOS: Record<CategoriaPatoTabla, Umbral> = {
+  P1: {
+    viento: { fav: 1, ace: 2, exi: 3, des: 4 },
+    ola: { fav: 0.1, ace: 0.2, exi: 0.3, des: 0.4 },
+    periodo: { fav: 5, ace: 4, exi: 2, des: 2 },
+    corriente: { fav: 0.2, ace: 0.3, exi: 0.5, des: 0.6 },
+    marea: { fav: 0.2, ace: 0.3, exi: 0.4, des: 0.5 },
+  },
+  P2: {
+    viento: { fav: 2, ace: 3, exi: 4, des: 4 },
+    ola: { fav: 0.2, ace: 0.3, exi: 0.4, des: 0.5 },
+    periodo: { fav: 5, ace: 4, exi: 2, des: 2 },
+    corriente: { fav: 0.3, ace: 0.4, exi: 0.6, des: 0.7 },
+    marea: { fav: 0.2, ace: 0.3, exi: 0.4, des: 0.5 },
+  },
+  P3: {
+    viento: { fav: 2, ace: 3, exi: 4, des: 5 },
+    ola: { fav: 0.2, ace: 0.4, exi: 0.6, des: 0.7 },
+    periodo: { fav: 5, ace: 4, exi: 2, des: 2 },
+    corriente: { fav: 0.3, ace: 0.5, exi: 0.8, des: 0.9 },
+    marea: { fav: 0.2, ace: 0.3, exi: 0.4, des: 0.5 },
+  },
+  P4: {
+    viento: { fav: 3, ace: 4, exi: 5, des: 6 },
+    ola: { fav: 0.3, ace: 0.5, exi: 0.8, des: 0.9 },
+    periodo: { fav: 5, ace: 4, exi: 2, des: 2 },
+    corriente: { fav: 0.4, ace: 0.7, exi: 1.0, des: 1.1 },
+    marea: { fav: 0.3, ace: 0.4, exi: 0.5, des: 0.6 },
+  },
+};

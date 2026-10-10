@@ -4,17 +4,22 @@
 
 import {
   UMBRALES_BASE,
+  UMBRALES_PATOS,
   type Umbral,
   type ZonaTabla,
   type CategoriaKayakTabla,
+  type CategoriaPatoTabla,
   type NivelExperienciaTabla,
   type FranjaDiaTabla,
   type TipoAccesoTabla,
 } from './verdict-tabla.ts';
 import type { Kayak, TechoAbsoluto } from './kayaks.ts';
+import { type Pato, TECHOS_PATOS, type CategoriaPato } from './patos.ts';
 
 export type Zona = ZonaTabla;
 export type CategoriaKayak = CategoriaKayakTabla;
+export type { CategoriaPato };
+export type CategoriaEmbarcacion = CategoriaKayak | CategoriaPato;
 export type NivelExperiencia = NivelExperienciaTabla;
 export type FranjaDia = FranjaDiaTabla;
 export type TipoAcceso = TipoAccesoTabla;
@@ -177,19 +182,50 @@ function aplicarAjuste(
 
 export function calcularVeredicto(
   zona: Zona,
-  categoria: CategoriaKayak,
+  categoria: CategoriaKayak | CategoriaPato | string,
   perfil: PerfilKayakista,
   franja: FranjaDia,
   condiciones: Condiciones,
-  kayak?: Kayak | TechoAbsoluto | null
+  embarcacion?: Kayak | Pato | TechoAbsoluto | null
 ): ResultadoVeredicto {
-  // Techo absoluto del kayak (límite duro de diseño/certificación).
-  const techo: TechoAbsoluto | undefined =
-    kayak && 'techoAbsoluto' in kayak && kayak.techoAbsoluto
-      ? kayak.techoAbsoluto
-      : (kayak as TechoAbsoluto | undefined);
+  const esPato =
+    (embarcacion && 'tipoEmbarcacion' in embarcacion && embarcacion.tipoEmbarcacion === 'pato') ||
+    categoria === 'P1' ||
+    categoria === 'P2' ||
+    categoria === 'P3' ||
+    categoria === 'P4';
 
-  const baseOriginal = UMBRALES_BASE[zona][categoria];
+  let techo: TechoAbsoluto | undefined;
+  let baseOriginal: Umbral;
+
+  if (esPato) {
+    const catPato: CategoriaPato =
+      embarcacion && 'categoriaWKF' in embarcacion && (embarcacion.categoriaWKF === 'P1' || embarcacion.categoriaWKF === 'P2' || embarcacion.categoriaWKF === 'P3' || embarcacion.categoriaWKF === 'P4')
+        ? (embarcacion.categoriaWKF as CategoriaPato)
+        : (categoria === 'P1' || categoria === 'P2' || categoria === 'P3' || categoria === 'P4')
+        ? (categoria as CategoriaPato)
+        : 'P1';
+
+    baseOriginal = UMBRALES_PATOS[catPato] ?? UMBRALES_PATOS.P1;
+    const tp = TECHOS_PATOS[catPato] ?? TECHOS_PATOS.P1;
+    techo = {
+      vientoMaxBf: tp.vientoMaxBf,
+      olaMaxM: tp.olaMaxM,
+      fuente: 'estimado',
+    };
+  } else {
+    techo =
+      embarcacion && 'techoAbsoluto' in embarcacion && embarcacion.techoAbsoluto
+        ? (embarcacion.techoAbsoluto as TechoAbsoluto)
+        : (embarcacion as TechoAbsoluto | undefined);
+
+    const catKayak: CategoriaKayakTabla =
+      categoria === 'K1' || categoria === 'K2' || categoria === 'K3' || categoria === 'K4' || categoria === 'K5'
+        ? (categoria as CategoriaKayakTabla)
+        : 'K3';
+    baseOriginal = UMBRALES_BASE[zona]?.[catKayak] ?? UMBRALES_BASE.mediterraneo_espanol.K3;
+  }
+
   const base: Umbral = {
     viento: { ...baseOriginal.viento },
     ola: { ...baseOriginal.ola },

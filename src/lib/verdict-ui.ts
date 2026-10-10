@@ -11,6 +11,7 @@
 
 import type { SpotWeather } from './openmeteo.ts';
 import type { Kayak, TechoAbsoluto } from './kayaks.ts';
+import type { Pato, CategoriaPato } from './patos.ts';
 import {
   calcularVeredicto,
   type Veredicto,
@@ -94,9 +95,9 @@ export function calcularVeredictoPorFranja(
   spot: Spot,
   weather: SpotWeather | null,
   franjas: FranjaUsuario[],
-  categoria: CategoriaKayak,
+  categoria: CategoriaKayak | CategoriaPato | string,
   perfil: PerfilKayakista,
-  kayak?: Kayak | TechoAbsoluto | null
+  embarcacion?: Kayak | Pato | TechoAbsoluto | null
 ): Record<string, Veredicto | null> {
   const res: Record<string, Veredicto | null> = {};
   for (const f of franjas) {
@@ -148,7 +149,7 @@ export function calcularVeredictoPorFranja(
         perfil,
         franjaDia,
         condiciones,
-        kayak
+        embarcacion
       );
 
       peor = peor ? peorVeredicto(peor, resultado.veredicto) : resultado.veredicto;
@@ -169,9 +170,9 @@ export function calcularVeredictoFranjaDia(
   weather: SpotWeather | null,
   franja: FranjaUsuario,
   fechaBase: Date,
-  categoria: CategoriaKayak,
+  categoria: CategoriaKayak | CategoriaPato | string,
   perfil: PerfilKayakista,
-  kayak?: Kayak | TechoAbsoluto | null
+  embarcacion?: Kayak | Pato | TechoAbsoluto | null
 ): Veredicto | null {
   if (!weather) return null;
   const y = fechaBase.getFullYear();
@@ -188,7 +189,7 @@ export function calcularVeredictoFranjaDia(
   if (horas.length === 0) return null;
 
   const sub: SpotWeather = { ...weather, hourly: horas };
-  const r = calcularVeredictoPorFranja(spot, sub, [franja], categoria, perfil, kayak);
+  const r = calcularVeredictoPorFranja(spot, sub, [franja], categoria, perfil, embarcacion);
   return r[franja.id] ?? null;
 }
 

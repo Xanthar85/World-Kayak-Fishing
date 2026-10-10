@@ -476,6 +476,8 @@ export const MapScreen: React.FC<MapScreenProps> = ({
                   const marker = e.target as L.Marker;
                   const latlng = marker.getLatLng();
                   setPuntoPesca({ lat: latlng.lat, lon: latlng.lng });
+                  const zonaDetectada = detectarZona(latlng.lat, latlng.lng);
+                  setZona(zonaDetectada);
                 },
               }}
             />
