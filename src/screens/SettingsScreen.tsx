@@ -34,6 +34,22 @@ import {
 } from '../lib/verdict.ts';
 import type { FormatoCoords } from '../lib/coords.ts';
 import type { NivelColorTabla } from '../lib/verdict-color.ts';
+import {
+  OPCIONES_VIENTO,
+  OPCIONES_OLA,
+  OPCIONES_TEMPERATURA,
+  OPCIONES_PRESION,
+  OPCIONES_CORRIENTE,
+  OPCIONES_DISTANCIA,
+  OPCIONES_PRECIPITACION,
+  SUFIJO_VIENTO,
+  SUFIJO_OLA,
+  SUFIJO_TEMPERATURA,
+  SUFIJO_PRESION,
+  SUFIJO_CORRIENTE,
+  SUFIJO_DISTANCIA,
+  SUFIJO_PRECIPITACION,
+} from '../lib/unidades.ts';
 
 interface SettingsScreenProps {
   onClose: () => void;
@@ -118,6 +134,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const setOrdenSubpestanas = useAppStore((s) => s.setOrdenSubpestanas);
   const setColorTabla = useAppStore((s) => s.setColorTabla);
   const setFiltroFranja = useAppStore((s) => s.setFiltroFranja);
+  const setUnidades = useAppStore((s) => s.setUnidades);
   const resetAll = useAppStore((s) => s.resetAll);
   const exportState = useAppStore((s) => s.exportState);
   const importState = useAppStore((s) => s.importState);
@@ -446,6 +463,266 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 {t(`coords.${fmt}`)}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Sección Unidades */}
+        <div style={cardStyle}>
+          <div style={sectionTitleStyle}>{t('settings.unitsSection')}</div>
+          <p
+            style={{
+              fontSize: '0.85rem',
+              color: 'var(--text-muted)',
+              margin: '0 0 16px 0',
+            }}
+          >
+            {t('settings.unitsSectionDesc')}
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Viento (columna 1) */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  color: 'var(--text-muted)',
+                  marginBottom: 6,
+                }}
+              >
+                {t('unidades.viento1')}
+              </label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {OPCIONES_VIENTO.map((u) => (
+                  <button
+                    key={u}
+                    onClick={() => setUnidades({ viento: u })}
+                    style={buttonOptionStyle(ajustes.unidades.viento === u)}
+                  >
+                    {SUFIJO_VIENTO[u]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Viento (columna 2) */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  color: 'var(--text-muted)',
+                  marginBottom: 6,
+                }}
+              >
+                {t('unidades.viento2')}
+              </label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {OPCIONES_VIENTO.map((u) => (
+                  <button
+                    key={u}
+                    onClick={() => setUnidades({ viento2: u })}
+                    style={buttonOptionStyle(ajustes.unidades.viento2 === u)}
+                  >
+                    {SUFIJO_VIENTO[u]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Ola */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  color: 'var(--text-muted)',
+                  marginBottom: 6,
+                }}
+              >
+                {t('unidades.ola')}
+              </label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {OPCIONES_OLA.map((u) => (
+                  <button
+                    key={u}
+                    onClick={() => setUnidades({ ola: u })}
+                    style={buttonOptionStyle(ajustes.unidades.ola === u)}
+                  >
+                    {SUFIJO_OLA[u]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Temperatura */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  color: 'var(--text-muted)',
+                  marginBottom: 6,
+                }}
+              >
+                {t('unidades.temperatura')}
+              </label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {OPCIONES_TEMPERATURA.map((u) => (
+                  <button
+                    key={u}
+                    onClick={() => setUnidades({ temperatura: u })}
+                    style={buttonOptionStyle(ajustes.unidades.temperatura === u)}
+                  >
+                    {SUFIJO_TEMPERATURA[u]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Presión */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  color: 'var(--text-muted)',
+                  marginBottom: 6,
+                }}
+              >
+                {t('unidades.presion')}
+              </label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {OPCIONES_PRESION.map((u) => (
+                  <button
+                    key={u}
+                    onClick={() => setUnidades({ presion: u })}
+                    style={buttonOptionStyle(ajustes.unidades.presion === u)}
+                  >
+                    {SUFIJO_PRESION[u]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Corriente */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  color: 'var(--text-muted)',
+                  marginBottom: 6,
+                }}
+              >
+                {t('unidades.corriente')}
+              </label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {OPCIONES_CORRIENTE.map((u) => (
+                  <button
+                    key={u}
+                    onClick={() => setUnidades({ corriente: u })}
+                    style={buttonOptionStyle(ajustes.unidades.corriente === u)}
+                  >
+                    {SUFIJO_CORRIENTE[u]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Distancia */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  color: 'var(--text-muted)',
+                  marginBottom: 6,
+                }}
+              >
+                {t('unidades.distancia')}
+              </label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {OPCIONES_DISTANCIA.map((u) => (
+                  <button
+                    key={u}
+                    onClick={() => setUnidades({ distancia: u })}
+                    style={buttonOptionStyle(ajustes.unidades.distancia === u)}
+                  >
+                    {SUFIJO_DISTANCIA[u]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Visibilidad */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  color: 'var(--text-muted)',
+                  marginBottom: 6,
+                }}
+              >
+                {t('unidades.visibilidad')}
+              </label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {OPCIONES_DISTANCIA.map((u) => (
+                  <button
+                    key={u}
+                    onClick={() => setUnidades({ visibilidad: u })}
+                    style={buttonOptionStyle(ajustes.unidades.visibilidad === u)}
+                  >
+                    {SUFIJO_DISTANCIA[u]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Precipitación */}
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  color: 'var(--text-muted)',
+                  marginBottom: 6,
+                }}
+              >
+                {t('unidades.precipitacion')}
+              </label>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {OPCIONES_PRECIPITACION.map((u) => (
+                  <button
+                    key={u}
+                    onClick={() => setUnidades({ precipitacion: u })}
+                    style={buttonOptionStyle(ajustes.unidades.precipitacion === u)}
+                  >
+                    {SUFIJO_PRECIPITACION[u]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              marginTop: 14,
+              fontSize: '0.75rem',
+              color: 'var(--text-muted)',
+            }}
+          >
+            ℹ️ {t('unidades.note')}
           </div>
         </div>
 

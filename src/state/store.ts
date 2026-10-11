@@ -1,10 +1,6 @@
 // src/state/store.ts
 // WKF — Estado global Zustand con persistencia en localStorage.
-// Persist version 2. Clave "wkf-state-v1".
-// v1.010:
-//   - Color de tabla por defecto: 'todo' (DP-092).
-//   - Nuevo método reorderSpots (DP-083) para arrastrar puntos.
-//   - Se conserva el resto.
+// Persist version 3. Clave "wkf-state-v1".
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
@@ -23,6 +19,7 @@ import type {
   PerfilKayakista,
 } from '../lib/verdict.ts';
 import type { FormatoCoords } from '../lib/coords.ts';
+import { UNIDADES_POR_DEFECTO, type SistemaUnidades } from '../lib/unidades.ts';
 
 export type Embarcacion = Kayak | Pato;
 
@@ -72,6 +69,7 @@ export interface AjustesApp {
   ordenSubpestanas: string[];
   colorTabla: NivelColorTabla;
   filtroFranja: boolean;
+  unidades: SistemaUnidades;
 }
 
 export type ImportResult =
@@ -94,7 +92,7 @@ export interface WeatherEntry {
 }
 
 const WEATHER_TTL_MS = 30 * 60 * 1000;
-export const PERSIST_VERSION = 2;
+export const PERSIST_VERSION = 3;
 
 const FRANJAS_DEFECTO: FranjaUsuario[] = [
   { id: 'manana', nombre: 'Mañana', inicio: 6, fin: 12 },
@@ -281,6 +279,7 @@ function validarAjustes(raw: unknown): raw is AjustesApp {
     return false;
   if (raw.filtroFranja !== undefined && typeof raw.filtroFranja !== 'boolean')
     return false;
+  if (raw.unidades !== undefined && !esObjeto(raw.unidades)) return false;
   return true;
 }
 
@@ -323,6 +322,7 @@ export interface AppState {
   setOrdenSubpestanas: (orden: string[]) => void;
   setColorTabla: (nivel: NivelColorTabla) => void;
   setFiltroFranja: (activo: boolean) => void;
+  setUnidades: (patch: Partial<SistemaUnidades>) => void;
 
   resetAll: () => void;
   exportState: () => Record<string, unknown>;
@@ -349,6 +349,7 @@ export const useAppStore = create<AppState>()(
         // DP-092: color de tabla por defecto = "todo".
         colorTabla: 'todo',
         filtroFranja: true,
+        unidades: { ...UNIDADES_POR_DEFECTO },
       },
 
       setLanguage: (lang) => {
@@ -368,10 +369,7 @@ export const useAppStore = create<AppState>()(
               accesoLat: null,
               accesoLon: null,
               ...spot,
-              id:
-                typeof crypto !== 'undefined' && 'randomUUID' in crypto
-                  ? crypto.randomUUID()
-                  : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
               createdAt: Date.now(),
             },
           ],
@@ -384,33 +382,40 @@ export const useAppStore = create<AppState>()(
 
       removeSpot: (id) =>
         set((state) => {
-          const { [id]: _removed, ...rest } = state.weather;
-          return {
-            spots: state.spots.filter((s) => s.id !== id),
-            weather: rest,
-          };
+          const nuevasSpots = state.spots.filter((s) => s.id !== id);
+          const { [id]: _, ...restoWeather } = state.weather;
+          return { spots: nuevasSpots, weather: restoWeather };
         }),
 
       reorderSpots: (ids) =>
         set((state) => {
-          const map = new Map(state.spots.map((s) => [s.id, s]));
-          const ordenados = ids
-            .map((id) => map.get(id))
-            .filter((s): s is Spot => s !== undefined);
-          // Cualquier spot que no estuviera en la lista se añade al final.
-          const faltantes = state.spots.filter((s) => !ids.includes(s.id));
-          return { spots: [...ordenados, ...faltantes] };
+          const spotMap = new Map(state.spots.map((s) => [s.id, s]));
+          const reordenados: Spot[] = [];
+          for (const id of ids) {
+            const spot = spotMap.get(id);
+            if (spot) {
+              reordenados.push(spot);
+              spotMap.delete(id);
+            }
+          }
+          // Conservar cualquier punto no listado al final
+          for (const spot of spotMap.values()) {
+            reordenados.push(spot);
+          }
+          return { spots: reordenados };
         }),
 
       setWeather: (spotId, data) =>
         set((state) => ({
           weather: { ...state.weather, [spotId]: data },
         })),
+
       clearWeather: (spotId) =>
         set((state) => {
-          const { [spotId]: _removed, ...rest } = state.weather;
-          return { weather: rest };
+          const { [spotId]: _, ...resto } = state.weather;
+          return { weather: resto };
         }),
+
       getWeatherEntry: (spotId) => {
         const data = get().weather[spotId];
         if (!data) return null;
@@ -421,28 +426,31 @@ export const useAppStore = create<AppState>()(
           ageMin: Math.floor(ageMs / 60000),
         };
       },
+
       getFreshWeather: (spotId) => {
-        const entry = get().getWeatherEntry(spotId);
-        if (!entry) return null;
-        if (entry.stale) return null;
-        return entry.data;
-      },
-      isWeatherStale: (spotId) => {
-        const entry = get().getWeatherEntry(spotId);
-        return entry ? entry.stale : false;
+        const data = get().weather[spotId];
+        if (!data) return null;
+        const ageMs = Date.now() - data.fetchedAt;
+        return ageMs <= WEATHER_TTL_MS ? data : null;
       },
 
-      setFormatoCoords: (f) =>
-        set((state) => ({ ajustes: { ...state.ajustes, formatoCoords: f } })),
-      setKayakIds: (ids) =>
+      isWeatherStale: (spotId) => {
+        const data = get().weather[spotId];
+        if (!data) return true;
+        return Date.now() - data.fetchedAt > WEATHER_TTL_MS;
+      },
+
+      setFormatoCoords: (formatoCoords) =>
+        set((state) => ({ ajustes: { ...state.ajustes, formatoCoords } })),
+      setKayakIds: (kayakIds) =>
         set((state) => {
-          const saneado = sanearKayakIds(ids);
-          const kayakActivo = getKayakActivo(saneado.kayakIds);
+          const saneado = sanearKayakIds(kayakIds);
           return {
             ajustes: {
               ...state.ajustes,
               kayakIds: saneado.kayakIds,
-              categoriaKayak: kayakActivo.categoriaWKF,
+              categoriaKayak:
+                saneado.categoriaKayak ?? state.ajustes.categoriaKayak,
             },
           };
         }),
@@ -475,6 +483,13 @@ export const useAppStore = create<AppState>()(
         set((state) => ({ ajustes: { ...state.ajustes, colorTabla: nivel } })),
       setFiltroFranja: (activo) =>
         set((state) => ({ ajustes: { ...state.ajustes, filtroFranja: activo } })),
+      setUnidades: (patch) =>
+        set((state) => ({
+          ajustes: {
+            ...state.ajustes,
+            unidades: { ...state.ajustes.unidades, ...patch },
+          },
+        })),
 
       resetAll: () =>
         set(() => ({
@@ -491,6 +506,7 @@ export const useAppStore = create<AppState>()(
             ordenSubpestanas: [],
             colorTabla: 'todo',
             filtroFranja: true,
+            unidades: { ...UNIDADES_POR_DEFECTO },
           },
         })),
 
@@ -549,6 +565,8 @@ export const useAppStore = create<AppState>()(
           colorTabla: ajustesImportados.colorTabla ?? 'todo',
           filtroFranja: ajustesImportados.filtroFranja ?? true,
           ordenSubpestanas: ajustesImportados.ordenSubpestanas ?? [],
+          unidades: (ajustesImportados.unidades as SistemaUnidades | undefined)
+            ?? { ...UNIDADES_POR_DEFECTO },
         };
 
         set(() => ({
@@ -583,6 +601,16 @@ export const useAppStore = create<AppState>()(
         state.ajustes.categoriaKayak = getKayakActivo(saneado.kayakIds).categoriaWKF;
         if (!Array.isArray(state.ajustes.ordenSubpestanas)) {
           state.ajustes.ordenSubpestanas = [];
+        }
+
+        if (!state.ajustes.unidades) {
+          state.ajustes.unidades = { ...UNIDADES_POR_DEFECTO };
+        } else {
+          // Rellenar campos que falten con el valor por defecto.
+          state.ajustes.unidades = {
+            ...UNIDADES_POR_DEFECTO,
+            ...state.ajustes.unidades,
+          };
         }
 
         return state;

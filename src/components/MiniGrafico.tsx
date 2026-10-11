@@ -16,6 +16,14 @@ import {
   gradosACardinal16,
 } from '../lib/openmeteo.ts';
 import { useAppStore } from '../state/store.ts';
+import {
+  valorViento,
+  valorOla,
+  SUFIJO_VIENTO,
+  SUFIJO_OLA,
+  formatearViento,
+  formatearOla,
+} from '../lib/unidades.ts';
 
 export interface MiniGraficoProps {
   weather: SpotWeather | null;
@@ -213,10 +221,10 @@ export const MiniGrafico: React.FC<MiniGraficoProps> = ({ weather }) => {
               {c.temperatura != null ? `${Math.round(c.temperatura)}°` : '—'}
             </div>
             <div style={{ color: colorOla ?? 'var(--text)', fontWeight: colorOla ? 700 : 500 }}>
-              {c.ola != null ? `${c.ola.toFixed(1)}m` : '—'}
+              {formatearOla(c.ola, ajustes.unidades.ola)}
             </div>
             <div style={{ color: colorViento ?? 'var(--text)', fontWeight: colorViento ? 700 : 500 }}>
-              {c.vientoKmh != null ? `${Math.round(c.vientoKmh)}` : '—'}
+              {formatearViento(c.vientoKmh, ajustes.unidades.viento)}
             </div>
             <div
               style={{

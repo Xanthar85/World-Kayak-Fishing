@@ -33,6 +33,25 @@ import { nombreViento } from '../lib/wind.ts';
 import { colorNumero, type NivelColorTabla } from '../lib/verdict-color.ts';
 import { calcularActividadPorHora, type ActividadHora } from '../lib/actividad.ts';
 import type { FranjaUsuario } from '../state/store.ts';
+import {
+  formatearViento,
+  formatearOla,
+  formatearTemperatura,
+  formatearPresion,
+  formatearCorriente,
+  formatearDistancia,
+  formatearPrecipitacion,
+  SUFIJO_VIENTO,
+  SUFIJO_OLA,
+  SUFIJO_TEMPERATURA,
+  SUFIJO_PRESION,
+  SUFIJO_CORRIENTE,
+  valorViento,
+  valorOla,
+  valorTemperatura,
+  valorPresion,
+  valorCorriente,
+} from '../lib/unidades.ts';
 
 export interface SpotScreenProps {
   spotId: string;
@@ -570,31 +589,39 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     return `${t(`factors.${factorKeyMap[fd]}`)} ${formatearValorFactor(fd, detalleFranjaActiva.horaPeor)}`;
   })();
 
+  const u = ajustes.unidades;
+
   const numeroGrande = (() => {
     switch (tabActiva) {
       case 'waves': {
         const v = horasFiltradas.find((h) => h.waveHeight != null)?.waveHeight;
-        return { val: v != null ? v.toFixed(1) : '—', unit: 'm', color: 'var(--accent)' };
+        const valNum = valorOla(v ?? null, u.ola);
+        return { val: valNum != null ? valNum.toFixed(1) : '—', unit: SUFIJO_OLA[u.ola], color: 'var(--accent)' };
       }
       case 'wind': {
-        const v = kmhAKn(horasFiltradas.find((h) => h.windSpeed != null)?.windSpeed ?? null);
-        return { val: v != null ? String(v) : '—', unit: 'kt', color: 'var(--accent-2)' };
+        const v = horasFiltradas.find((h) => h.windSpeed != null)?.windSpeed;
+        const valNum = valorViento(v ?? null, u.viento);
+        return { val: valNum != null ? valNum.toFixed(1) : '—', unit: SUFIJO_VIENTO[u.viento], color: 'var(--accent-2)' };
       }
       case 'weather': {
         const v = horasFiltradas.find((h) => h.temperature != null)?.temperature;
-        return { val: v != null ? v.toFixed(1) : '—', unit: '°C', color: '#f59e0b' };
+        const valNum = valorTemperatura(v ?? null, u.temperatura);
+        return { val: valNum != null ? valNum.toFixed(1) : '—', unit: SUFIJO_TEMPERATURA[u.temperatura], color: '#f59e0b' };
       }
       case 'barometer': {
         const v = horasFiltradas.find((h) => h.pressure != null)?.pressure;
-        return { val: v != null ? v.toFixed(0) : '—', unit: 'hPa', color: '#a855f7' };
+        const valNum = valorPresion(v ?? null, u.presion);
+        return { val: valNum != null ? (u.presion === 'inhg' ? valNum.toFixed(2) : valNum.toFixed(0)) : '—', unit: SUFIJO_PRESION[u.presion], color: '#a855f7' };
       }
       case 'activity': {
         const v = horasFiltradas.find((h) => h.currentVelocity != null)?.currentVelocity;
-        return { val: v != null ? v.toFixed(2) : '—', unit: 'kn', color: '#06b6d4' };
+        const valNum = valorCorriente(v ?? null, u.corriente);
+        return { val: valNum != null ? valNum.toFixed(2) : '—', unit: SUFIJO_CORRIENTE[u.corriente], color: '#06b6d4' };
       }
       case 'tides': {
         const v = horasFiltradas.find((h) => h.seaLevelHeight != null)?.seaLevelHeight;
-        return { val: v != null ? v.toFixed(2) : '—', unit: 'm', color: '#38bdf8' };
+        const valNum = valorOla(v ?? null, u.ola);
+        return { val: valNum != null ? valNum.toFixed(2) : '—', unit: SUFIJO_OLA[u.ola], color: '#38bdf8' };
       }
       default: return null;
     }
@@ -931,14 +958,14 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {tabActiva === 'waves' && weather && (
           <TablaDatos tabId="waves" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
             columnas={[
-              { key: 'wt', label: t('factors.waveHeightTotal'),
-                render: (h) => h.waveHeight != null ? `${h.waveHeight.toFixed(2)} m` : '—',
+              { key: 'wt', label: `${t('factors.waveHeightTotal')} (${SUFIJO_OLA[u.ola]})`,
+                render: (h) => formatearOla(h.waveHeight, u.ola),
                 veredicto: subVeredictoWaves },
-              { key: 'ww', label: t('factors.waveHeightWind'),
-                render: (h) => h.windWaveHeight != null ? `${h.windWaveHeight.toFixed(2)} m` : '—',
+              { key: 'ww', label: `${t('factors.waveHeightWind')} (${SUFIJO_OLA[u.ola]})`,
+                render: (h) => formatearOla(h.windWaveHeight, u.ola),
                 veredicto: subVeredictoWaves },
-              { key: 'ws', label: t('factors.waveHeightSwell'),
-                render: (h) => h.swellWaveHeight != null ? `${h.swellWaveHeight.toFixed(2)} m` : '—',
+              { key: 'ws', label: `${t('factors.waveHeightSwell')} (${SUFIJO_OLA[u.ola]})`,
+                render: (h) => formatearOla(h.swellWaveHeight, u.ola),
                 veredicto: subVeredictoWaves },
               { key: 'wp', label: t('factors.wavePeriod'),
                 render: (h) => h.wavePeriod != null ? `${h.wavePeriod.toFixed(0)} s` : '—',
@@ -964,10 +991,10 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
               { key: 'bf', label: 'Bf',
                 render: (h) => { const b = kmhABf(h.windSpeed); return b != null ? `${b}` : '—'; },
                 veredicto: subVeredictoWind },
-              { key: 'wkh', label: 'km/h',
-                render: (h) => h.windSpeed != null ? `${Math.round(h.windSpeed * 10) / 10}` : '—',
+              { key: 'w1', label: `V.(${SUFIJO_VIENTO[u.viento]})`,
+                render: (h) => formatearViento(h.windSpeed, u.viento),
                 veredicto: subVeredictoWind },
-              { key: 'gkh', label: 'R.km/h',
+              { key: 'g1', label: `R.(${SUFIJO_VIENTO[u.viento]})`,
                 render: (h) => {
                   const v = h.windGusts;
                   if (v == null) return '—';
@@ -978,17 +1005,17 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                         color: esRachaFuerte ? '#FF2D55' : undefined,
                         fontWeight: esRachaFuerte ? 700 : 500,
                         textShadow: esRachaFuerte ? '0 0 6px rgba(255, 45, 85, 0.7)' : 'none',
-                      }}>{Math.round(v * 10) / 10}</span>
+                      }}>{formatearViento(v, u.viento)}</span>
                       {esRachaFuerte && <BotonAyuda tabId="wind" />}
                     </span>
                   );
                 },
                 veredicto: subVeredictoWindGust },
-              { key: 'wk', label: 'kt',
-                render: (h) => { const v = kmhAKn(h.windSpeed); return v != null ? `${v}` : '—'; },
+              { key: 'w2', label: `V.(${SUFIJO_VIENTO[u.viento2]})`,
+                render: (h) => formatearViento(h.windSpeed, u.viento2),
                 veredicto: subVeredictoWind },
-              { key: 'gk', label: 'R.kt',
-                render: (h) => { const v = kmhAKn(h.windGusts); return v != null ? `${v}` : '—'; },
+              { key: 'g2', label: `R.(${SUFIJO_VIENTO[u.viento2]})`,
+                render: (h) => formatearViento(h.windGusts, u.viento2),
                 veredicto: subVeredictoWindGust },
             ]}
           />
@@ -1005,13 +1032,13 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
               { key: 'cc', label: t('factors.cloudCover'),
                 render: (h) => h.cloudCover != null ? `${Math.round(h.cloudCover)}%` : '—' },
               { key: 'pr', label: t('factors.precipitation'),
-                render: (h) => h.precipitation != null ? `${h.precipitation.toFixed(1)} mm` : '—' },
+                render: (h) => formatearPrecipitacion(h.precipitation, u.precipitacion) },
               { key: 'prp', label: t('factors.precipitationProbability'),
                 render: (h) => h.precipitationProbability != null ? `${Math.round(h.precipitationProbability)}%` : '—' },
               { key: 'tmp', label: t('factors.temperature'),
-                render: (h) => h.temperature != null ? `${h.temperature.toFixed(1)}°` : '—' },
+                render: (h) => formatearTemperatura(h.temperature, u.temperatura) },
               { key: 'vis', label: t('factors.visibility'),
-                render: (h) => h.visibility != null ? `${Math.round(h.visibility / 1000)} km` : '—' },
+                render: (h) => formatearDistancia(h.visibility != null ? h.visibility / 1000 : null, u.visibilidad) },
             ]}
           />
         )}
@@ -1019,9 +1046,9 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {tabActiva === 'air' && weather && (
           <TablaDatos tabId="air" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
             columnas={[
-              { key: 't', label: t('factors.temperature'), render: (h) => h.temperature != null ? `${h.temperature.toFixed(1)}°` : '—' },
-              { key: 'at', label: t('factors.apparentTemperature'), render: (h) => h.apparentTemperature != null ? `${h.apparentTemperature.toFixed(1)}°` : '—' },
-              { key: 'sst', label: t('factors.seaTemperature'), render: (h) => h.seaSurfaceTemperature != null ? `${h.seaSurfaceTemperature.toFixed(1)}°` : '—' },
+              { key: 't', label: t('factors.temperature'), render: (h) => formatearTemperatura(h.temperature, u.temperatura) },
+              { key: 'at', label: t('factors.apparentTemperature'), render: (h) => formatearTemperatura(h.apparentTemperature, u.temperatura) },
+              { key: 'sst', label: t('factors.seaTemperature'), render: (h) => formatearTemperatura(h.seaSurfaceTemperature, u.temperatura) },
             ]}
           />
         )}
@@ -1029,7 +1056,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {tabActiva === 'barometer' && weather && (
           <TablaDatos tabId="barometer" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
             columnas={[
-              { key: 'p', label: t('factors.pressure'), render: (h) => h.pressure != null ? `${h.pressure.toFixed(0)}` : '—' },
+              { key: 'p', label: t('factors.pressure'), render: (h) => formatearPresion(h.pressure, u.presion) },
               { key: 'tr', label: t('factors.pressureTrend'),
                 render: (h) => {
                   const idx = horasFiltradas.indexOf(h);
@@ -1064,13 +1091,12 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                 render: (h) => {
                   if (h.currentVelocity == null) return '—';
                   const kn = h.currentVelocity;
-                  const kmh = kn * 1.852;
                   let indicador = '▶ correcto';
                   if (kn < 0.4) indicador = 'Agua parada / baja actividad';
                   else if (kn > 1.4) indicador = 'Deriva rápida';
                   return (
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: '0.68rem' }}>
-                      <span>{kn.toFixed(1)} kn ({kmh.toFixed(1).replace('.', ',')} km/h) {indicador}</span>
+                      <span>{formatearCorriente(kn, u.corriente)} {indicador}</span>
                       {(kn < 0.4 || kn > 1.4) && <BotonAyuda tabId="activity" />}
                     </span>
                   );
@@ -1108,8 +1134,8 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {tabActiva === 'tides' && weather && (
           <TablaDatos tabId="tides" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
             columnas={[
-              { key: 'sl', label: t('factors.seaLevel'),
-                render: (h) => h.seaLevelHeight != null ? `${h.seaLevelHeight.toFixed(2)} m` : '—',
+              { key: 'sl', label: `${t('factors.seaLevel')} (${SUFIJO_OLA[u.ola]})`,
+                render: (h) => formatearOla(h.seaLevelHeight, u.ola),
                 veredicto: subVeredictoMarea },
               { key: 'tr', label: t('factors.seaLevelTrend'),
                 render: (h) => {

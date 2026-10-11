@@ -24,6 +24,20 @@ import { calcularVeredicto, type FranjaDia, type Veredicto } from '../lib/verdic
 import { colorNumero } from '../lib/verdict-color.ts';
 import { calcularSol } from '../lib/sun.ts';
 import { calcularActividadPorHora, type ActividadHora } from '../lib/actividad.ts';
+import {
+  formatearViento,
+  formatearOla,
+  formatearTemperatura,
+  formatearCorriente,
+  formatearPrecipitacion,
+  valorViento,
+  valorOla,
+  SUFIJO_VIENTO,
+  SUFIJO_OLA,
+  SUFIJO_CORRIENTE,
+  SUFIJO_TEMPERATURA,
+  SUFIJO_PRECIPITACION,
+} from '../lib/unidades.ts';
 
 function localDateKey(d: Date): string {
   const y = d.getFullYear();
@@ -164,6 +178,9 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
     return `${lines.join(' ')} L ${last.x.toFixed(1)},${(paddingTop + plotH).toFixed(1)} L ${first.x.toFixed(1)},${(paddingTop + plotH).toFixed(1)} Z`;
   })();
 
+  const ajustes = useAppStore((s) => s.ajustes);
+  const u = ajustes.unidades;
+
   const marcasY = [0, 0.5, 1];
   const ahora = new Date();
   const esHoy = localDateKey(ahora) === keyDia;
@@ -232,26 +249,28 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
         })}
 
         {marcasY.map((frac) => {
-          const val = frac * olaMax;
+          const valCrudo = frac * olaMax;
+          const valConvertido = valorOla(valCrudo, u.ola) ?? valCrudo;
           const y = paddingTop + plotH - frac * plotH;
           return (
             <g key={`yola-${frac}`}>
               <line x1={paddingLeft - 4} y1={y} x2={paddingLeft} y2={y} stroke="var(--text-dim)" strokeWidth={0.6} />
               <text x={paddingLeft - 6} y={y + 2} fontSize={9} fill="var(--text-dim)" textAnchor="end" fontFamily="Fira Code, monospace">
-                {val.toFixed(1)}
+                {valConvertido.toFixed(1)}
               </text>
             </g>
           );
         })}
 
         {marcasY.map((frac) => {
-          const val = frac * vientoMax;
+          const valCrudo = frac * vientoMax;
+          const valConvertido = valorViento(valCrudo, u.viento) ?? valCrudo;
           const y = paddingTop + plotH - frac * plotH;
           return (
             <g key={`yvie-${frac}`}>
               <line x1={paddingLeft + plotW} y1={y} x2={paddingLeft + plotW + 4} y2={y} stroke="var(--text-dim)" strokeWidth={0.6} />
               <text x={paddingLeft + plotW + 6} y={y + 2} fontSize={9} fill="var(--text-dim)" textAnchor="start" fontFamily="Fira Code, monospace">
-                {Math.round(val)}
+                {Math.round(valConvertido)}
               </text>
             </g>
           );
@@ -315,8 +334,8 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           color: 'var(--text-dim)',
         }}
       >
-        <span style={{ color: 'var(--accent)' }}>— Ola (m)</span>
-        <span style={{ color: 'var(--accent-2)' }}>┄ Viento (km/h)</span>
+        <span style={{ color: 'var(--accent)' }}>— Ola ({SUFIJO_OLA[u.ola]})</span>
+        <span style={{ color: 'var(--accent-2)' }}>┄ Viento ({SUFIJO_VIENTO[u.viento]})</span>
       </div>
     </div>
   );
@@ -328,6 +347,9 @@ interface ResumenDiaProps {
 
 const ResumenDia: React.FC<ResumenDiaProps> = ({ puntos }) => {
   const { t } = useTranslation();
+  const ajustes = useAppStore((s) => s.ajustes);
+  const u = ajustes.unidades;
+
   let olaMax = 0;
   let vientoMax = 0;
   const dirVientoCount: Record<string, number> = {};
@@ -371,13 +393,13 @@ const ResumenDia: React.FC<ResumenDiaProps> = ({ puntos }) => {
       <div style={cardStyle}>
         <div style={labelStyle}>{t('prevision.maxWave')}</div>
         <div style={{ ...valueStyle, color: 'var(--accent)' }}>
-          {olaMax.toFixed(2)} m
+          {formatearOla(olaMax, u.ola)}
         </div>
       </div>
       <div style={cardStyle}>
         <div style={labelStyle}>{t('prevision.maxWind')}</div>
         <div style={{ ...valueStyle, color: 'var(--accent-2)' }}>
-          {Math.round(vientoMax)} km/h
+          {formatearViento(vientoMax, u.viento)}
         </div>
       </div>
       <div style={cardStyle}>
@@ -477,16 +499,18 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
     return result;
   }, [weather]);
 
+  const u = ajustes.unidades;
+
   const columnas = [
     'Hora',
     'Clima',
-    'mm',
-    'ºC',
-    'OlaT',
+    SUFIJO_PRECIPITACION[u.precipitacion],
+    SUFIJO_TEMPERATURA[u.temperatura],
+    `OlaT (${SUFIJO_OLA[u.ola]})`,
     'Per',
-    'V.Med',
-    'V.Max',
-    'KN',
+    `V.Med (${SUFIJO_VIENTO[u.viento]})`,
+    `V.Max (${SUFIJO_VIENTO[u.viento]})`,
+    `KN (${SUFIJO_CORRIENTE[u.corriente]})`,
     'Act',
   ];
 
@@ -562,23 +586,14 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                 fecha.getHours() < 7 || fecha.getHours() >= 21
               );
 
-              // mm (precipitación)
-              const mmTexto =
-                point?.precipitation != null
-                  ? `${point.precipitation.toFixed(1)}mm`
-                  : '—';
+              // Precipitación
+              const mmTexto = formatearPrecipitacion(point?.precipitation ?? null, u.precipitacion);
 
-              // ºC (temperatura)
-              const tempTexto =
-                point?.temperature != null
-                  ? `${point.temperature.toFixed(1)}ºC`
-                  : '—';
+              // Temperatura
+              const tempTexto = formatearTemperatura(point?.temperature ?? null, u.temperatura);
 
               // OlaT
-              const olaTexto =
-                point?.waveHeight != null
-                  ? `${point.waveHeight.toFixed(2)}m`
-                  : '—';
+              const olaTexto = formatearOla(point?.waveHeight ?? null, u.ola);
               const vOla =
                 point?.waveHeight != null && spot
                   ? calcularVeredicto(
@@ -623,10 +638,7 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
               const colorPer = colorNumero(vPer, ajustes.colorTabla);
 
               // V.Med
-              const vmedTexto =
-                point?.windSpeed != null
-                  ? `${Math.round(point.windSpeed)}`
-                  : '—';
+              const vmedTexto = formatearViento(point?.windSpeed ?? null, u.viento);
               const vVmed =
                 point?.windSpeed != null && spot
                   ? calcularVeredicto(
@@ -647,10 +659,7 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
               const colorVmed = colorNumero(vVmed, ajustes.colorTabla);
 
               // V.Max
-              const vmaxTexto =
-                point?.windGusts != null
-                  ? `${Math.round(point.windGusts)}`
-                  : '—';
+              const vmaxTexto = formatearViento(point?.windGusts ?? null, u.viento);
               const vVmax =
                 point?.windGusts != null && spot
                   ? calcularVeredicto(
@@ -670,10 +679,8 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                   : null;
               const colorVmax = colorNumero(vVmax, ajustes.colorTabla);
 
-              // KN (corriente en km/h)
-              const knVal = point?.currentVelocity;
-              const kmhVal = knVal != null ? knVal * 1.852 : null;
-              const knTexto = kmhVal != null ? kmhVal.toFixed(1) : '—';
+              // KN (corriente)
+              const knTexto = formatearCorriente(point?.currentVelocity ?? null, u.corriente);
               const vKN =
                 point?.currentVelocity != null && spot
                   ? calcularVeredicto(
