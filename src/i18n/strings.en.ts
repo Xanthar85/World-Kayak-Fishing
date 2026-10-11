@@ -627,14 +627,9 @@ Please explain all this to me as if I had little technical experience. What does
     selector: {
       titulo: 'Craft for this spot',
       subtitulo: 'Choose which kayak or belly boat evaluates conditions for this spot.',
-      usarActiva: 'Use active from Settings',
-      sinDefinir: 'No craft defined',
-      cat: 'Cat.',
-      slot2Vacio: 'Slot 2 not configured',
-      irAAjustes: 'Configure in Settings',
-      gestionarAjustes: 'Manage crafts in Settings',
     },
-    asignar: 'Change craft',
+    asignar: 'Assign craft',
+    cambiar: 'Change craft',
   },
 
   privacidad: { note: 'No personal data leaves your device.' },

@@ -634,14 +634,9 @@ Por favor, explícame todo esto como si tuviera poca experiencia técnica. Qué 
     selector: {
       titulo: 'Embarcación para este punto',
       subtitulo: 'Elige con qué kayak o pato evaluar las condiciones de este punto.',
-      usarActiva: 'Usar la activa de Ajustes',
-      sinDefinir: 'Sin embarcación definida',
-      cat: 'Cat.',
-      slot2Vacio: 'Slot 2 sin configurar',
-      irAAjustes: 'Configurar en Ajustes',
-      gestionarAjustes: 'Gestionar embarcaciones en Ajustes',
     },
-    asignar: 'Cambiar embarcación',
+    asignar: 'Asignar embarcación',
+    cambiar: 'Cambiar embarcación',
   },
 
   privacidad: { note: 'Ningún dato personal sale de tu dispositivo.' },

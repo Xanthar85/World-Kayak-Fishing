@@ -69,7 +69,13 @@ export const Home: React.FC = () => {
   const autoFetchDoneRef = useRef(false);
 
   useEffect(() => {
+    const irAAjustesHandler = () => {
+      setViewingSpotId(null);
+      setPestanaActiva('ajustes');
+    };
+    window.addEventListener('wkf:ir-a-ajustes', irAAjustesHandler);
     return () => {
+      window.removeEventListener('wkf:ir-a-ajustes', irAAjustesHandler);
       if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
     };
   }, []);
@@ -328,6 +334,7 @@ export const Home: React.FC = () => {
                   onDragStart={handleDragStart(spot.id)}
                   onDragOver={handleDragOver(spot.id)}
                   onDrop={handleDrop(spot.id)}
+                  onIrAAjustes={() => setPestanaActiva('ajustes')}
                 />
               ))}
 

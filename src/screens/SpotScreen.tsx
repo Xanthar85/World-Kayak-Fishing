@@ -1217,6 +1217,11 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
             updateSpot(spot.id, { embarcacionId: id ?? undefined });
           }}
           onClose={() => setModalEmbarcacionAbierto(false)}
+          onIrAAjustes={() => {
+            setModalEmbarcacionAbierto(false);
+            onClose();
+            window.dispatchEvent(new CustomEvent('wkf:ir-a-ajustes'));
+          }}
         />
       )}
     </div>
