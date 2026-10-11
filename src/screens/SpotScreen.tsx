@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAppStore, getKayakActivo, getEmbarcacionParaSpot } from '../state/store.ts';
+import { SelectorEmbarcacionModal } from '../components/SelectorEmbarcacionModal.tsx';
 import { formatearCoords } from '../lib/coords.ts';
 import {
   calcularVeredictoPorFranja,
@@ -274,6 +275,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
   const spots = useAppStore((s) => s.spots);
   const getWeatherEntry = useAppStore((s) => s.getWeatherEntry);
   const setWeather = useAppStore((s) => s.setWeather);
+  const updateSpot = useAppStore((s) => s.updateSpot);
   const ajustes = useAppStore((s) => s.ajustes);
   const setFranjaActiva = useAppStore((s) => s.setFranjaActiva);
 
@@ -283,6 +285,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
   const nombreKayak = `${kayakActivo.marca} ${kayakActivo.modelo}`;
 
   const [tabActiva, setTabActiva] = useState<TabId>('waves');
+  const [modalEmbarcacionAbierto, setModalEmbarcacionAbierto] = useState(false);
   const [coordsCopiedFeedback, setCoordsCopiedFeedback] = useState(false);
   const [loading, setLoading] = useState(false);
   const loadingRef = useRef(false);
@@ -854,10 +857,31 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 
           <div style={{
             fontSize: '0.68rem', color: 'var(--text-dim)', textAlign: 'center',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, flexWrap: 'wrap',
           }}>
-            {t('verdict.appliedThresholdPrefix')}{' '}
-            <span style={{ color: colorVeredictoFranja, fontWeight: 700 }}>{nombreKayak}</span>
-            {' · '}
+            <span>{t('verdict.appliedThresholdPrefix')}</span>
+            <button
+              type="button"
+              onClick={() => setModalEmbarcacionAbierto(true)}
+              title={t('embarcacion.asignar', { defaultValue: 'Cambiar embarcación' })}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                background: 'transparent',
+                border: 'none',
+                color: colorVeredictoFranja,
+                fontWeight: 700,
+                fontSize: '0.68rem',
+                cursor: 'pointer',
+                padding: '0 2px',
+                fontFamily: 'inherit',
+              }}
+            >
+              <span>{nombreKayak}</span>
+              <span style={{ fontSize: '0.75rem', lineHeight: 1, opacity: 0.85 }}>✎</span>
+            </button>
+            <span>·</span>
             <span style={{ color: colorVeredictoFranja, fontWeight: 700 }}>
               {t(`zones.${spot.zona ?? 'mediterraneo_espanol'}`)}
             </span>
@@ -1185,6 +1209,16 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
           );
         })}
       </nav>
+
+      {modalEmbarcacionAbierto && (
+        <SelectorEmbarcacionModal
+          embarcacionIdActual={spot.embarcacionId ?? null}
+          onSelect={(id) => {
+            updateSpot(spot.id, { embarcacionId: id ?? undefined });
+          }}
+          onClose={() => setModalEmbarcacionAbierto(false)}
+        />
+      )}
     </div>
   );
 };

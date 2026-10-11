@@ -16,6 +16,8 @@
 //   - Arrastrar para reordenar (DP-083): props de drag opcional.
 //   - Botón "Invitar a un café" fuera de la tarjeta (bug 15):
 //     la Home lo gestiona.
+//   - Selector de embarcación por punto (lápiz para asignar slot 1,
+//     slot 2 o usar kayak activo por defecto).
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,6 +27,7 @@ import {
   veredictoAColor,
 } from '../lib/verdict-ui.ts';
 import { MiniGrafico } from './MiniGrafico.tsx';
+import { SelectorEmbarcacionModal } from './SelectorEmbarcacionModal.tsx';
 import {
   useAppStore,
   getEmbarcacionParaSpot,
@@ -61,6 +64,8 @@ export interface SpotCardProps {
   onDragOver?: (e: React.DragEvent<HTMLDivElement>) => void;
   onDrop?: (e: React.DragEvent<HTMLDivElement>) => void;
   isDragging?: boolean;
+  /** Callback opcional para navegar a la pestaña Ajustes */
+  onIrAAjustes?: () => void;
 }
 
 function localDateKey(d: Date): string {
@@ -97,9 +102,11 @@ export const SpotCard: React.FC<SpotCardProps> = ({
   onDragOver,
   onDrop,
   isDragging = false,
+  onIrAAjustes,
 }) => {
   const { t, i18n } = useTranslation();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [modalEmbarcacionAbierto, setModalEmbarcacionAbierto] = useState(false);
 
   const lang = i18n.language?.startsWith('en') ? 'en' : 'es';
 
@@ -126,15 +133,11 @@ export const SpotCard: React.FC<SpotCardProps> = ({
 
   const ajustes = useAppStore((s) => s.ajustes);
   const updateSpot = useAppStore((s) => s.updateSpot);
-  const [modalKayakAbierto, setModalKayakAbierto] = useState(false);
 
   const embarcacionSpot = getEmbarcacionParaSpot(spot, ajustes);
   const categoriaSpot = embarcacionSpot.categoriaWKF;
   const nombreEmbarcacion = `${embarcacionSpot.marca} ${embarcacionSpot.modelo}`;
-
-  // Opciones de slots 1 y 2
-  const slot1 = ajustes.kayakIds[0] ? buscarEmbarcacionPorId(ajustes.kayakIds[0]) : null;
-  const slot2 = ajustes.kayakIds[1] ? buscarEmbarcacionPorId(ajustes.kayakIds[1]) : null;
+  const tieneEmbarcacionPropia = spot.embarcacionId != null;
 
   // Veredicto por franja y día, cacheado por key+id.
   const veredictosCache = React.useMemo(() => {
@@ -178,7 +181,7 @@ export const SpotCard: React.FC<SpotCardProps> = ({
         cursor: draggable ? 'grab' : 'default',
       }}
     >
-      {/* Fila 1: Nombre + zona + borrar */}
+      {/* Fila 1: Nombre + zona + embarcación + borrar */}
       <div
         style={{
           display: 'flex',
@@ -206,15 +209,66 @@ export const SpotCard: React.FC<SpotCardProps> = ({
           </h2>
           <div
             style={{
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 6,
               fontSize: '0.7rem',
               color: 'var(--text-dim)',
               marginTop: 2,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
             }}
           >
-            {t(`zones.${spot.zona ?? 'mediterraneo_espanol'}`)}
+            <span
+              style={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {t(`zones.${spot.zona ?? 'mediterraneo_espanol'}`)}
+            </span>
+            <span style={{ opacity: 0.5 }}>·</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setModalEmbarcacionAbierto(true);
+              }}
+              title={t('embarcacion.asignar', { defaultValue: 'Cambiar embarcación' })}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                background: 'transparent',
+                border: 'none',
+                color: tieneEmbarcacionPropia ? 'var(--accent)' : 'var(--text-dim)',
+                cursor: 'pointer',
+                padding: '0 2px',
+                fontSize: '0.7rem',
+                fontFamily: 'inherit',
+                maxWidth: '100%',
+              }}
+            >
+              <span
+                style={{
+                  fontWeight: tieneEmbarcacionPropia ? 600 : 400,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {nombreEmbarcacion}
+              </span>
+              <span
+                style={{
+                  fontSize: '0.75rem',
+                  lineHeight: 1,
+                  opacity: 0.8,
+                }}
+              >
+                ✎
+              </span>
+            </button>
           </div>
         </div>
 
@@ -434,6 +488,18 @@ export const SpotCard: React.FC<SpotCardProps> = ({
           {refreshing ? t('home.card.loading') : t('home.card.refresh')}
         </button>
       </div>
+
+      {/* Modal para elegir embarcación por punto */}
+      {modalEmbarcacionAbierto && (
+        <SelectorEmbarcacionModal
+          embarcacionIdActual={spot.embarcacionId ?? null}
+          onSelect={(id) => {
+            updateSpot(spot.id, { embarcacionId: id ?? undefined });
+          }}
+          onClose={() => setModalEmbarcacionAbierto(false)}
+          onIrAAjustes={onIrAAjustes}
+        />
+      )}
     </div>
   );
 };
