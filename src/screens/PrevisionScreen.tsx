@@ -1,9 +1,8 @@
 // src/screens/PrevisionScreen.tsx
 // WKF — Pantalla de Previsión meteorológica (tipo Windy).
-// v1.011: pestaña Previsión de la barra inferior.
 // Muestra gráfico de ola + viento del punto activo, día a día,
-// con 7 días seleccionables, franjas de veredicto encuadradas y
-// resumen numérico bajo el gráfico.
+// con 7 días seleccionables, franjas de veredicto, líneas de umbral
+// y tabla detallada de 72h.
 
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,7 +19,14 @@ import {
 } from '../lib/openmeteo.ts';
 import type { SpotWeather, HourlyPoint } from '../lib/openmeteo.ts';
 import type { Spot, FranjaUsuario } from '../state/store.ts';
-import { calcularVeredicto, type FranjaDia, type Veredicto } from '../lib/verdict.ts';
+import {
+  calcularVeredicto,
+  type FranjaDia,
+  type Veredicto,
+  type Umbral,
+} from '../lib/verdict.ts';
+import type { Kayak } from '../lib/kayaks.ts';
+import type { Pato } from '../lib/patos.ts';
 import { colorNumero } from '../lib/verdict-color.ts';
 import { calcularSol } from '../lib/sun.ts';
 import { calcularActividadPorHora, type ActividadHora } from '../lib/actividad.ts';
@@ -46,11 +52,35 @@ function localDateKey(d: Date): string {
   return `${y}-${m}-${dd}`;
 }
 
+// Límite superior en km/h para cada grado Beaufort (0 a 12)
+// Beaufort 0: < 1
+// Beaufort 1: 1 - 5
+// Beaufort 2: 6 - 11
+// Beaufort 3: 12 - 19
+// Beaufort 4: 20 - 28
+// Beaufort 5: 29 - 38
+// Beaufort 6: 39 - 49
+// Beaufort 7: 50 - 61
+// Beaufort 8: 62 - 74
+// Beaufort 9: 75 - 88
+// Beaufort 10: 89 - 102
+// Beaufort 11: 103 - 117
+// Beaufort 12: >= 118
+const BF_A_KMH_MAX = [1, 5, 11, 19, 28, 38, 49, 61, 74, 88, 102, 117];
+
+function bfAKmh(bf: number): number {
+  if (bf <= 0) return 0;
+  const idx = Math.min(Math.floor(bf), BF_A_KMH_MAX.length - 1);
+  return BF_A_KMH_MAX[idx] ?? 118;
+}
+
 interface GraficoGrandeProps {
   weather: SpotWeather | null;
   dia: Date;
   franjas: FranjaUsuario[];
   veredictosPorFranja: Record<string, Veredicto | null>;
+  spot: Spot | null;
+  embarcacion: Kayak | Pato;
 }
 
 const GraficoGrande: React.FC<GraficoGrandeProps> = ({
@@ -58,7 +88,12 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
   dia,
   franjas,
   veredictosPorFranja,
+  spot,
+  embarcacion,
 }) => {
+  const ajustes = useAppStore((s) => s.ajustes);
+  const u = ajustes.unidades;
+
   if (!weather || !weather.hourly || weather.hourly.length === 0) {
     return (
       <div
@@ -106,28 +141,74 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
 
   const W = 720;
   const H = 320;
-  const paddingLeft = 32;
-  const paddingRight = 32;
+  const paddingLeft = 34;
+  const paddingRight = 34;
   const paddingTop = 20;
-  const paddingBottom = 34;
+  const paddingBottom = 42;
   const plotW = W - paddingLeft - paddingRight;
   const plotH = H - paddingTop - paddingBottom;
 
-  let olaMax = 0.5;
-  let vientoMax = 5;
+  // 1. CÁLCULO DE MÁXIMOS Y TECHOS DE OLA Y VIENTO
+  let olaMaxDia = 0.1;
+  let vientoMaxDia = 1;
   for (const p of puntos) {
     const o = p.waveHeight ?? 0;
     const v = msAKmh(p.windSpeed) ?? 0;
-    if (o > olaMax) olaMax = o;
-    if (v > vientoMax) vientoMax = v;
+    if (o > olaMaxDia) olaMaxDia = o;
+    if (v > vientoMaxDia) vientoMaxDia = v;
   }
-  olaMax = Math.ceil((olaMax * 1.15) * 10) / 10;
-  vientoMax = Math.ceil((vientoMax * 1.15) / 5) * 5;
+
+  // Obtener umbrales de cada franja horaria del día
+  const zonaSpot = spot?.zona ?? 'mediterraneo_espanol';
+  const categoriaSpot = embarcacion.categoriaWKF;
+
+  const umbralesPorFranja: Record<string, Umbral> = {};
+  for (const f of franjas) {
+    const inicio = f.inicio;
+    const franjaDia: FranjaDia =
+      inicio >= 0 && inicio < 12
+        ? 'manana'
+        : inicio >= 12 && inicio < 20
+        ? 'tarde'
+        : 'noche';
+
+    const res = calcularVeredicto(
+      zonaSpot,
+      categoriaSpot,
+      ajustes.perfil,
+      franjaDia,
+      { viento: 0, ola: 0, periodo: 0, corriente: 0, marea: 0 },
+      embarcacion
+    );
+    umbralesPorFranja[f.id] = res.umbralAplicado;
+  }
+
+  // Techos ajustados del día
+  let techoOlaAjustado = 0;
+  let techoVientoBfAjustado = 0;
+  for (const f of franjas) {
+    const umb = umbralesPorFranja[f.id];
+    if (umb) {
+      if (umb.ola.des > techoOlaAjustado) techoOlaAjustado = umb.ola.des;
+      if (umb.viento.des > techoVientoBfAjustado) techoVientoBfAjustado = umb.viento.des;
+    }
+  }
+
+  const techoVientoAjustadoKmh = bfAKmh(techoVientoBfAjustado);
+
+  let olaMax = Math.max(olaMaxDia * 1.15, techoOlaAjustado * 1.05);
+  olaMax = Math.ceil(olaMax * 10) / 10;
+  if (olaMax <= 0.1) olaMax = 1.0;
+
+  let vientoMax = Math.max(vientoMaxDia * 1.15, techoVientoAjustadoKmh * 1.05);
+  vientoMax = Math.ceil(vientoMax / 5) * 5;
+  if (vientoMax <= 5) vientoMax = 20;
 
   const xHora = (h: number) => paddingLeft + (h / 23) * plotW;
   const yOla = (m: number) => paddingTop + plotH - (Math.min(m, olaMax) / olaMax) * plotH;
   const yViento = (k: number) => paddingTop + plotH - (Math.min(k, vientoMax) / vientoMax) * plotH;
 
+  // Curvas y áreas
   const olaPath = puntos
     .map((p, i) => {
       if (p.waveHeight == null) return null;
@@ -178,9 +259,6 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
     return `${lines.join(' ')} L ${last.x.toFixed(1)},${(paddingTop + plotH).toFixed(1)} L ${first.x.toFixed(1)},${(paddingTop + plotH).toFixed(1)} Z`;
   })();
 
-  const ajustes = useAppStore((s) => s.ajustes);
-  const u = ajustes.unidades;
-
   const marcasY = [0, 0.5, 1];
   const ahora = new Date();
   const esHoy = localDateKey(ahora) === keyDia;
@@ -201,6 +279,7 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
         preserveAspectRatio="xMidYMid meet"
         style={{ width: '100%', height: 'auto', display: 'block' }}
       >
+        {/* 2. FRANJAS DE VEREDICTO: relleno translúcido (opacity 0.03) + línea inferior continua con strokeWidth 2 */}
         {franjas.map((f) => {
           const v = veredictosPorFranja[f.id] ?? null;
           if (!v) return null;
@@ -213,25 +292,103 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           }
           return tramos.map(([a, b], k) => {
             const x1 = xHora(a);
-            const x2 = xHora(b - 1);
+            const x2 = xHora(Math.min(23, b));
             const w = Math.max(0, x2 - x1);
+            const yBottom = paddingTop + plotH;
             return (
-              <rect
-                key={`${f.id}-${k}`}
-                x={x1}
-                y={paddingTop}
-                width={w}
-                height={plotH}
-                fill={color}
-                fillOpacity={0.06}
-                stroke={color}
-                strokeWidth={1.5}
-                strokeOpacity={0.85}
-              />
+              <g key={`franja-bg-${f.id}-${k}`}>
+                <rect
+                  x={x1}
+                  y={paddingTop}
+                  width={w}
+                  height={plotH}
+                  fill={color}
+                  fillOpacity={0.03}
+                />
+                <line
+                  x1={x1}
+                  y1={yBottom}
+                  x2={x2}
+                  y2={yBottom}
+                  stroke={color}
+                  strokeWidth={2}
+                />
+              </g>
             );
           });
         })}
 
+        {/* 5. LÍNEAS DE UMBRAL (para cada franja y tramo: ola continua 0.8, viento discontinua 0.8) */}
+        {franjas.map((f) => {
+          const umb = umbralesPorFranja[f.id];
+          if (!umb) return null;
+          const tramos: Array<[number, number]> = [];
+          if (f.inicio < f.fin) tramos.push([f.inicio, f.fin]);
+          else {
+            tramos.push([f.inicio, 24]);
+            tramos.push([0, f.fin]);
+          }
+
+          // Umbrales de ola en metros: fav (fin favorable), ace (fin aceptable), exi (fin exigente)
+          const nivelesOla = [
+            { val: umb.ola.fav, color: 'var(--verdict-aceptable)' },
+            { val: umb.ola.ace, color: 'var(--verdict-exigente)' },
+            { val: umb.ola.exi, color: 'var(--verdict-desaconsejado)' },
+          ];
+
+          // Umbrales de viento convertidos a km/h
+          const nivelesViento = [
+            { val: bfAKmh(umb.viento.fav), color: 'var(--verdict-aceptable)' },
+            { val: bfAKmh(umb.viento.ace), color: 'var(--verdict-exigente)' },
+            { val: bfAKmh(umb.viento.exi), color: 'var(--verdict-desaconsejado)' },
+          ];
+
+          return tramos.map(([a, b], k) => {
+            const x1 = xHora(a);
+            const x2 = xHora(Math.min(23, b));
+            return (
+              <g key={`umbrales-${f.id}-${k}`}>
+                {/* Líneas de umbral de ola */}
+                {nivelesOla.map((niv, ni) => {
+                  if (niv.val <= 0 || niv.val > olaMax) return null;
+                  const y = yOla(niv.val);
+                  return (
+                    <line
+                      key={`umb-ola-${f.id}-${k}-${ni}`}
+                      x1={x1}
+                      y1={y}
+                      x2={x2}
+                      y2={y}
+                      stroke={niv.color}
+                      strokeWidth={0.8}
+                      strokeOpacity={0.6}
+                    />
+                  );
+                })}
+                {/* Líneas de umbral de viento */}
+                {nivelesViento.map((niv, ni) => {
+                  if (niv.val <= 0 || niv.val > vientoMax) return null;
+                  const y = yViento(niv.val);
+                  return (
+                    <line
+                      key={`umb-vie-${f.id}-${k}-${ni}`}
+                      x1={x1}
+                      y1={y}
+                      x2={x2}
+                      y2={y}
+                      stroke={niv.color}
+                      strokeWidth={0.8}
+                      strokeDasharray="2 2"
+                      strokeOpacity={0.6}
+                    />
+                  );
+                })}
+              </g>
+            );
+          });
+        })}
+
+        {/* Líneas de rejilla horizontal */}
         {marcasY.map((frac) => {
           const y = paddingTop + plotH - frac * plotH;
           return (
@@ -248,6 +405,7 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           );
         })}
 
+        {/* Eje Y izquierdo: OLA */}
         {marcasY.map((frac) => {
           const valCrudo = frac * olaMax;
           const valConvertido = valorOla(valCrudo, u.ola) ?? valCrudo;
@@ -255,13 +413,14 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           return (
             <g key={`yola-${frac}`}>
               <line x1={paddingLeft - 4} y1={y} x2={paddingLeft} y2={y} stroke="var(--text-dim)" strokeWidth={0.6} />
-              <text x={paddingLeft - 6} y={y + 2} fontSize={9} fill="var(--text-dim)" textAnchor="end" fontFamily="Fira Code, monospace">
+              <text x={paddingLeft - 6} y={y + 3} fontSize={9} fill="var(--text-dim)" textAnchor="end" fontFamily="Fira Code, monospace">
                 {valConvertido.toFixed(1)}
               </text>
             </g>
           );
         })}
 
+        {/* Eje Y derecho: VIENTO */}
         {marcasY.map((frac) => {
           const valCrudo = frac * vientoMax;
           const valConvertido = valorViento(valCrudo, u.viento) ?? valCrudo;
@@ -269,15 +428,17 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           return (
             <g key={`yvie-${frac}`}>
               <line x1={paddingLeft + plotW} y1={y} x2={paddingLeft + plotW + 4} y2={y} stroke="var(--text-dim)" strokeWidth={0.6} />
-              <text x={paddingLeft + plotW + 6} y={y + 2} fontSize={9} fill="var(--text-dim)" textAnchor="start" fontFamily="Fira Code, monospace">
+              <text x={paddingLeft + plotW + 6} y={y + 3} fontSize={9} fill="var(--text-dim)" textAnchor="start" fontFamily="Fira Code, monospace">
                 {Math.round(valConvertido)}
               </text>
             </g>
           );
         })}
 
+        {/* Línea base del eje X */}
         <line x1={paddingLeft} y1={paddingTop + plotH} x2={paddingLeft + plotW} y2={paddingTop + plotH} stroke="var(--border)" strokeWidth={0.6} />
 
+        {/* Curvas de datos */}
         {olaArea && <path d={olaArea} fill="var(--accent)" opacity={0.15} />}
         {olaPath && (
           <path d={olaPath} fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
@@ -288,18 +449,70 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           <path d={vientoPath} fill="none" stroke="var(--accent-2)" strokeWidth={1.6} strokeDasharray="4 3" strokeLinecap="round" strokeLinejoin="round" />
         )}
 
-        {[0, 6, 12, 18, 23].map((h) => (
-          <g key={`xh-${h}`}>
-            <line x1={xHora(h)} y1={paddingTop + plotH} x2={xHora(h)} y2={paddingTop + plotH + 3} stroke="var(--text-dim)" strokeWidth={0.6} />
-            <text x={xHora(h)} y={H - 6} fontSize={10} fill="var(--text-dim)" textAnchor="middle" fontFamily="Fira Code, monospace">
-              {h}
-            </text>
-          </g>
-        ))}
+        {/* 3. EJE X - FILA 2: NOMBRE DE FRANJA */}
+        {franjas.map((f) => {
+          const v = veredictosPorFranja[f.id] ?? null;
+          const color = v ? veredictoAColor(v) : 'var(--text-dim)';
+          const tramos: Array<{ a: number; b: number; len: number }> = [];
+          if (f.inicio < f.fin) {
+            tramos.push({ a: f.inicio, b: f.fin, len: f.fin - f.inicio });
+          } else {
+            tramos.push({ a: f.inicio, b: 24, len: 24 - f.inicio });
+            tramos.push({ a: 0, b: f.fin, len: f.fin });
+          }
 
+          // Elegir el tramo mayor; si son iguales, el de la derecha
+          let elegido = tramos[0];
+          if (tramos.length > 1) {
+            if (tramos[1].len >= tramos[0].len) {
+              elegido = tramos[1];
+            }
+          }
+
+          const centroHora = (elegido.a + Math.min(23, elegido.b)) / 2;
+          const xCentro = xHora(centroHora);
+
+          return (
+            <text
+              key={`label-franja-${f.id}`}
+              x={xCentro}
+              y={paddingTop + plotH + 13}
+              fontSize={10}
+              fill={color}
+              textAnchor="middle"
+              fontFamily="Fira Code, monospace"
+              fontWeight={600}
+            >
+              {f.nombre}
+            </text>
+          );
+        })}
+
+        {/* 4. EJE X - FILA 1: TODAS LAS 24 HORAS (0 a 23) */}
+        {Array.from({ length: 24 }, (_, h) => {
+          const x = xHora(h);
+          const yTick = paddingTop + plotH;
+          return (
+            <g key={`xh-${h}`}>
+              <line x1={x} y1={yTick} x2={x} y2={yTick + 2} stroke="var(--text-dim)" strokeWidth={0.5} opacity={0.5} />
+              <text
+                x={x}
+                y={paddingTop + plotH + 26}
+                fontSize={8.5}
+                fill="var(--text-dim)"
+                textAnchor="middle"
+                fontFamily="Fira Code, monospace"
+              >
+                {h}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Indicador "Ahora" si es hoy */}
         {esHoy && (
           <g>
-            <line x1={xHora(horaAhora)} y1={paddingTop} x2={xHora(horaAhora)} y2={paddingTop + plotH} stroke="var(--accent)" strokeWidth={1} strokeDasharray="3 2" opacity={0.6} />
+            <line x1={xHora(horaAhora)} y1={paddingTop} x2={xHora(horaAhora)} y2={paddingTop + plotH} stroke="var(--accent)" strokeWidth={1} strokeDasharray="3 2" opacity={0.7} />
             <text x={xHora(horaAhora)} y={paddingTop - 6} fontSize={9} fill="var(--accent)" textAnchor="middle" fontFamily="Fira Code, monospace" fontWeight={600}>
               Ahora
             </text>
@@ -311,7 +524,7 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          padding: '4px 32px 0',
+          padding: '4px 34px 0',
           fontSize: '0.9rem',
           color: 'var(--text-dim)',
         }}
@@ -814,7 +1027,6 @@ export const PrevisionScreen: React.FC = () => {
   const spots = useAppStore((s) => s.spots);
   const ajustes = useAppStore((s) => s.ajustes);
   const getFreshWeather = useAppStore((s) => s.getFreshWeather);
-  const kayakActivo = getKayakActivo(ajustes.kayakIds);
 
   const [spotActivoId, setSpotActivoId] = useState<string | null>(
     spots[0]?.id ?? null
@@ -947,6 +1159,8 @@ export const PrevisionScreen: React.FC = () => {
         dia={diaSeleccionado.fecha}
         franjas={ajustes.franjas}
         veredictosPorFranja={veredictosPorFranja}
+        spot={spotActivo}
+        embarcacion={embarcacionSpot}
       />
 
       {puntosDia.length > 0 && <ResumenDia puntos={puntosDia} />}
