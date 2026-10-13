@@ -1,8 +1,16 @@
-// src/screens/SpotScreen.tsx — v1.013 limpia
+// src/screens/SpotScreen.tsx — v1.019 limpia
+// Cambios v1.019:
+//   - Cabecera de dos líneas (nombre + unidad) en TODAS las tablas.
+//   - Pestaña Oleaje reestructurada:
+//       Hora | O.Total | O.Fondo | Periodo | O.Viento | Corriente
+//       Dirección dentro de cada celda de ola.
+//       Corriente: velocidad + dirección + indicador textual.
+//   - Botón MAR CRUZADA en pestaña Oleaje (si aplica).
+//   - Modal explicativo de mar cruzada.
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAppStore, getKayakActivo, getEmbarcacionParaSpot } from '../state/store.ts';
+import { useAppStore, getEmbarcacionParaSpot } from '../state/store.ts';
 import { SelectorEmbarcacionModal } from '../components/SelectorEmbarcacionModal.tsx';
 import { formatearCoords } from '../lib/coords.ts';
 import {
@@ -28,6 +36,7 @@ import {
   kmhAKn,
   kmhABf,
   weatherCodeAIcono,
+  gradosACardinal16,
   type HourlyPoint,
 } from '../lib/openmeteo.ts';
 import { nombreViento } from '../lib/wind.ts';
@@ -122,9 +131,166 @@ function formatearValorFactor(factor: keyof Umbral, h: HourlyPoint): string {
   }
 }
 
+// ============================================================
+// DETECCIÓN DE MAR CRUZADA
+// ============================================================
+// Criterio: windWaveHeight > 0.3 m Y swellWaveHeight > 0.3 m
+// Y diferencia angular entre windWaveDirection y swellWaveDirection > 60°.
+function diferenciaAngular(a: number, b: number): number {
+  const d = Math.abs(((a - b) % 360 + 360) % 360);
+  return d > 180 ? 360 - d : d;
+}
+
+function hayMarCruzadaEnHora(h: HourlyPoint): boolean {
+  const wh = h.windWaveHeight ?? 0;
+  const sh = h.swellWaveHeight ?? 0;
+  const wd = h.windWaveDirection;
+  const sd = h.swellWaveDirection;
+  if (wh <= 0.3 || sh <= 0.3) return false;
+  if (wd == null || sd == null) return false;
+  return diferenciaAngular(wd, sd) > 60;
+}
+
+function hayMarCruzadaEnHoras(horas: HourlyPoint[]): boolean {
+  return horas.some(hayMarCruzadaEnHora);
+}
+
+// ============================================================
+// MODAL DE MAR CRUZADA
+// ============================================================
+const ModalMarCruzada: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const { t } = useTranslation();
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0,0,0,0.75)',
+        zIndex: 3000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          backgroundColor: 'var(--surface)',
+          border: '1px solid var(--verdict-desaconsejado)',
+          borderRadius: 12,
+          padding: 20,
+          maxWidth: 480,
+          width: '100%',
+          maxHeight: '85vh',
+          overflowY: 'auto',
+          boxShadow: '0 12px 40px rgba(0, 0, 0, 0.6)',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 14,
+          }}
+        >
+          <h3
+            style={{
+              margin: 0,
+              fontSize: '1.05rem',
+              fontWeight: 700,
+              color: 'var(--verdict-desaconsejado)',
+              letterSpacing: '0.04em',
+            }}
+          >
+            {t('marcruzada.titulo', { defaultValue: 'MAR CRUZADA' })}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--text-dim)',
+              cursor: 'pointer',
+              fontSize: '1.1rem',
+              padding: '4px 8px',
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <p
+          style={{
+            fontSize: '0.9rem',
+            lineHeight: 1.55,
+            color: 'var(--text)',
+            margin: '0 0 12px 0',
+          }}
+        >
+          {t('marcruzada.intro', {
+            defaultValue:
+              'Hay dos sistemas de ola viniendo de direcciones distintas. Eso se llama mar cruzada.',
+          })}
+        </p>
+
+        <p
+          style={{
+            fontSize: '0.9rem',
+            lineHeight: 1.55,
+            color: 'var(--text)',
+            margin: '0 0 12px 0',
+          }}
+        >
+          {t('marcruzada.cuerpo1', {
+            defaultValue:
+              'En mar cruzada, el kayak recibe golpes desde dos ángulos. Los picos de una ola y de la otra se suman de vez en cuando, y el kayak cabecea y balancea a la vez. Es incómodo, agota, y en un descuido puede volcar.',
+          })}
+        </p>
+
+        <p
+          style={{
+            fontSize: '0.9rem',
+            lineHeight: 1.55,
+            color: 'var(--text)',
+            margin: '0 0 12px 0',
+          }}
+        >
+          {t('marcruzada.cuerpo2', {
+            defaultValue:
+              'Si sales con mar cruzada, extrema la precaución. No te alejes de la costa. Mantén el kayak siempre con la proa a una de las dos olas. Y si el mar se pone peor, vuelve antes de que la situación se complique.',
+          })}
+        </p>
+
+        <p
+          style={{
+            fontSize: '0.8rem',
+            lineHeight: 1.5,
+            color: 'var(--text-dim)',
+            margin: '14px 0 0 0',
+            fontStyle: 'italic',
+          }}
+        >
+          {t('marcruzada.criterio', {
+            defaultValue:
+              'Se avisa de mar cruzada cuando la ola de viento y la ola de fondo superan los 0,3 m cada una y vienen de direcciones separadas por más de 60°.',
+          })}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// TABLA GENÉRICA — cabecera de dos líneas
+// ============================================================
 interface ColumnaTabla<T> {
   key: string;
   label: string;
+  unit?: string;
   render: (h: T) => React.ReactNode;
   veredicto?: (h: T) => Veredicto | null;
 }
@@ -159,15 +325,43 @@ function TablaDatos<T extends { time: string }>({
       borderRadius: 8, border: '1px solid var(--border)',
       overflow: 'hidden', fontSize: '0.72rem',
     }}>
+      {/* Cabecera de dos líneas */}
       <div style={{
         display: 'grid', gridTemplateColumns: gridCols,
         backgroundColor: 'var(--surface)', borderBottom: '1px solid var(--border)',
         fontSize: '0.68rem', color: 'var(--text-dim)', fontWeight: 700,
         textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0,
       }}>
-        <div style={{ padding: '6px 6px', textAlign: 'left' }}>Hora</div>
+        <div style={{
+          padding: '6px 6px', textAlign: 'left',
+          display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+        }}>
+          <div style={{ lineHeight: 1.2 }}>Hora</div>
+          <div style={{ lineHeight: 1.2, fontSize: '0.6rem', minHeight: '0.72rem', opacity: 0 }}>
+            {'\u00A0'}
+          </div>
+        </div>
         {columnas.map((c) => (
-          <div key={c.key} style={{ padding: '6px 4px', textAlign: 'center' }}>{c.label}</div>
+          <div
+            key={c.key}
+            style={{
+              padding: '6px 4px', textAlign: 'center',
+              display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+            }}
+          >
+            <div style={{ lineHeight: 1.2 }}>{c.label}</div>
+            <div
+              style={{
+                lineHeight: 1.2,
+                fontSize: '0.6rem',
+                minHeight: '0.72rem',
+                opacity: c.unit ? 0.75 : 0,
+                marginTop: 1,
+              }}
+            >
+              {c.unit || '\u00A0'}
+            </div>
+          </div>
         ))}
       </div>
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
@@ -268,6 +462,9 @@ const BotonAyuda: React.FC<{ tabId: string }> = ({ tabId }) => (
   }}>?</button>
 );
 
+// ============================================================
+// SPOTSCREEN
+// ============================================================
 export const SpotScreen: React.FC<SpotScreenProps> = ({
   spotId, onClose, onEditSpot,
 }) => {
@@ -286,6 +483,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 
   const [tabActiva, setTabActiva] = useState<TabId>('waves');
   const [modalEmbarcacionAbierto, setModalEmbarcacionAbierto] = useState(false);
+  const [modalMarCruzadaAbierto, setModalMarCruzadaAbierto] = useState(false);
   const [coordsCopiedFeedback, setCoordsCopiedFeedback] = useState(false);
   const [loading, setLoading] = useState(false);
   const loadingRef = useRef(false);
@@ -445,7 +643,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     const orden = ajustes.ordenSubpestanas || [];
     if (orden.length === 0) return baseTabs;
 
-    // Ordenar respetando el orden elegido por el usuario
     return [...baseTabs].sort((a, b) => {
       const idxA = orden.indexOf(a);
       const idxB = orden.indexOf(b);
@@ -459,6 +656,16 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     if (!weather?.hourly) return [];
     return filtrarHoras(weather.hourly, franjaActiva, ajustes.filtroFranja, null);
   }, [weather, franjaActiva, ajustes.filtroFranja]);
+
+  // ¿Hay mar cruzada en el día actual (primer día del weather)?
+  const hayMarCruzadaHoy = useMemo(() => {
+    if (!weather?.hourly) return false;
+    const keyHoy = localDateKey(new Date());
+    const horasHoy = weather.hourly.filter(
+      (h) => localDateKey(new Date(h.time)) === keyHoy
+    );
+    return hayMarCruzadaEnHoras(horasHoy);
+  }, [weather]);
 
   const actividad: ActividadHora[] = useMemo(() => {
     if (!weather?.hourly || !spot) return [];
@@ -629,6 +836,29 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
       default: return null;
     }
   })();
+
+  // Indicador textual de corriente (universal, no depende de zona ni kayak)
+  const indicadorCorriente = (kn: number | null): string | null => {
+    if (kn == null) return null;
+    if (kn < 0.05) return 'agua parada';
+    if (kn < 0.4) return 'corriente floja';
+    if (kn <= 1.4) return null;
+    if (kn <= 2.0) return 'deriva rápida';
+    return 'deriva fuerte';
+  };
+
+  // Render de celda de ola con dirección al lado
+  const renderOlaConDireccion = (altura: number | null, dirGrados: number | null) => {
+    if (altura == null) return '—';
+    const alturaTxt = formatearOla(altura, u.ola);
+    if (dirGrados == null) return alturaTxt;
+    const card = gradosACardinal16(dirGrados);
+    return (
+      <span>
+        {alturaTxt} <span style={{ opacity: 0.75, fontSize: '0.85em' }}>{card}</span>
+      </span>
+    );
+  };
 
   return (
     <div style={{
@@ -963,6 +1193,33 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                 {numeroGrande.unit}
               </span>
             </div>
+
+            {/* Botón MAR CRUZADA (solo pestaña Oleaje, si aplica) */}
+            {tabActiva === 'waves' && hayMarCruzadaHoy && (
+              <button
+                type="button"
+                onClick={() => setModalMarCruzadaAbierto(true)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '8px 14px',
+                  backgroundColor: 'rgba(255, 45, 85, 0.15)',
+                  border: '2px solid var(--verdict-desaconsejado)',
+                  borderRadius: 8,
+                  color: 'var(--verdict-desaconsejado)',
+                  fontSize: '0.85rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.06em',
+                  cursor: 'pointer',
+                  boxShadow: '0 0 10px rgba(255, 45, 85, 0.45)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                ⚠ MAR CRUZADA
+              </button>
+            )}
+
             <a href="https://ko-fi.com/xanthar" target="_blank" rel="noopener noreferrer"
               title={t('settings.donate')} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 10,
@@ -980,25 +1237,75 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         )}
 
         {tabActiva === 'waves' && weather && (
-          <TablaDatos tabId="waves" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
+          <TablaDatos
+            tabId="waves"
+            horas={horasFiltradas}
+            colorNivel={colorNivel}
+            lang={lang}
             columnas={[
-              { key: 'wt', label: `${t('factors.waveHeightTotal')} (${SUFIJO_OLA[u.ola]})`,
-                render: (h) => formatearOla(h.waveHeight, u.ola),
-                veredicto: subVeredictoWaves },
-              { key: 'ww', label: `${t('factors.waveHeightWind')} (${SUFIJO_OLA[u.ola]})`,
-                render: (h) => formatearOla(h.windWaveHeight, u.ola),
-                veredicto: subVeredictoWaves },
-              { key: 'ws', label: `${t('factors.waveHeightSwell')} (${SUFIJO_OLA[u.ola]})`,
-                render: (h) => formatearOla(h.swellWaveHeight, u.ola),
-                veredicto: subVeredictoWaves },
-              { key: 'wp', label: t('factors.wavePeriod'),
-                render: (h) => h.wavePeriod != null ? `${h.wavePeriod.toFixed(0)} s` : '—',
-                veredicto: subVeredictoPeriodo },
-              { key: 'wd', label: t('factors.waveDirection'),
+              {
+                key: 'ot',
+                label: t('factors.waveHeightTotal', { defaultValue: 'O.Total' }),
+                unit: `(${SUFIJO_OLA[u.ola]})`,
+                render: (h) => renderOlaConDireccion(h.waveHeight, h.waveDirection),
+                veredicto: subVeredictoWaves,
+              },
+              {
+                key: 'of',
+                label: t('factors.olaFondo', { defaultValue: 'O.Fondo' }),
+                unit: `(${SUFIJO_OLA[u.ola]})`,
+                render: (h) => renderOlaConDireccion(h.swellWaveHeight, h.swellWaveDirection),
+                veredicto: subVeredictoWaves,
+              },
+              {
+                key: 'per',
+                label: t('factors.wavePeriod', { defaultValue: 'Periodo' }),
+                unit: '(s)',
+                render: (h) => h.wavePeriod != null ? `${h.wavePeriod.toFixed(0)}` : '—',
+                veredicto: subVeredictoPeriodo,
+              },
+              {
+                key: 'ov',
+                label: t('factors.olaViento', { defaultValue: 'O.Viento' }),
+                unit: `(${SUFIJO_OLA[u.ola]})`,
+                render: (h) => renderOlaConDireccion(h.windWaveHeight, h.windWaveDirection),
+                veredicto: subVeredictoWaves,
+              },
+              {
+                key: 'corr',
+                label: t('factors.current', { defaultValue: 'Corriente' }),
+                unit: `(${SUFIJO_CORRIENTE[u.corriente]})`,
                 render: (h) => {
-                  const nv = nombreViento(h.waveDirection, spot.zona ?? 'mediterraneo_espanol', lang);
-                  return nv.grados != null ? `${nv.cardinal} ${Math.round(nv.grados)}°` : '—';
-                } },
+                  if (h.currentVelocity == null) return '—';
+                  const vel = formatearCorriente(h.currentVelocity, u.corriente);
+                  const dir = h.currentDirection != null
+                    ? gradosACardinal16(h.currentDirection)
+                    : null;
+                  const ind = indicadorCorriente(h.currentVelocity);
+                  return (
+                    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <span>
+                        {vel}
+                        {dir != null && (
+                          <span style={{ opacity: 0.75, fontSize: '0.85em', marginLeft: 3 }}>
+                            {dir}
+                          </span>
+                        )}
+                      </span>
+                      {ind != null && (
+                        <span style={{
+                          fontSize: '0.6rem',
+                          opacity: 0.8,
+                          fontStyle: 'italic',
+                          lineHeight: 1.1,
+                          marginTop: 1,
+                        }}>{ind}</span>
+                      )}
+                    </span>
+                  );
+                },
+                veredicto: subVeredictoCurrent,
+              },
             ]}
           />
         )}
@@ -1006,19 +1313,19 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {tabActiva === 'wind' && weather && (
           <TablaDatos tabId="wind" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
             columnas={[
-              { key: 'wd', label: 'Dir',
+              { key: 'wd', label: 'Dir', unit: '',
                 render: (h) => {
                   const nv = nombreViento(h.windDirection, spot.zona ?? 'mediterraneo_espanol', lang);
                   return nv.grados != null ? `${nv.nombre} (${nv.cardinal})` : '—';
                 },
                 veredicto: subVeredictoWind },
-              { key: 'bf', label: 'Bf',
+              { key: 'bf', label: 'Bf', unit: '',
                 render: (h) => { const b = kmhABf(h.windSpeed); return b != null ? `${b}` : '—'; },
                 veredicto: subVeredictoWind },
-              { key: 'w1', label: `V.(${SUFIJO_VIENTO[u.viento]})`,
+              { key: 'w1', label: 'V.', unit: `(${SUFIJO_VIENTO[u.viento]})`,
                 render: (h) => formatearViento(h.windSpeed, u.viento),
                 veredicto: subVeredictoWind },
-              { key: 'g1', label: `R.(${SUFIJO_VIENTO[u.viento]})`,
+              { key: 'g1', label: 'R.', unit: `(${SUFIJO_VIENTO[u.viento]})`,
                 render: (h) => {
                   const v = h.windGusts;
                   if (v == null) return '—';
@@ -1035,10 +1342,10 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                   );
                 },
                 veredicto: subVeredictoWindGust },
-              { key: 'w2', label: `V.(${SUFIJO_VIENTO[u.viento2]})`,
+              { key: 'w2', label: 'V.', unit: `(${SUFIJO_VIENTO[u.viento2]})`,
                 render: (h) => formatearViento(h.windSpeed, u.viento2),
                 veredicto: subVeredictoWind },
-              { key: 'g2', label: `R.(${SUFIJO_VIENTO[u.viento2]})`,
+              { key: 'g2', label: 'R.', unit: `(${SUFIJO_VIENTO[u.viento2]})`,
                 render: (h) => formatearViento(h.windGusts, u.viento2),
                 veredicto: subVeredictoWindGust },
             ]}
@@ -1048,20 +1355,20 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {tabActiva === 'weather' && weather && (
           <TablaDatos tabId="weather" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
             columnas={[
-              { key: 'ico', label: t('factors.weatherCode'),
+              { key: 'ico', label: t('factors.weatherCode'), unit: '',
                 render: (h) => {
                   const isNight = new Date(h.time).getHours() < 7 || new Date(h.time).getHours() >= 20;
                   return <span style={{ fontSize: '1.1rem' }}>{weatherCodeAIcono(h.weatherCode, isNight)}</span>;
                 } },
-              { key: 'cc', label: t('factors.cloudCover'),
-                render: (h) => h.cloudCover != null ? `${Math.round(h.cloudCover)}%` : '—' },
-              { key: 'pr', label: t('factors.precipitation'),
+              { key: 'cc', label: t('factors.cloudCover'), unit: '(%)',
+                render: (h) => h.cloudCover != null ? `${Math.round(h.cloudCover)}` : '—' },
+              { key: 'pr', label: t('factors.precipitation'), unit: `(${SUFIJO_PRECIPITACION[u.precipitacion]})`,
                 render: (h) => formatearPrecipitacion(h.precipitation, u.precipitacion) },
-              { key: 'prp', label: t('factors.precipitationProbability'),
-                render: (h) => h.precipitationProbability != null ? `${Math.round(h.precipitationProbability)}%` : '—' },
-              { key: 'tmp', label: t('factors.temperature'),
+              { key: 'prp', label: t('factors.precipitationProbability'), unit: '(%)',
+                render: (h) => h.precipitationProbability != null ? `${Math.round(h.precipitationProbability)}` : '—' },
+              { key: 'tmp', label: t('factors.temperature'), unit: `(${SUFIJO_TEMPERATURA[u.temperatura]})`,
                 render: (h) => formatearTemperatura(h.temperature, u.temperatura) },
-              { key: 'vis', label: t('factors.visibility'),
+              { key: 'vis', label: t('factors.visibility'), unit: '(km)',
                 render: (h) => formatearDistancia(h.visibility != null ? h.visibility / 1000 : null, u.visibilidad) },
             ]}
           />
@@ -1070,9 +1377,9 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {tabActiva === 'air' && weather && (
           <TablaDatos tabId="air" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
             columnas={[
-              { key: 't', label: t('factors.temperature'), render: (h) => formatearTemperatura(h.temperature, u.temperatura) },
-              { key: 'at', label: t('factors.apparentTemperature'), render: (h) => formatearTemperatura(h.apparentTemperature, u.temperatura) },
-              { key: 'sst', label: t('factors.seaTemperature'), render: (h) => formatearTemperatura(h.seaSurfaceTemperature, u.temperatura) },
+              { key: 't', label: t('factors.temperature'), unit: `(${SUFIJO_TEMPERATURA[u.temperatura]})`, render: (h) => formatearTemperatura(h.temperature, u.temperatura) },
+              { key: 'at', label: t('factors.apparentTemperature'), unit: `(${SUFIJO_TEMPERATURA[u.temperatura]})`, render: (h) => formatearTemperatura(h.apparentTemperature, u.temperatura) },
+              { key: 'sst', label: t('factors.seaTemperature'), unit: `(${SUFIJO_TEMPERATURA[u.temperatura]})`, render: (h) => formatearTemperatura(h.seaSurfaceTemperature, u.temperatura) },
             ]}
           />
         )}
@@ -1080,8 +1387,8 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {tabActiva === 'barometer' && weather && (
           <TablaDatos tabId="barometer" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
             columnas={[
-              { key: 'p', label: t('factors.pressure'), render: (h) => formatearPresion(h.pressure, u.presion) },
-              { key: 'tr', label: t('factors.pressureTrend'),
+              { key: 'p', label: t('factors.pressure'), unit: `(${SUFIJO_PRESION[u.presion]})`, render: (h) => formatearPresion(h.pressure, u.presion) },
+              { key: 'tr', label: t('factors.pressureTrend'), unit: '',
                 render: (h) => {
                   const idx = horasFiltradas.indexOf(h);
                   if (idx < 3) return '—';
@@ -1111,7 +1418,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {tabActiva === 'activity' && weather && (
           <TablaDatos tabId="activity" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
             columnas={[
-              { key: 'cv', label: t('factors.currentKn'),
+              { key: 'cv', label: t('factors.currentKn', { defaultValue: 'Corriente' }), unit: `(${SUFIJO_CORRIENTE[u.corriente]})`,
                 render: (h) => {
                   if (h.currentVelocity == null) return '—';
                   const kn = h.currentVelocity;
@@ -1126,16 +1433,16 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                   );
                 },
                 veredicto: subVeredictoCurrent },
-              { key: 'cd', label: t('factors.currentDirection'),
+              { key: 'cd', label: t('factors.currentDirection'), unit: '',
                 render: (h) => {
                   const nv = nombreViento(h.currentDirection, spot.zona ?? 'mediterraneo_espanol', lang);
                   return nv.grados != null ? `${nv.cardinal} ${Math.round(nv.grados)}°` : '—';
                 } },
-              { key: 'act', label: t('factors.fishActivity'),
+              { key: 'act', label: t('factors.fishActivity'), unit: '(x/10)',
                 render: (h) => {
                   const a = actividad.find((x) => x.hora === h.time);
                   if (!a) return '—';
-                  return <span style={{ fontSize: '0.68rem' }}>{a.coeficiente}/10</span>;
+                  return <span style={{ fontSize: '0.68rem' }}>{a.coeficiente}</span>;
                 } },
             ]}
           />
@@ -1158,10 +1465,10 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {tabActiva === 'tides' && weather && (
           <TablaDatos tabId="tides" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
             columnas={[
-              { key: 'sl', label: `${t('factors.seaLevel')} (${SUFIJO_OLA[u.ola]})`,
+              { key: 'sl', label: t('factors.seaLevel'), unit: `(${SUFIJO_OLA[u.ola]})`,
                 render: (h) => formatearOla(h.seaLevelHeight, u.ola),
                 veredicto: subVeredictoMarea },
-              { key: 'tr', label: t('factors.seaLevelTrend'),
+              { key: 'tr', label: t('factors.seaLevelTrend'), unit: '',
                 render: (h) => {
                   const idx = horasFiltradas.indexOf(h);
                   if (idx === 0) return '—';
@@ -1223,6 +1530,10 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
             window.dispatchEvent(new CustomEvent('wkf:ir-a-ajustes'));
           }}
         />
+      )}
+
+      {modalMarCruzadaAbierto && (
+        <ModalMarCruzada onClose={() => setModalMarCruzadaAbierto(false)} />
       )}
     </div>
   );
