@@ -652,6 +652,18 @@ Por favor, explícame todo esto como si tuviera poca experiencia técnica. Qué 
   },
 
   privacidad: { note: 'Ningún dato personal sale de tu dispositivo.' },
+
+  marcruzada: {
+    titulo: 'MAR CRUZADA',
+    intro:
+      'Hay dos sistemas de ola viniendo de direcciones distintas. Eso se llama mar cruzada.',
+    cuerpo1:
+      'En mar cruzada, el kayak recibe golpes desde dos ángulos. Los picos de una ola y de la otra se suman de vez en cuando, y el kayak cabecea y balancea a la vez. Es incómodo, agota, y en un descuido puede volcar.',
+    cuerpo2:
+      'Si sales con mar cruzada, extrema la precaución. No te alejes de la costa. Mantén el kayak siempre con la proa a una de las dos olas. Y si el mar se pone peor, vuelve antes de que la situación se complique.',
+    criterio:
+      'Se avisa de mar cruzada cuando la ola de viento y la ola de fondo superan los 0,3 m cada una y vienen de direcciones separadas por más de 60°.',
+  },
 };
 
 export type StringsSchema = typeof stringsEs;

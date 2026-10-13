@@ -45,3 +45,12 @@ export function colorNumero(
       return null;
   }
 }
+
+export function colorPescaCorriente(kt: number | null): string | null {
+  if (kt == null) return null;
+  if (kt === 0) return 'var(--verdict-desaconsejado)';
+  if (kt < 0.5) return 'var(--verdict-exigente)';
+  if (kt <= 1.0) return 'var(--verdict-favorable)';
+  if (kt <= 1.5) return 'var(--verdict-aceptable)';
+  return 'var(--verdict-exigente)';
+}

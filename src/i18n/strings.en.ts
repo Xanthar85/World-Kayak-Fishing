@@ -645,4 +645,16 @@ Please explain all this to me as if I had little technical experience. What does
   },
 
   privacidad: { note: 'No personal data leaves your device.' },
+
+  marcruzada: {
+    titulo: 'CROSS SEA',
+    intro:
+      'There are two wave systems coming from different directions. That is called cross sea.',
+    cuerpo1:
+      'In a cross sea, the kayak takes hits from two angles. The peaks of one wave and the other add up from time to time, and the kayak pitches and rolls at the same time. It is uncomfortable, tiring, and a single lapse can capsize you.',
+    cuerpo2:
+      'If you go out in a cross sea, take extreme care. Do not stray far from the coast. Keep the kayak bow into one of the two wave systems at all times. And if the sea gets worse, turn back before the situation becomes complicated.',
+    criterio:
+      'A cross sea warning is issued when the wind wave and the swell each exceed 0.3 m and come from directions separated by more than 60°.',
+  },
 };

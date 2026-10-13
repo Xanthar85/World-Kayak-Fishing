@@ -28,7 +28,7 @@ import {
 } from '../lib/verdict.ts';
 import type { Kayak } from '../lib/kayaks.ts';
 import type { Pato } from '../lib/patos.ts';
-import { colorNumero } from '../lib/verdict-color.ts';
+import { colorNumero, colorPescaCorriente } from '../lib/verdict-color.ts';
 import { calcularSol } from '../lib/sun.ts';
 import { calcularLuna, emojiFase } from '../lib/moon.ts';
 import { calcularActividadPorHora, type ActividadHora } from '../lib/actividad.ts';
@@ -1149,8 +1149,7 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                 const vStr = valorVientoNum.toFixed(1).replace('.', ',');
                 if (point.windDirection != null) {
                   const card = abreviaturaViento(point.windDirection);
-                  const deg = Math.round(point.windDirection);
-                  vientoTexto = `${vStr}/${card}${deg}º`;
+                  vientoTexto = `${vStr}/${card}`;
                 } else {
                   vientoTexto = vStr;
                 }
@@ -1180,24 +1179,9 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                 valorRachaNum != null ? valorRachaNum.toFixed(1).replace('.', ',') : '—';
               const esRachaFuerte = point?.windGusts != null && point.windGusts >= 30;
 
-              const vKN =
-                point?.currentVelocity != null && spot
-                  ? calcularVeredicto(
-                      spot.zona ?? 'mediterraneo_espanol',
-                      categoriaKayak,
-                      ajustes.perfil,
-                      franjaDia,
-                      {
-                        viento: 0,
-                        ola: 0,
-                        periodo: 0,
-                        corriente: point.currentVelocity,
-                        marea: 0,
-                      },
-                      kayakActivo
-                    ).veredictoPorFactor.corriente
-                  : null;
-              const colorKN = colorNumero(vKN, ajustes.colorTabla);
+              const colorKN = point?.currentVelocity != null
+                ? colorPescaCorriente(point.currentVelocity)
+                : null;
 
               let derivaTexto = '—';
               if (point?.currentVelocity != null) {
@@ -1205,8 +1189,7 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                 const dStr = kmhDeriva.toFixed(1).replace('.', ',');
                 if (point.currentDirection != null) {
                   const card = abreviaturaViento(point.currentDirection);
-                  const deg = Math.round(point.currentDirection);
-                  derivaTexto = `${dStr}/${card}${deg}º`;
+                  derivaTexto = `${dStr}/${card}`;
                 } else {
                   derivaTexto = dStr;
                 }

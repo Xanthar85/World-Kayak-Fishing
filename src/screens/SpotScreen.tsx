@@ -43,7 +43,7 @@ import {
   type HourlyPoint,
 } from '../lib/openmeteo.ts';
 import { nombreViento } from '../lib/wind.ts';
-import { colorNumero, type NivelColorTabla } from '../lib/verdict-color.ts';
+import { colorNumero, colorPescaCorriente, type NivelColorTabla } from '../lib/verdict-color.ts';
 import { calcularActividadPorHora, type ActividadHora } from '../lib/actividad.ts';
 import type { FranjaUsuario } from '../state/store.ts';
 import {
@@ -845,7 +845,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
   const indicadorCorriente = (kn: number | null): string | null => {
     if (kn == null) return null;
     if (kn < 0.05) return 'agua parada';
-    if (kn < 0.4) return 'corriente floja';
+    if (kn < 0.4) return 'corriente lenta';
     if (kn <= 1.4) return null;
     if (kn <= 2.0) return 'deriva rápida';
     return 'deriva fuerte';
@@ -1464,23 +1464,44 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {tabActiva === 'activity' && weather && (
           <TablaDatos tabId="activity" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
             columnas={[
-              { key: 'cv', label: t('factors.currentKn', { defaultValue: 'Corriente' }), unit: `(${SUFIJO_CORRIENTE[u.corriente]})`,
+              {
+                key: 'cv',
+                label: t('factors.currentKn', { defaultValue: 'Corriente' }),
+                unit: `(${SUFIJO_CORRIENTE[u.corriente]})`,
                 render: (h) => {
                   if (h.currentVelocity == null) return '—';
                   const kn = h.currentVelocity;
                   const val = valorCorriente(kn, u.corriente);
                   const valTxt = val != null ? val.toFixed(2).replace('.', ',') : '—';
-                  let indicador = '▶ correcto';
-                  if (kn < 0.4) indicador = 'Agua parada / baja actividad';
-                  else if (kn > 1.4) indicador = 'Deriva rápida';
+                  let indicador: string | null = null;
+                  if (kn === 0) indicador = null;
+                  else if (kn < 0.5) indicador = 'baja actividad';
+                  else if (kn <= 1.0) indicador = 'cefalópodos / espáridos';
+                  else if (kn <= 1.5) indicador = 'espáridos';
+                  else indicador = 'deriva rápida';
+                  const color = colorPescaCorriente(kn);
                   return (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: '0.68rem' }}>
-                      <span>{valTxt} {indicador}</span>
-                      {(kn < 0.4 || kn > 1.4) && <BotonAyuda tabId="activity" />}
+                    <span style={{
+                      display: 'inline-flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      color: color ?? 'var(--text)',
+                      fontWeight: color ? 600 : 400,
+                    }}>
+                      <span>{valTxt}</span>
+                      {indicador != null && (
+                        <span style={{
+                          fontSize: '0.6rem',
+                          opacity: 0.85,
+                          fontStyle: 'italic',
+                          lineHeight: 1.1,
+                          marginTop: 1,
+                        }}>{indicador}</span>
+                      )}
                     </span>
                   );
                 },
-                veredicto: subVeredictoCurrent },
+              },
               { key: 'cd', label: t('factors.currentDirection'), unit: '',
                 render: (h) => {
                   const nv = nombreViento(h.currentDirection, spot.zona ?? 'mediterraneo_espanol', lang);
