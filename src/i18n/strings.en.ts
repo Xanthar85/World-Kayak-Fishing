@@ -110,6 +110,13 @@ export const stringsEn: StringsSchema = {
     maxWave: 'Max wave',
     maxWind: 'Max wind',
     clima: 'Weather',
+    legendWaves: '— Wave',
+    legendWind: '┄ Wind',
+    legendDrift: '┈ Drift',
+    legendActivity: '▮ Activity',
+    legendSun: '│ Sun',
+    legendMoon: '│ Moon',
+    legendTwilight: '│ Civil twilight',
   },
 
   map: {

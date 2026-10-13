@@ -115,6 +115,13 @@ export const stringsEs = {
     maxWave: 'Ola máx.',
     maxWind: 'Viento máx.',
     clima: 'Clima',
+    legendWaves: '— Ola',
+    legendWind: '┄ Viento',
+    legendDrift: '┈ Deriva',
+    legendActivity: '▮ Actividad',
+    legendSun: '│ Sol',
+    legendMoon: '│ Luna',
+    legendTwilight: '│ Crepúsculo civil',
   },
 
   map: {
