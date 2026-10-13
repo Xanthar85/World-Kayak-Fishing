@@ -1,10 +1,97 @@
-import React from 'react';
+// src/components/Logo.tsx
+// WKF — Logo de la app.
+// v1.018: el símbolo (dial) del logo horizontal en esquema
+// "neon" cicla en bucle entre los cuatro colores de veredicto
+// (verde → amarillo → naranja → rojo → verde), con transición
+// suave y glow que acompaña al color. Arranca en un color
+// aleatorio del ciclo para no verse repetitivo.
+// Los esquemas white-on-black y black-on-white no se animan.
+// El modo "icon" (barra inferior) tampoco se anima.
+// La palabra "WKF" y el tagline no cambian: siguen verde y
+// cian fijos.
+
+import React, { useEffect, useRef, useState } from 'react';
 
 export interface LogoProps {
   variant?: 'horizontal' | 'icon';
   size?: 'sm' | 'md' | 'lg';
   scheme?: 'neon' | 'white-on-black' | 'black-on-white';
   className?: string;
+}
+
+// Paleta de veredicto. Se usa para el ciclo de color del símbolo.
+const COLORES_VEREDICTO = ['#00E56A', '#E5E500', '#FF8A00', '#FF2D55'];
+
+// Duración de un ciclo completo (los 4 colores y vuelta al primero).
+const DURACION_CICLO_MS = 13000;
+
+function hexARgb(hex: string): { r: number; g: number; b: number } {
+  const h = hex.replace('#', '');
+  return {
+    r: parseInt(h.slice(0, 2), 16),
+    g: parseInt(h.slice(2, 4), 16),
+    b: parseInt(h.slice(4, 6), 16),
+  };
+}
+
+function interpolarHex(a: string, b: string, t: number): string {
+  const ca = hexARgb(a);
+  const cb = hexARgb(b);
+  const r = Math.round(ca.r + (cb.r - ca.r) * t);
+  const g = Math.round(ca.g + (cb.g - ca.g) * t);
+  const bl = Math.round(ca.b + (cb.b - ca.b) * t);
+  const toHex = (n: number) => n.toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(bl)}`;
+}
+
+// Devuelve el color interpolado del ciclo en un instante dado.
+// t va de 0 a 1 dentro del ciclo completo (4 tramos).
+function colorDelCiclo(t: number): string {
+  const n = COLORES_VEREDICTO.length;
+  const tramo = t * n; // 0..4
+  const i = Math.floor(tramo) % n;
+  const j = (i + 1) % n;
+  const frac = tramo - Math.floor(tramo);
+  return interpolarHex(COLORES_VEREDICTO[i], COLORES_VEREDICTO[j], frac);
+}
+
+// Hook interno: devuelve el color actual del ciclo.
+function useColorCiclico(activo: boolean): string {
+  const [color, setColor] = useState<string>(() => {
+    if (!activo) return COLORES_VEREDICTO[0];
+    // Arranque aleatorio dentro del ciclo.
+    const t0 = Math.random();
+    return colorDelCiclo(t0);
+  });
+
+  const rafRef = useRef<number | null>(null);
+  const inicioRef = useRef<number>(performance.now());
+  const offsetRef = useRef<number>(Math.random() * DURACION_CICLO_MS);
+
+  useEffect(() => {
+    if (!activo) {
+      setColor(COLORES_VEREDICTO[0]);
+      return;
+    }
+
+    // Reinicia el inicio para que el offset aleatorio sea el punto
+    // de partida de este montaje concreto.
+    inicioRef.current = performance.now();
+
+    const tick = (ahora: number) => {
+      const transcurrido = ahora - inicioRef.current + offsetRef.current;
+      const t = (transcurrido % DURACION_CICLO_MS) / DURACION_CICLO_MS;
+      setColor(colorDelCiclo(t));
+      rafRef.current = requestAnimationFrame(tick);
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [activo]);
+
+  return color;
 }
 
 // Símbolo WKF — retícula de dial marino con W/pulso central.
@@ -122,6 +209,10 @@ export const Logo: React.FC<LogoProps> = ({
 }) => {
   const px = size === 'sm' ? 36 : size === 'lg' ? 72 : 48;
 
+  // Solo animamos el símbolo del logo horizontal en esquema neon.
+  const animarSimbolo = variant === 'horizontal' && scheme === 'neon';
+  const colorSimboloAnimado = useColorCiclico(animarSimbolo);
+
   const palettes = {
     neon: {
       symbol: 'var(--accent)',
@@ -148,6 +239,10 @@ export const Logo: React.FC<LogoProps> = ({
 
   const palette = palettes[scheme];
 
+  // Si toca animar, el símbolo usa el color del ciclo. Si no,
+  // usa el color fijo del esquema.
+  const symbolColor = animarSimbolo ? colorSimboloAnimado : palette.symbol;
+
   if (variant === 'icon') {
     return (
       <div
@@ -160,7 +255,7 @@ export const Logo: React.FC<LogoProps> = ({
       >
         <WKFSymbol
           size={px}
-          color={palette.symbol}
+          color={symbolColor}
           glow={palette.glow}
           strokeBg={palette.strokeBg}
         />
@@ -186,7 +281,7 @@ export const Logo: React.FC<LogoProps> = ({
     >
       <WKFSymbol
         size={px}
-        color={palette.symbol}
+        color={symbolColor}
         glow={palette.glow}
         strokeBg={palette.strokeBg}
       />
