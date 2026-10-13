@@ -23,7 +23,7 @@ export interface LogoProps {
 const COLORES_VEREDICTO = ['#00E56A', '#E5E500', '#FF8A00', '#FF2D55'];
 
 // Duración de un ciclo completo (los 4 colores y vuelta al primero).
-const DURACION_CICLO_MS = 13000;
+const DURACION_CICLO_MS = 26000;
 
 function hexARgb(hex: string): { r: number; g: number; b: number } {
   const h = hex.replace('#', '');
