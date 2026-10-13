@@ -114,7 +114,7 @@ export const stringsEs = {
     noSpots: 'Añade un punto para ver la previsión.',
     maxWave: 'Ola máx.',
     maxWind: 'Viento máx.',
-    windDir: 'Viento dominante',
+    clima: 'Clima',
   },
 
   map: {
@@ -151,6 +151,11 @@ export const stringsEs = {
     waveHeightTotal: 'Alt. total',
     waveHeightWind: 'Alt. viento',
     waveHeightSwell: 'Alt. fondo',
+    olaFondo: 'OlaF',
+    olaViento: 'OlaV',
+    deriva: 'Deriva',
+    racha: 'Racha',
+    clima: 'Clima',
     wavePeriod: 'Periodo',
     waveDirection: 'Dirección de ola',
     windSpeed: 'Viento',

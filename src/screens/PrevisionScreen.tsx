@@ -30,6 +30,7 @@ import type { Pato } from '../lib/patos.ts';
 import { colorNumero } from '../lib/verdict-color.ts';
 import { calcularSol } from '../lib/sun.ts';
 import { calcularActividadPorHora, type ActividadHora } from '../lib/actividad.ts';
+import { abreviaturaViento } from '../lib/wind.ts';
 import {
   formatearViento,
   formatearOla,
@@ -38,6 +39,7 @@ import {
   formatearPrecipitacion,
   valorViento,
   valorOla,
+  valorTemperatura,
   SUFIJO_VIENTO,
   SUFIJO_OLA,
   SUFIJO_CORRIENTE,
@@ -618,20 +620,21 @@ const ResumenDia: React.FC<ResumenDiaProps> = ({ puntos }) => {
 
   let olaMax = 0;
   let vientoMax = 0;
-  const dirVientoCount: Record<string, number> = {};
+  const weatherCodeCount: Record<number, number> = {};
   for (const p of puntos) {
     if (p.waveHeight != null && p.waveHeight > olaMax) olaMax = p.waveHeight;
     const v = msAKmh(p.windGusts ?? p.windSpeed);
     if (v != null && v > vientoMax) vientoMax = v;
-    if (p.windDirection != null) {
-      const card = Math.round(p.windDirection / 22.5) % 16;
-      const nombres = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSO','SO','OSO','O','ONO','NO','NNO'];
-      const c = nombres[card];
-      dirVientoCount[c] = (dirVientoCount[c] ?? 0) + 1;
+    if (p.weatherCode != null) {
+      weatherCodeCount[p.weatherCode] = (weatherCodeCount[p.weatherCode] ?? 0) + 1;
     }
   }
-  const dirDominante =
-    Object.entries(dirVientoCount).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '—';
+  const weatherCodeDominante =
+    Object.entries(weatherCodeCount).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const iconoClima =
+    weatherCodeDominante != null
+      ? weatherCodeAIcono(Number(weatherCodeDominante), false)
+      : '—';
 
   const cardStyle: React.CSSProperties = {
     flex: 1,
@@ -669,8 +672,8 @@ const ResumenDia: React.FC<ResumenDiaProps> = ({ puntos }) => {
         </div>
       </div>
       <div style={cardStyle}>
-        <div style={labelStyle}>{t('prevision.windDir')}</div>
-        <div style={valueStyle}>{dirDominante}</div>
+        <div style={labelStyle}>{t('prevision.clima', { defaultValue: 'Clima' })}</div>
+        <div style={{ ...valueStyle, fontSize: '1.6rem', lineHeight: 1.2 }}>{iconoClima}</div>
       </div>
     </div>
   );
@@ -701,6 +704,7 @@ interface Tabla72HorasProps {
 }
 
 const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
+  const { t } = useTranslation();
   const ajustes = useAppStore((s) => s.ajustes);
   const kayakActivo = getEmbarcacionParaSpot(spot, ajustes);
   const categoriaKayak = kayakActivo.categoriaWKF;
@@ -767,17 +771,18 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
 
   const u = ajustes.unidades;
 
-  const columnas = [
-    'Hora',
-    'Clima',
-    SUFIJO_PRECIPITACION[u.precipitacion],
-    SUFIJO_TEMPERATURA[u.temperatura],
-    `OlaT (${SUFIJO_OLA[u.ola]})`,
-    'Per',
-    `V.Med (${SUFIJO_VIENTO[u.viento]})`,
-    `V.Max (${SUFIJO_VIENTO[u.viento]})`,
-    `KN (${SUFIJO_CORRIENTE[u.corriente]})`,
-    'Act',
+  const columnas: Array<{ key: string; label: string; unit: string }> = [
+    { key: 'hora', label: 'Hora', unit: '' },
+    { key: 'clima', label: t('factors.clima', { defaultValue: 'Clima' }), unit: '' },
+    { key: 'temp', label: 'Temp', unit: `(${SUFIJO_TEMPERATURA[u.temperatura] ?? '°C'})` },
+    { key: 'lluvia', label: 'Lluvia', unit: `(${SUFIJO_PRECIPITACION[u.precipitacion] ?? 'mm'})` },
+    { key: 'olaf', label: t('factors.olaFondo', { defaultValue: 'OlaF' }), unit: `(${SUFIJO_OLA[u.ola] ?? 'm'})` },
+    { key: 'per', label: 'Per', unit: '(s)' },
+    { key: 'olav', label: t('factors.olaViento', { defaultValue: 'OlaV' }), unit: `(${SUFIJO_OLA[u.ola] ?? 'm'})` },
+    { key: 'viento', label: 'Viento', unit: `(${SUFIJO_VIENTO[u.viento] ?? 'km/h'})` },
+    { key: 'racha', label: t('factors.racha', { defaultValue: 'Racha' }), unit: `(${SUFIJO_VIENTO[u.viento] ?? 'km/h'})` },
+    { key: 'deriva', label: t('factors.deriva', { defaultValue: 'Deriva' }), unit: '(km/h)' },
+    { key: 'act', label: 'Actividad', unit: '(x/10)' },
   ];
 
   const celdaBase: React.CSSProperties = {
@@ -824,7 +829,7 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
             <tr>
               {columnas.map((col) => (
                 <th
-                  key={col}
+                  key={col.key}
                   style={{
                     padding: '6px 2px',
                     fontWeight: 600,
@@ -833,9 +838,21 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                     borderBottom: '1px solid var(--border)',
                     whiteSpace: 'nowrap',
                     textAlign: 'center',
+                    verticalAlign: 'bottom',
                   }}
                 >
-                  {col}
+                  <div style={{ lineHeight: 1.2 }}>{col.label}</div>
+                  <div
+                    style={{
+                      fontSize: '0.6rem',
+                      opacity: col.unit ? 0.75 : 0,
+                      lineHeight: 1.2,
+                      marginTop: 1,
+                      minHeight: '0.72rem',
+                    }}
+                  >
+                    {col.unit || '\u00A0'}
+                  </div>
                 </th>
               ))}
             </tr>
@@ -852,16 +869,24 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                 fecha.getHours() < 7 || fecha.getHours() >= 21
               );
 
-              // Precipitación
-              const mmTexto = formatearPrecipitacion(point?.precipitation ?? null, u.precipitacion);
+              // Temp (Temperatura del aire sin unidad)
+              const tempVal = valorTemperatura(point?.temperature ?? null, u.temperatura);
+              const tempTexto = tempVal != null ? tempVal.toFixed(1).replace('.', ',') : '—';
 
-              // Temperatura
-              const tempTexto = formatearTemperatura(point?.temperature ?? null, u.temperatura);
+              // Lluvia (0 o null -> "—", > 0 -> 1 decimal sin unidad)
+              const precipVal = point?.precipitation ?? null;
+              const lluviaTexto =
+                precipVal == null || precipVal === 0
+                  ? '—'
+                  : (u.precipitacion === 'in' ? precipVal / 25.4 : precipVal)
+                      .toFixed(1)
+                      .replace('.', ',');
 
-              // OlaT
-              const olaTexto = formatearOla(point?.waveHeight ?? null, u.ola);
-              const vOla =
-                point?.waveHeight != null && spot
+              // OlaF (swellWaveHeight)
+              const olaFVal = valorOla(point?.swellWaveHeight ?? null, u.ola);
+              const olaFTexto = olaFVal != null ? olaFVal.toFixed(1).replace('.', ',') : '—';
+              const vOlaF =
+                point?.swellWaveHeight != null && spot
                   ? calcularVeredicto(
                       spot.zona ?? 'mediterraneo_espanol',
                       categoriaKayak,
@@ -869,20 +894,20 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                       franjaDia,
                       {
                         viento: 0,
-                        ola: point.waveHeight,
-                        periodo: point.wavePeriod ?? 0,
+                        ola: point.swellWaveHeight,
+                        periodo: point.swellWavePeriod ?? point.wavePeriod ?? 0,
                         corriente: 0,
                         marea: 0,
                       },
                       kayakActivo
                     ).veredictoPorFactor.ola
                   : null;
-              const colorOla = colorNumero(vOla, ajustes.colorTabla);
+              const colorOlaF = colorNumero(vOlaF, ajustes.colorTabla);
 
-              // Per
+              // Per (periodo en segundos sin unidad)
               const perTexto =
                 point?.wavePeriod != null
-                  ? `${Math.round(point.wavePeriod)}s`
+                  ? `${Math.round(point.wavePeriod)}`
                   : '—';
               const vPer =
                 point?.wavePeriod != null && spot
@@ -903,8 +928,29 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                   : null;
               const colorPer = colorNumero(vPer, ajustes.colorTabla);
 
-              // V.Med
-              const vmedTexto = formatearViento(point?.windSpeed ?? null, u.viento);
+              // OlaV (windWaveHeight)
+              const olaVVal = valorOla(point?.windWaveHeight ?? null, u.ola);
+              const olaVTexto = olaVVal != null ? olaVVal.toFixed(1).replace('.', ',') : '—';
+              const vOlaV =
+                point?.windWaveHeight != null && spot
+                  ? calcularVeredicto(
+                      spot.zona ?? 'mediterraneo_espanol',
+                      categoriaKayak,
+                      ajustes.perfil,
+                      franjaDia,
+                      {
+                        viento: 0,
+                        ola: point.windWaveHeight,
+                        periodo: point.windWavePeriod ?? point.wavePeriod ?? 0,
+                        corriente: 0,
+                        marea: 0,
+                      },
+                      kayakActivo
+                    ).veredictoPorFactor.ola
+                  : null;
+              const colorOlaV = colorNumero(vOlaV, ajustes.colorTabla);
+
+              // Viento (formato "1,5/E90º", o solo velocidad, o "—")
               const vVmed =
                 point?.windSpeed != null && spot
                   ? calcularVeredicto(
@@ -924,8 +970,20 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                   : null;
               const colorVmed = colorNumero(vVmed, ajustes.colorTabla);
 
-              // V.Max
-              const vmaxTexto = formatearViento(point?.windGusts ?? null, u.viento);
+              const valorVientoNum = valorViento(point?.windSpeed ?? null, u.viento);
+              let vientoTexto = '—';
+              if (valorVientoNum != null && point?.windSpeed != null && point.windSpeed > 0) {
+                const vStr = valorVientoNum.toFixed(1).replace('.', ',');
+                if (point.windDirection != null) {
+                  const card = abreviaturaViento(point.windDirection);
+                  const deg = Math.round(point.windDirection);
+                  vientoTexto = `${vStr}/${card}${deg}º`;
+                } else {
+                  vientoTexto = vStr;
+                }
+              }
+
+              // Racha (solo velocidad, rojo neón si >= 30 km/h)
               const vVmax =
                 point?.windGusts != null && spot
                   ? calcularVeredicto(
@@ -945,8 +1003,12 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                   : null;
               const colorVmax = colorNumero(vVmax, ajustes.colorTabla);
 
-              // KN (corriente)
-              const knTexto = formatearCorriente(point?.currentVelocity ?? null, u.corriente);
+              const valorRachaNum = valorViento(point?.windGusts ?? null, u.viento);
+              const rachaTexto =
+                valorRachaNum != null ? valorRachaNum.toFixed(1).replace('.', ',') : '—';
+              const esRachaFuerte = point?.windGusts != null && point.windGusts >= 30;
+
+              // Deriva (formato "1,5/E90º" en km/h, color de veredicto corriente)
               const vKN =
                 point?.currentVelocity != null && spot
                   ? calcularVeredicto(
@@ -966,7 +1028,20 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                   : null;
               const colorKN = colorNumero(vKN, ajustes.colorTabla);
 
-              // Act (actividad peces 0-10)
+              let derivaTexto = '—';
+              if (point?.currentVelocity != null) {
+                const kmhDeriva = point.currentVelocity * 1.852;
+                const dStr = kmhDeriva.toFixed(1).replace('.', ',');
+                if (point.currentDirection != null) {
+                  const card = abreviaturaViento(point.currentDirection);
+                  const deg = Math.round(point.currentDirection);
+                  derivaTexto = `${dStr}/${card}${deg}º`;
+                } else {
+                  derivaTexto = dStr;
+                }
+              }
+
+              // Actividad (0-10)
               const actItem = point ? actividadMap.get(point.time) : null;
               const actTexto =
                 actItem != null ? String(actItem.coeficiente) : '—';
@@ -976,7 +1051,7 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                   {esCambioDia && (
                     <tr>
                       <td
-                        colSpan={10}
+                        colSpan={11}
                         style={{
                           padding: '6px 8px',
                           backgroundColor: 'rgba(0, 230, 118, 0.08)',
@@ -1011,19 +1086,19 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                       {climaIcono}
                     </td>
                     <td style={{ ...celdaBase, color: 'var(--text)' }}>
-                      {mmTexto}
+                      {tempTexto}
                     </td>
                     <td style={{ ...celdaBase, color: 'var(--text)' }}>
-                      {tempTexto}
+                      {lluviaTexto}
                     </td>
                     <td
                       style={{
                         ...celdaBase,
-                        color: colorOla ?? 'var(--text)',
-                        fontWeight: colorOla ? 600 : 400,
+                        color: colorOlaF ?? 'var(--text)',
+                        fontWeight: colorOlaF ? 600 : 400,
                       }}
                     >
-                      {olaTexto}
+                      {olaFTexto}
                     </td>
                     <td
                       style={{
@@ -1037,20 +1112,30 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                     <td
                       style={{
                         ...celdaBase,
-                        color: colorVmed ?? 'var(--text)',
-                        fontWeight: colorVmed ? 600 : 400,
+                        color: colorOlaV ?? 'var(--text)',
+                        fontWeight: colorOlaV ? 600 : 400,
                       }}
                     >
-                      {vmedTexto}
+                      {olaVTexto}
                     </td>
                     <td
                       style={{
                         ...celdaBase,
-                        color: colorVmax ?? 'var(--text)',
-                        fontWeight: colorVmax ? 600 : 400,
+                        color: colorVmed ?? 'var(--text)',
+                        fontWeight: colorVmed ? 600 : 400,
                       }}
                     >
-                      {vmaxTexto}
+                      {vientoTexto}
+                    </td>
+                    <td
+                      style={{
+                        ...celdaBase,
+                        color: esRachaFuerte ? '#FF2D55' : (colorVmax ?? 'var(--text)'),
+                        fontWeight: esRachaFuerte ? 700 : (colorVmax ? 600 : 400),
+                        textShadow: esRachaFuerte ? '0 0 6px rgba(255, 45, 85, 0.7)' : 'none',
+                      }}
+                    >
+                      {rachaTexto}
                     </td>
                     <td
                       style={{
@@ -1059,7 +1144,7 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                         fontWeight: colorKN ? 600 : 400,
                       }}
                     >
-                      {knTexto}
+                      {derivaTexto}
                     </td>
                     <td style={{ ...celdaBase, color: 'var(--text)' }}>
                       {actTexto}

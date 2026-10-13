@@ -109,7 +109,7 @@ export const stringsEn: StringsSchema = {
     noSpots: 'Add a spot to see the forecast.',
     maxWave: 'Max wave',
     maxWind: 'Max wind',
-    windDir: 'Dominant wind',
+    clima: 'Weather',
   },
 
   map: {
@@ -146,6 +146,11 @@ export const stringsEn: StringsSchema = {
     waveHeightTotal: 'Total height',
     waveHeightWind: 'Wind wave',
     waveHeightSwell: 'Swell',
+    olaFondo: 'OlaF',
+    olaViento: 'OlaV',
+    deriva: 'Drift',
+    racha: 'Gust',
+    clima: 'Weather',
     wavePeriod: 'Period',
     waveDirection: 'Wave direction',
     windSpeed: 'Wind',
