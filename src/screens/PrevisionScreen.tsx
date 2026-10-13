@@ -1,13 +1,9 @@
 // src/screens/PrevisionScreen.tsx
 // WKF — Pantalla de Previsión meteorológica (tipo Windy).
-// v1.019: gráfico grande ampliado.
-//   - Eje izquierdo: ola (verde, continua) + deriva (naranja, punteada).
-//   - Eje derecho: viento (azul, continua).
-//   - Actividad: barras verticales finas, blancas, con número encima.
-//   - 7 líneas verticales: orto sol, mediodía solar, ocaso sol,
-//     orto luna, ocaso luna, crepúsculo civil mañana, crepúsculo civil tarde.
-//   - Iconos: ☀ en líneas solares, fase lunar en líneas lunares.
-//   - Leyenda ampliada.
+// v1.019:
+//   - Gráfico grande ampliado (ola, viento, deriva, actividad, líneas astronómicas).
+//   - ResumenDia con botón MAR CRUZADA que sustituye a Clima cuando aplica.
+//   - Modal explicativo de mar cruzada.
 
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -60,21 +56,9 @@ function localDateKey(d: Date): string {
   return `${y}-${m}-${dd}`;
 }
 
-// Tabla de conversión Bf → km/h (valor medio del rango estándar Beaufort)
 const BF_A_KMH_MEDIO: Record<number, number> = {
-  0: 1,
-  1: 3,
-  2: 8,
-  3: 15,
-  4: 24,
-  5: 33,
-  6: 44,
-  7: 55,
-  8: 67,
-  9: 82,
-  10: 95,
-  11: 110,
-  12: 125,
+  0: 1, 1: 3, 2: 8, 3: 15, 4: 24, 5: 33, 6: 44,
+  7: 55, 8: 67, 9: 82, 10: 95, 11: 110, 12: 125,
 };
 
 function bfAKmh(bf: number): number {
@@ -82,6 +66,139 @@ function bfAKmh(bf: number): number {
   return BF_A_KMH_MEDIO[b] ?? 125;
 }
 
+// ============================================================
+// DETECCIÓN DE MAR CRUZADA (duplicada de SpotScreen)
+// ============================================================
+function diferenciaAngular(a: number, b: number): number {
+  const d = Math.abs(((a - b) % 360 + 360) % 360);
+  return d > 180 ? 360 - d : d;
+}
+
+function hayMarCruzadaEnHora(h: HourlyPoint): boolean {
+  const wh = h.windWaveHeight ?? 0;
+  const sh = h.swellWaveHeight ?? 0;
+  const wd = h.windWaveDirection;
+  const sd = h.swellWaveDirection;
+  if (wh <= 0.3 || sh <= 0.3) return false;
+  if (wd == null || sd == null) return false;
+  return diferenciaAngular(wd, sd) > 60;
+}
+
+function hayMarCruzadaEnHoras(horas: HourlyPoint[]): boolean {
+  return horas.some(hayMarCruzadaEnHora);
+}
+
+// ============================================================
+// MODAL DE MAR CRUZADA
+// ============================================================
+const ModalMarCruzada: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const { t } = useTranslation();
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0,0,0,0.75)',
+        zIndex: 3000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          backgroundColor: 'var(--surface)',
+          border: '1px solid var(--verdict-desaconsejado)',
+          borderRadius: 12,
+          padding: 20,
+          maxWidth: 480,
+          width: '100%',
+          maxHeight: '85vh',
+          overflowY: 'auto',
+          boxShadow: '0 12px 40px rgba(0, 0, 0, 0.6)',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 14,
+          }}
+        >
+          <h3
+            style={{
+              margin: 0,
+              fontSize: '1.05rem',
+              fontWeight: 700,
+              color: 'var(--verdict-desaconsejado)',
+              letterSpacing: '0.04em',
+            }}
+          >
+            {t('marcruzada.titulo', { defaultValue: 'MAR CRUZADA' })}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--text-dim)',
+              cursor: 'pointer',
+              fontSize: '1.1rem',
+              padding: '4px 8px',
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <p style={{ fontSize: '0.9rem', lineHeight: 1.55, color: 'var(--text)', margin: '0 0 12px 0' }}>
+          {t('marcruzada.intro', {
+            defaultValue:
+              'Hay dos sistemas de ola viniendo de direcciones distintas. Eso se llama mar cruzada.',
+          })}
+        </p>
+
+        <p style={{ fontSize: '0.9rem', lineHeight: 1.55, color: 'var(--text)', margin: '0 0 12px 0' }}>
+          {t('marcruzada.cuerpo1', {
+            defaultValue:
+              'En mar cruzada, el kayak recibe golpes desde dos ángulos. Los picos de una ola y de la otra se suman de vez en cuando, y el kayak cabecea y balancea a la vez. Es incómodo, agota, y en un descuido puede volcar.',
+          })}
+        </p>
+
+        <p style={{ fontSize: '0.9rem', lineHeight: 1.55, color: 'var(--text)', margin: '0 0 12px 0' }}>
+          {t('marcruzada.cuerpo2', {
+            defaultValue:
+              'Si sales con mar cruzada, extrema la precaución. No te alejes de la costa. Mantén el kayak siempre con la proa a una de las dos olas. Y si el mar se pone peor, vuelve antes de que la situación se complique.',
+          })}
+        </p>
+
+        <p
+          style={{
+            fontSize: '0.8rem',
+            lineHeight: 1.5,
+            color: 'var(--text-dim)',
+            margin: '14px 0 0 0',
+            fontStyle: 'italic',
+          }}
+        >
+          {t('marcruzada.criterio', {
+            defaultValue:
+              'Se avisa de mar cruzada cuando la ola de viento y la ola de fondo superan los 0,3 m cada una y vienen de direcciones separadas por más de 60°.',
+          })}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// GRÁFICO GRANDE
+// ============================================================
 interface GraficoGrandeProps {
   weather: SpotWeather | null;
   dia: Date;
@@ -156,7 +273,6 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
   const plotW = W - paddingLeft - paddingRight;
   const plotH = H - paddingTop - paddingBottom;
 
-  // 1. ESCALA DEL EJE Y: EXCLUSIVAMENTE a partir de los datos reales del día mostrado
   let olaMaxDia = 0;
   let vientoMaxDia = 0;
   let derivaMaxDia = 0;
@@ -169,12 +285,10 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
     if (d > derivaMaxDia) derivaMaxDia = d;
   }
 
-  // Escala del eje izquierdo: la mayor de ola y deriva, con margen.
   const maxIzquierda = Math.max(olaMaxDia, derivaMaxDia, 0.1);
   let escalaIzquierda = Math.ceil(maxIzquierda * 1.15 * 10) / 10;
   if (escalaIzquierda < 0.1) escalaIzquierda = 0.1;
 
-  // Escala del eje derecho: viento, con margen al múltiplo de 5.
   let vientoEscala = Math.ceil((vientoMaxDia * 1.15) / 5) * 5;
   if (vientoEscala < 5) vientoEscala = 5;
 
@@ -184,7 +298,6 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
   const yDerecha = (v: number) =>
     paddingTop + plotH - (Math.min(v, vientoEscala) / vientoEscala) * plotH;
 
-  // 2. LÍNEAS DE UMBRAL (solo ola y viento, como antes)
   const franjaActiva =
     franjas.find((f) => f.id === ajustes.franjaActivaId) ?? franjas[0] ?? null;
   let umbralActivo: Umbral | null = null;
@@ -211,7 +324,6 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
     umbralActivo = res.umbralAplicado;
   }
 
-  // 3. EVENTOS ASTRONÓMICOS (líneas verticales)
   const sol = calcularSol(dia, spot?.lat ?? 0, spot?.lon ?? 0);
   const luna = calcularLuna(dia, spot?.lat ?? 0, spot?.lon ?? 0);
 
@@ -237,49 +349,19 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
     const civilFin = horaDecimal(sol.crepusculoCivilFin);
 
     if (orto != null) {
-      lineasVerticales.push({
-        hora: orto,
-        color: '#FFD500',
-        icono: '☀',
-        label: 'orto',
-        strokeWidth: 1.5,
-      });
+      lineasVerticales.push({ hora: orto, color: '#FFD500', icono: '☀', label: 'orto', strokeWidth: 1.5 });
     }
     if (mediodia != null) {
-      lineasVerticales.push({
-        hora: mediodia,
-        color: '#FFD500',
-        icono: '☀',
-        label: 'mediodía',
-        strokeWidth: 1,
-      });
+      lineasVerticales.push({ hora: mediodia, color: '#FFD500', icono: '☀', label: 'mediodía', strokeWidth: 1 });
     }
     if (ocaso != null) {
-      lineasVerticales.push({
-        hora: ocaso,
-        color: '#FFD500',
-        icono: '☀',
-        label: 'ocaso',
-        strokeWidth: 1.5,
-      });
+      lineasVerticales.push({ hora: ocaso, color: '#FFD500', icono: '☀', label: 'ocaso', strokeWidth: 1.5 });
     }
     if (civilInicio != null) {
-      lineasVerticales.push({
-        hora: civilInicio,
-        color: '#00B8FF',
-        icono: '🌅',
-        label: 'crepúsculo civil',
-        strokeWidth: 1,
-      });
+      lineasVerticales.push({ hora: civilInicio, color: '#00B8FF', icono: '🌅', label: 'crepúsculo civil', strokeWidth: 1 });
     }
     if (civilFin != null) {
-      lineasVerticales.push({
-        hora: civilFin,
-        color: '#00B8FF',
-        icono: '🌇',
-        label: 'crepúsculo civil',
-        strokeWidth: 1,
-      });
+      lineasVerticales.push({ hora: civilFin, color: '#00B8FF', icono: '🌇', label: 'crepúsculo civil', strokeWidth: 1 });
     }
   }
   if (luna) {
@@ -287,26 +369,13 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
     const ocasoL = horaDecimal(luna.ocasoLunar);
     const emoji = emojiFase(luna.fase);
     if (ortoL != null) {
-      lineasVerticales.push({
-        hora: ortoL,
-        color: '#B0B0B0',
-        icono: emoji,
-        label: 'orto lunar',
-        strokeWidth: 1,
-      });
+      lineasVerticales.push({ hora: ortoL, color: '#B0B0B0', icono: emoji, label: 'orto lunar', strokeWidth: 1 });
     }
     if (ocasoL != null) {
-      lineasVerticales.push({
-        hora: ocasoL,
-        color: '#B0B0B0',
-        icono: emoji,
-        label: 'ocaso lunar',
-        strokeWidth: 1,
-      });
+      lineasVerticales.push({ hora: ocasoL, color: '#B0B0B0', icono: emoji, label: 'ocaso lunar', strokeWidth: 1 });
     }
   }
 
-  // 4. ACTIVIDAD (barras)
   const actividad: ActividadHora[] = useMemo(() => {
     if (!weather?.hourly || !spot) return [];
     const mapa = new Map<string, { orto: Date | null; ocaso: Date | null }>();
@@ -331,7 +400,6 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
     return m;
   }, [actividad, keyDia]);
 
-  // 5. CURVAS
   const olaPath = puntos
     .map((p, i) => {
       if (p.waveHeight == null) return null;
@@ -403,7 +471,6 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
   const umbVieExiKmh = umbralActivo ? bfAKmh(umbralActivo.viento.exi) : null;
   const umbVieDesKmh = umbralActivo ? bfAKmh(umbralActivo.viento.des) : null;
 
-  // Colores fijos de las series nuevas
   const COLOR_DERIVA = '#FF8A00';
   const COLOR_ACTIVIDAD = 'rgba(255, 255, 255, 0.55)';
 
@@ -422,7 +489,6 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
         preserveAspectRatio="xMidYMid meet"
         style={{ width: '100%', height: 'auto', display: 'block' }}
       >
-        {/* Franjas de veredicto: fondo translúcido + línea inferior */}
         {franjas.map((f) => {
           const v = veredictosPorFranja[f.id] ?? null;
           if (!v) return null;
@@ -440,75 +506,43 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
             const yBottom = paddingTop + plotH;
             return (
               <g key={`franja-bg-${f.id}-${k}`}>
-                <rect
-                  x={x1}
-                  y={paddingTop}
-                  width={w}
-                  height={plotH}
-                  fill={color}
-                  fillOpacity={0.03}
-                />
-                <line
-                  x1={x1}
-                  y1={yBottom}
-                  x2={x2}
-                  y2={yBottom}
-                  stroke={color}
-                  strokeWidth={2}
-                />
+                <rect x={x1} y={paddingTop} width={w} height={plotH} fill={color} fillOpacity={0.03} />
+                <line x1={x1} y1={yBottom} x2={x2} y2={yBottom} stroke={color} strokeWidth={2} />
               </g>
             );
           });
         })}
 
-        {/* Líneas de rejilla horizontal */}
         {marcasY.map((frac) => {
           const y = paddingTop + plotH - frac * plotH;
           return (
             <line
               key={`grid-${frac}`}
-              x1={paddingLeft}
-              y1={y}
-              x2={paddingLeft + plotW}
-              y2={y}
-              stroke="var(--border)"
-              strokeWidth={0.5}
-              strokeDasharray="2 3"
+              x1={paddingLeft} y1={y} x2={paddingLeft + plotW} y2={y}
+              stroke="var(--border)" strokeWidth={0.5} strokeDasharray="2 3"
             />
           );
         })}
 
-        {/* Líneas verticales de eventos astronómicos */}
         {lineasVerticales.map((lv, i) => {
           const x = xHora(lv.hora);
           if (x < paddingLeft - 2 || x > paddingLeft + plotW + 2) return null;
           return (
             <g key={`lv-${i}`}>
               <line
-                x1={x}
-                y1={paddingTop}
-                x2={x}
-                y2={paddingTop + plotH}
+                x1={x} y1={paddingTop} x2={x} y2={paddingTop + plotH}
                 stroke={lv.color}
                 strokeWidth={lv.strokeWidth}
                 strokeDasharray={lv.strokeWidth < 1.5 ? '3 3' : undefined}
                 opacity={0.75}
               />
-              <text
-                x={x}
-                y={paddingTop + 12}
-                fontSize={11}
-                fill={lv.color}
-                textAnchor="middle"
-                style={{ pointerEvents: 'none' }}
-              >
+              <text x={x} y={paddingTop + 12} fontSize={11} fill={lv.color} textAnchor="middle" style={{ pointerEvents: 'none' }}>
                 {lv.icono}
               </text>
             </g>
           );
         })}
 
-        {/* Barras de actividad (detrás de las curvas) */}
         {Array.from({ length: 24 }, (_, h) => {
           const coef = actividadPorHora.get(h);
           if (coef == null || coef === 0) return null;
@@ -518,23 +552,9 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           const y = paddingTop + plotH - altura;
           return (
             <g key={`act-${h}`}>
-              <rect
-                x={x - barW / 2}
-                y={y}
-                width={barW}
-                height={altura}
-                fill={COLOR_ACTIVIDAD}
-                opacity={0.35}
-              />
+              <rect x={x - barW / 2} y={y} width={barW} height={altura} fill={COLOR_ACTIVIDAD} opacity={0.35} />
               {coef >= 7 && (
-                <text
-                  x={x}
-                  y={y - 3}
-                  fontSize={7}
-                  fill="rgba(255,255,255,0.85)"
-                  textAnchor="middle"
-                  fontFamily="Fira Code, monospace"
-                >
+                <text x={x} y={y - 3} fontSize={7} fill="rgba(255,255,255,0.85)" textAnchor="middle" fontFamily="Fira Code, monospace">
                   {coef}
                 </text>
               )}
@@ -542,133 +562,62 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           );
         })}
 
-        {/* Umbral ola EXIGENTE */}
         {umbOlaExi != null && umbOlaExi > 0 && umbOlaExi <= escalaIzquierda && (() => {
           const y = yIzquierda(umbOlaExi);
           const yText = y - 3 < paddingTop + 7 ? y + 9 : y - 3;
           const valConvertido = valorOla(umbOlaExi, u.ola) ?? umbOlaExi;
           return (
             <g key="umb-ola-exi">
-              <line
-                x1={paddingLeft}
-                y1={y}
-                x2={paddingLeft + plotW}
-                y2={y}
-                stroke="var(--verdict-exigente-text, #d97706)"
-                strokeWidth={1}
-                strokeDasharray="4 3"
-                opacity={0.7}
-              />
-              <text
-                x={paddingLeft + 4}
-                y={yText}
-                fontSize={9}
-                fill="var(--verdict-exigente-text, #d97706)"
-                fontFamily="Fira Code, monospace"
-                opacity={0.85}
-              >
+              <line x1={paddingLeft} y1={y} x2={paddingLeft + plotW} y2={y} stroke="var(--verdict-exigente-text, #d97706)" strokeWidth={1} strokeDasharray="4 3" opacity={0.7} />
+              <text x={paddingLeft + 4} y={yText} fontSize={9} fill="var(--verdict-exigente-text, #d97706)" fontFamily="Fira Code, monospace" opacity={0.85}>
                 {valConvertido.toFixed(1)} {SUFIJO_OLA[u.ola]}
               </text>
             </g>
           );
         })()}
 
-        {/* Umbral ola DESACONSEJADO */}
         {umbOlaDes != null && umbOlaDes > 0 && umbOlaDes <= escalaIzquierda && (() => {
           const y = yIzquierda(umbOlaDes);
           const yText = y - 3 < paddingTop + 7 ? y + 9 : y - 3;
           const valConvertido = valorOla(umbOlaDes, u.ola) ?? umbOlaDes;
           return (
             <g key="umb-ola-des">
-              <line
-                x1={paddingLeft}
-                y1={y}
-                x2={paddingLeft + plotW}
-                y2={y}
-                stroke="var(--verdict-desaconsejado-text, #dc2626)"
-                strokeWidth={1}
-                strokeDasharray="4 3"
-                opacity={0.7}
-              />
-              <text
-                x={paddingLeft + 4}
-                y={yText}
-                fontSize={9}
-                fill="var(--verdict-desaconsejado-text, #dc2626)"
-                fontFamily="Fira Code, monospace"
-                opacity={0.85}
-              >
+              <line x1={paddingLeft} y1={y} x2={paddingLeft + plotW} y2={y} stroke="var(--verdict-desaconsejado-text, #dc2626)" strokeWidth={1} strokeDasharray="4 3" opacity={0.7} />
+              <text x={paddingLeft + 4} y={yText} fontSize={9} fill="var(--verdict-desaconsejado-text, #dc2626)" fontFamily="Fira Code, monospace" opacity={0.85}>
                 {valConvertido.toFixed(1)} {SUFIJO_OLA[u.ola]}
               </text>
             </g>
           );
         })()}
 
-        {/* Umbral viento EXIGENTE */}
         {umbVieExiKmh != null && umbVieExiKmh > 0 && umbVieExiKmh <= vientoEscala && (() => {
           const y = yDerecha(umbVieExiKmh);
           const yText = y - 3 < paddingTop + 7 ? y + 9 : y - 3;
           const valConvertido = valorViento(umbVieExiKmh, u.viento) ?? umbVieExiKmh;
           return (
             <g key="umb-vie-exi">
-              <line
-                x1={paddingLeft}
-                y1={y}
-                x2={paddingLeft + plotW}
-                y2={y}
-                stroke="var(--verdict-exigente-text, #d97706)"
-                strokeWidth={1}
-                strokeDasharray="4 3"
-                opacity={0.7}
-              />
-              <text
-                x={paddingLeft + plotW - 4}
-                y={yText}
-                fontSize={9}
-                fill="var(--verdict-exigente-text, #d97706)"
-                textAnchor="end"
-                fontFamily="Fira Code, monospace"
-                opacity={0.85}
-              >
+              <line x1={paddingLeft} y1={y} x2={paddingLeft + plotW} y2={y} stroke="var(--verdict-exigente-text, #d97706)" strokeWidth={1} strokeDasharray="4 3" opacity={0.7} />
+              <text x={paddingLeft + plotW - 4} y={yText} fontSize={9} fill="var(--verdict-exigente-text, #d97706)" textAnchor="end" fontFamily="Fira Code, monospace" opacity={0.85}>
                 {Math.round(valConvertido)} {SUFIJO_VIENTO[u.viento]}
               </text>
             </g>
           );
         })()}
 
-        {/* Umbral viento DESACONSEJADO */}
         {umbVieDesKmh != null && umbVieDesKmh > 0 && umbVieDesKmh <= vientoEscala && (() => {
           const y = yDerecha(umbVieDesKmh);
           const yText = y - 3 < paddingTop + 7 ? y + 9 : y - 3;
           const valConvertido = valorViento(umbVieDesKmh, u.viento) ?? umbVieDesKmh;
           return (
             <g key="umb-vie-des">
-              <line
-                x1={paddingLeft}
-                y1={y}
-                x2={paddingLeft + plotW}
-                y2={y}
-                stroke="var(--verdict-desaconsejado-text, #dc2626)"
-                strokeWidth={1}
-                strokeDasharray="4 3"
-                opacity={0.7}
-              />
-              <text
-                x={paddingLeft + plotW - 4}
-                y={yText}
-                fontSize={9}
-                fill="var(--verdict-desaconsejado-text, #dc2626)"
-                textAnchor="end"
-                fontFamily="Fira Code, monospace"
-                opacity={0.85}
-              >
+              <line x1={paddingLeft} y1={y} x2={paddingLeft + plotW} y2={y} stroke="var(--verdict-desaconsejado-text, #dc2626)" strokeWidth={1} strokeDasharray="4 3" opacity={0.7} />
+              <text x={paddingLeft + plotW - 4} y={yText} fontSize={9} fill="var(--verdict-desaconsejado-text, #dc2626)" textAnchor="end" fontFamily="Fira Code, monospace" opacity={0.85}>
                 {Math.round(valConvertido)} {SUFIJO_VIENTO[u.viento]}
               </text>
             </g>
           );
         })()}
 
-        {/* Eje Y izquierdo: ola + deriva */}
         {marcasY.map((frac) => {
           const valCrudo = frac * escalaIzquierda;
           const valConvertido = valorOla(valCrudo, u.ola) ?? valCrudo;
@@ -683,7 +632,6 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           );
         })}
 
-        {/* Eje Y derecho: viento */}
         {marcasY.map((frac) => {
           const valCrudo = frac * vientoEscala;
           const valConvertido = valorViento(valCrudo, u.viento) ?? valCrudo;
@@ -698,26 +646,15 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           );
         })}
 
-        {/* Línea base del eje X */}
         <line x1={paddingLeft} y1={paddingTop + plotH} x2={paddingLeft + plotW} y2={paddingTop + plotH} stroke="var(--border)" strokeWidth={0.6} />
 
-        {/* Curvas de datos */}
         {olaArea && <path d={olaArea} fill="var(--accent)" opacity={0.15} />}
         {olaPath && (
           <path d={olaPath} fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
         )}
 
         {derivaPath && (
-          <path
-            d={derivaPath}
-            fill="none"
-            stroke={COLOR_DERIVA}
-            strokeWidth={1.6}
-            strokeDasharray="3 3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity={0.85}
-          />
+          <path d={derivaPath} fill="none" stroke={COLOR_DERIVA} strokeWidth={1.6} strokeDasharray="3 3" strokeLinecap="round" strokeLinejoin="round" opacity={0.85} />
         )}
 
         {vientoArea && <path d={vientoArea} fill="var(--accent-2)" opacity={0.12} />}
@@ -725,7 +662,6 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           <path d={vientoPath} fill="none" stroke="var(--accent-2)" strokeWidth={1.6} strokeDasharray="4 3" strokeLinecap="round" strokeLinejoin="round" />
         )}
 
-        {/* Nombres de franja (fila 1 del eje X) */}
         {franjas.map((f) => {
           const v = veredictosPorFranja[f.id] ?? null;
           const color = v ? veredictoAColor(v) : 'var(--text-dim)';
@@ -748,43 +684,25 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           const xCentro = xHora(centroHora);
 
           return (
-            <text
-              key={`label-franja-${f.id}`}
-              x={xCentro}
-              y={paddingTop + plotH + 13}
-              fontSize={10}
-              fill={color}
-              textAnchor="middle"
-              fontFamily="Fira Code, monospace"
-              fontWeight={600}
-            >
+            <text key={`label-franja-${f.id}`} x={xCentro} y={paddingTop + plotH + 13} fontSize={10} fill={color} textAnchor="middle" fontFamily="Fira Code, monospace" fontWeight={600}>
               {f.nombre}
             </text>
           );
         })}
 
-        {/* Horas (fila 2 del eje X) */}
         {Array.from({ length: 24 }, (_, h) => {
           const x = xHora(h);
           const yTick = paddingTop + plotH;
           return (
             <g key={`xh-${h}`}>
               <line x1={x} y1={yTick} x2={x} y2={yTick + 2} stroke="var(--text-dim)" strokeWidth={0.5} opacity={0.5} />
-              <text
-                x={x}
-                y={paddingTop + plotH + 26}
-                fontSize={8.5}
-                fill="var(--text-dim)"
-                textAnchor="middle"
-                fontFamily="Fira Code, monospace"
-              >
+              <text x={x} y={paddingTop + plotH + 26} fontSize={8.5} fill="var(--text-dim)" textAnchor="middle" fontFamily="Fira Code, monospace">
                 {h}
               </text>
             </g>
           );
         })}
 
-        {/* Indicador "Ahora" si es hoy */}
         {esHoy && (
           <g>
             <line x1={xHora(horaAhora)} y1={paddingTop} x2={xHora(horaAhora)} y2={paddingTop + plotH} stroke="var(--accent)" strokeWidth={1} strokeDasharray="3 2" opacity={0.7} />
@@ -811,7 +729,6 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           ))}
       </div>
 
-      {/* Leyenda ampliada */}
       <div
         style={{
           display: 'flex',
@@ -824,23 +741,27 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           color: 'var(--text-dim)',
         }}
       >
-        <span style={{ color: 'var(--accent)' }}>— Ola ({SUFIJO_OLA[u.ola]})</span>
-        <span style={{ color: 'var(--accent-2)' }}>┄ Viento ({SUFIJO_VIENTO[u.viento]})</span>
-        <span style={{ color: COLOR_DERIVA }}>┈ Deriva (km/h)</span>
-        <span style={{ color: 'rgba(255,255,255,0.7)' }}>▮ Actividad (0-10)</span>
-        <span style={{ color: '#FFD500' }}>│ Sol</span>
-        <span style={{ color: '#B0B0B0' }}>│ Luna</span>
-        <span style={{ color: '#00B8FF' }}>│ Crepúsculo civil</span>
+        <span style={{ color: 'var(--accent)' }}>{t('prevision.legendWaves', { defaultValue: '— Ola' })} ({SUFIJO_OLA[u.ola]})</span>
+        <span style={{ color: 'var(--accent-2)' }}>{t('prevision.legendWind', { defaultValue: '┄ Viento' })} ({SUFIJO_VIENTO[u.viento]})</span>
+        <span style={{ color: COLOR_DERIVA }}>{t('prevision.legendDrift', { defaultValue: '┈ Deriva' })} (km/h)</span>
+        <span style={{ color: 'rgba(255,255,255,0.7)' }}>{t('prevision.legendActivity', { defaultValue: '▮ Actividad' })} (0-10)</span>
+        <span style={{ color: '#FFD500' }}>{t('prevision.legendSun', { defaultValue: '│ Sol' })}</span>
+        <span style={{ color: '#B0B0B0' }}>{t('prevision.legendMoon', { defaultValue: '│ Luna' })}</span>
+        <span style={{ color: '#00B8FF' }}>{t('prevision.legendTwilight', { defaultValue: '│ Crepúsculo civil' })}</span>
       </div>
     </div>
   );
 };
 
+// ============================================================
+// RESUMEN DÍA — con botón MAR CRUZADA que sustituye a Clima
+// ============================================================
 interface ResumenDiaProps {
   puntos: HourlyPoint[];
+  onAbrirMarCruzada?: () => void;
 }
 
-const ResumenDia: React.FC<ResumenDiaProps> = ({ puntos }) => {
+const ResumenDia: React.FC<ResumenDiaProps> = ({ puntos, onAbrirMarCruzada }) => {
   const { t } = useTranslation();
   const ajustes = useAppStore((s) => s.ajustes);
   const u = ajustes.unidades;
@@ -862,6 +783,8 @@ const ResumenDia: React.FC<ResumenDiaProps> = ({ puntos }) => {
     weatherCodeDominante != null
       ? weatherCodeAIcono(Number(weatherCodeDominante), false)
       : '—';
+
+  const marCruzada = hayMarCruzadaEnHoras(puntos);
 
   const cardStyle: React.CSSProperties = {
     flex: 1,
@@ -898,10 +821,39 @@ const ResumenDia: React.FC<ResumenDiaProps> = ({ puntos }) => {
           {formatearViento(vientoMax, u.viento)}
         </div>
       </div>
-      <div style={cardStyle}>
-        <div style={labelStyle}>{t('prevision.clima', { defaultValue: 'Clima' })}</div>
-        <div style={{ ...valueStyle, fontSize: '1.6rem', lineHeight: 1.2 }}>{iconoClima}</div>
-      </div>
+      {marCruzada ? (
+        <button
+          type="button"
+          onClick={onAbrirMarCruzada}
+          style={{
+            ...cardStyle,
+            backgroundColor: 'rgba(255, 45, 85, 0.15)',
+            border: '2px solid var(--verdict-desaconsejado)',
+            cursor: 'pointer',
+            boxShadow: '0 0 10px rgba(255, 45, 85, 0.35)',
+          }}
+        >
+          <div style={{ ...labelStyle, color: 'var(--verdict-desaconsejado)' }}>
+            {t('prevision.marCruzada', { defaultValue: 'Aviso' })}
+          </div>
+          <div
+            style={{
+              ...valueStyle,
+              color: 'var(--verdict-desaconsejado)',
+              fontSize: '0.95rem',
+              letterSpacing: '0.06em',
+              lineHeight: 1.2,
+            }}
+          >
+            MAR CRUZADA
+          </div>
+        </button>
+      ) : (
+        <div style={cardStyle}>
+          <div style={labelStyle}>{t('prevision.clima', { defaultValue: 'Clima' })}</div>
+          <div style={{ ...valueStyle, fontSize: '1.6rem', lineHeight: 1.2 }}>{iconoClima}</div>
+        </div>
+      )}
     </div>
   );
 };
@@ -1285,57 +1237,23 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                       </td>
                     </tr>
                   )}
-                  <tr
-                    style={{
-                      borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-                    }}
-                  >
+                  <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
                     <td style={{ ...celdaBase, color: 'var(--text-dim)', fontWeight: 500 }}>
                       {horaTexto}
                     </td>
-                    <td style={{ ...celdaBase, fontSize: '0.82rem' }}>
-                      {climaIcono}
-                    </td>
-                    <td style={{ ...celdaBase, color: 'var(--text)' }}>
-                      {tempTexto}
-                    </td>
-                    <td style={{ ...celdaBase, color: 'var(--text)' }}>
-                      {lluviaTexto}
-                    </td>
-                    <td
-                      style={{
-                        ...celdaBase,
-                        color: colorOlaF ?? 'var(--text)',
-                        fontWeight: colorOlaF ? 600 : 400,
-                      }}
-                    >
+                    <td style={{ ...celdaBase, fontSize: '0.82rem' }}>{climaIcono}</td>
+                    <td style={{ ...celdaBase, color: 'var(--text)' }}>{tempTexto}</td>
+                    <td style={{ ...celdaBase, color: 'var(--text)' }}>{lluviaTexto}</td>
+                    <td style={{ ...celdaBase, color: colorOlaF ?? 'var(--text)', fontWeight: colorOlaF ? 600 : 400 }}>
                       {olaFTexto}
                     </td>
-                    <td
-                      style={{
-                        ...celdaBase,
-                        color: colorPer ?? 'var(--text)',
-                        fontWeight: colorPer ? 600 : 400,
-                      }}
-                    >
+                    <td style={{ ...celdaBase, color: colorPer ?? 'var(--text)', fontWeight: colorPer ? 600 : 400 }}>
                       {perTexto}
                     </td>
-                    <td
-                      style={{
-                        ...celdaBase,
-                        color: colorOlaV ?? 'var(--text)',
-                        fontWeight: colorOlaV ? 600 : 400,
-                      }}
-                    >
+                    <td style={{ ...celdaBase, color: colorOlaV ?? 'var(--text)', fontWeight: colorOlaV ? 600 : 400 }}>
                       {olaVTexto}
                     </td>
-                    <td
-                      style={{
-                        ...celdaBase,
-                        color: colorVmed ?? 'var(--text)',
-                        fontWeight: colorVmed ? 600 : 400,
-                      }}
-                    >
+                    <td style={{ ...celdaBase, color: colorVmed ?? 'var(--text)', fontWeight: colorVmed ? 600 : 400 }}>
                       {vientoTexto}
                     </td>
                     <td
@@ -1348,18 +1266,10 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                     >
                       {rachaTexto}
                     </td>
-                    <td
-                      style={{
-                        ...celdaBase,
-                        color: colorKN ?? 'var(--text)',
-                        fontWeight: colorKN ? 600 : 400,
-                      }}
-                    >
+                    <td style={{ ...celdaBase, color: colorKN ?? 'var(--text)', fontWeight: colorKN ? 600 : 400 }}>
                       {derivaTexto}
                     </td>
-                    <td style={{ ...celdaBase, color: 'var(--text)' }}>
-                      {actTexto}
-                    </td>
+                    <td style={{ ...celdaBase, color: 'var(--text)' }}>{actTexto}</td>
                   </tr>
                 </React.Fragment>
               );
@@ -1381,6 +1291,7 @@ export const PrevisionScreen: React.FC = () => {
     spots[0]?.id ?? null
   );
   const [diaOffset, setDiaOffset] = useState(0);
+  const [modalMarCruzadaAbierto, setModalMarCruzadaAbierto] = useState(false);
 
   const spotActivo = spots.find((s) => s.id === spotActivoId) ?? spots[0] ?? null;
   const weather = spotActivo ? getFreshWeather(spotActivo.id) : null;
@@ -1512,9 +1423,18 @@ export const PrevisionScreen: React.FC = () => {
         embarcacion={embarcacionSpot}
       />
 
-      {puntosDia.length > 0 && <ResumenDia puntos={puntosDia} />}
+      {puntosDia.length > 0 && (
+        <ResumenDia
+          puntos={puntosDia}
+          onAbrirMarCruzada={() => setModalMarCruzadaAbierto(true)}
+        />
+      )}
 
       <Tabla72Horas spot={spotActivo} weather={weather} lang={lang} />
+
+      {modalMarCruzadaAbierto && (
+        <ModalMarCruzada onClose={() => setModalMarCruzadaAbierto(false)} />
+      )}
     </div>
   );
 };
