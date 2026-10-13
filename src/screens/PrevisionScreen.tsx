@@ -138,7 +138,7 @@ const ModalMarCruzada: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               letterSpacing: '0.04em',
             }}
           >
-            {t('marcruzada.titulo', { defaultValue: 'MAR CRUZADA' })}
+            {t('marcruzada.titulo')}
           </h3>
           <button
             type="button"
@@ -157,24 +157,15 @@ const ModalMarCruzada: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         </div>
 
         <p style={{ fontSize: '0.9rem', lineHeight: 1.55, color: 'var(--text)', margin: '0 0 12px 0' }}>
-          {t('marcruzada.intro', {
-            defaultValue:
-              'Hay dos sistemas de ola viniendo de direcciones distintas. Eso se llama mar cruzada.',
-          })}
+          {t('marcruzada.intro')}
         </p>
 
         <p style={{ fontSize: '0.9rem', lineHeight: 1.55, color: 'var(--text)', margin: '0 0 12px 0' }}>
-          {t('marcruzada.cuerpo1', {
-            defaultValue:
-              'En mar cruzada, el kayak recibe golpes desde dos ángulos. Los picos de una ola y de la otra se suman de vez en cuando, y el kayak cabecea y balancea a la vez. Es incómodo, agota, y en un descuido puede volcar.',
-          })}
+          {t('marcruzada.cuerpo1')}
         </p>
 
         <p style={{ fontSize: '0.9rem', lineHeight: 1.55, color: 'var(--text)', margin: '0 0 12px 0' }}>
-          {t('marcruzada.cuerpo2', {
-            defaultValue:
-              'Si sales con mar cruzada, extrema la precaución. No te alejes de la costa. Mantén el kayak siempre con la proa a una de las dos olas. Y si el mar se pone peor, vuelve antes de que la situación se complique.',
-          })}
+          {t('marcruzada.cuerpo2')}
         </p>
 
         <p
@@ -186,10 +177,7 @@ const ModalMarCruzada: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             fontStyle: 'italic',
           }}
         >
-          {t('marcruzada.criterio', {
-            defaultValue:
-              'Se avisa de mar cruzada cuando la ola de viento y la ola de fondo superan los 0,3 m cada una y vienen de direcciones separadas por más de 60°.',
-          })}
+          {t('marcruzada.criterio')}
         </p>
       </div>
     </div>
