@@ -28,7 +28,7 @@ import {
 } from '../lib/verdict.ts';
 import type { Kayak } from '../lib/kayaks.ts';
 import type { Pato } from '../lib/patos.ts';
-import { colorNumero, colorPescaCorriente } from '../lib/verdict-color.ts';
+import { colorNumero, colorPescaCorriente, colorActividadPeces } from '../lib/verdict-color.ts';
 import { calcularSol } from '../lib/sun.ts';
 import { calcularLuna, emojiFase } from '../lib/moon.ts';
 import { calcularActividadPorHora, type ActividadHora } from '../lib/actividad.ts';
@@ -1241,7 +1241,11 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                     <td style={{ ...celdaBase, color: colorKN ?? 'var(--text)', fontWeight: colorKN ? 600 : 400 }}>
                       {derivaTexto}
                     </td>
-                    <td style={{ ...celdaBase, color: 'var(--text)' }}>{actTexto}</td>
+                    <td style={{
+                      ...celdaBase,
+                      color: colorActividadPeces(actItem?.coeficiente ?? null) ?? 'var(--text)',
+                      fontWeight: colorActividadPeces(actItem?.coeficiente ?? null) ? 600 : 400,
+                    }}>{actTexto}</td>
                   </tr>
                 </React.Fragment>
               );

@@ -43,7 +43,7 @@ import {
   type HourlyPoint,
 } from '../lib/openmeteo.ts';
 import { nombreViento } from '../lib/wind.ts';
-import { colorNumero, colorPescaCorriente, type NivelColorTabla } from '../lib/verdict-color.ts';
+import { colorNumero, colorPescaCorriente, colorActividadPeces, type NivelColorTabla } from '../lib/verdict-color.ts';
 import { calcularActividadPorHora, type ActividadHora } from '../lib/actividad.ts';
 import type { FranjaUsuario } from '../state/store.ts';
 import {
@@ -1499,7 +1499,14 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                 render: (h) => {
                   const a = actividad.find((x) => x.hora === h.time);
                   if (!a) return '—';
-                  return <span style={{ fontSize: '0.68rem' }}>{a.coeficiente}</span>;
+                  const color = colorActividadPeces(a.coeficiente);
+                  return (
+                    <span style={{
+                      fontSize: '0.68rem',
+                      color: color ?? 'var(--text)',
+                      fontWeight: color ? 600 : 400,
+                    }}>{a.coeficiente}</span>
+                  );
                 } },
             ]}
           />

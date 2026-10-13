@@ -54,3 +54,11 @@ export function colorPescaCorriente(kt: number | null): string | null {
   if (kt <= 1.5) return 'var(--verdict-aceptable)';
   return 'var(--verdict-exigente)';
 }
+
+export function colorActividadPeces(valor: number | null): string | null {
+  if (valor == null) return null;
+  if (valor <= 2) return 'var(--verdict-desaconsejado)';
+  if (valor <= 4) return 'var(--verdict-exigente)';
+  if (valor <= 7) return 'var(--verdict-aceptable)';
+  return 'var(--verdict-favorable)';
+}
