@@ -353,6 +353,14 @@ KAYAK CATEGORIES (WKF):
 - K4: heavy (4.2–4.8 m), with watertight bulkheads and rudder.
 - K5: sea kayak (> 4.8 m), closed cockpit, bulkheads and rudder.
 
+IMPORTANT — "c" SUFFIX:
+The WKF category may carry a "c" at the end (K4c instead of K4).
+That "c" means the kayak has official manufacturer certification
+(CE, UKCA, or equivalent). Without the "c", the kayak has no
+confirmed official certification and WKF applies conservatism.
+The "c" does not change the category number (K4 is K4), it only
+indicates that there is an official document behind it.
+
 EVALUATED FACTORS:
 - Wind (Beaufort scale).
 - Wave (significant wave height, meters).
@@ -544,7 +552,7 @@ Please explain all this to me as if I had little technical experience. What does
     certificadoSiWkf: 'Yes (according to WKF technical report)',
     certificadoNoWkf: 'No (according to WKF technical report)',
     certNotaPie:
-      'WKF does not verify kayak certifications individually. The information comes from an internal project technical report. If your kayak shows different data on the manufacturer plate or manual, manufacturer data always prevails.',
+      'WKF does not verify kayak certifications individually. The information comes from an internal project technical report. If your kayak shows different data on the manufacturer plate or manual, manufacturer data always prevails. The WKF category may carry a "c" at the end (K4c). That "c" means the kayak has official manufacturer certification (CE, UKCA or equivalent). Without the "c", the kayak has no confirmed official certification and WKF applies conservatism.',
     verificado: 'Verified',
     noCertificado: 'Not certified',
     brand: 'Brand',

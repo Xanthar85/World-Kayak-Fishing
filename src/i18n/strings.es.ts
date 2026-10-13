@@ -360,6 +360,14 @@ CATEGORÍAS DE KAYAK (WKF):
 - K4: pesado (4.2-4.8 m), con compartimentos estancos y timón.
 - K5: kayak de mar (> 4.8 m), cerrado, con compartimentos y timón.
 
+IMPORTANTE — SUFIJO "c":
+La categoría WKF puede llevar una "c" al final (K4c en lugar de K4).
+Esa "c" significa que el kayak tiene certificación oficial del
+fabricante (CE, UKCA, o equivalente). Sin la "c", el kayak no tiene
+certificación oficial confirmada y WKF aplica conservadurismo. La
+"c" no cambia el número de categoría (K4 es K4), solo indica que
+hay un papel oficial detrás.
+
 FACTORES EVALUADOS:
 - Viento (Beaufort).
 - Ola (altura significativa, metros).
@@ -551,7 +559,7 @@ Por favor, explícame todo esto como si tuviera poca experiencia técnica. Qué 
     certificadoSiWkf: 'Sí (según informe técnico WKF)',
     certificadoNoWkf: 'No (según informe técnico WKF)',
     certNotaPie:
-      'WKF no verifica las certificaciones de los kayaks una por una. La información proviene de un informe técnico interno del proyecto. Si tu kayak tiene datos diferentes en la placa del fabricante o en el manual, prevalecen siempre los del fabricante.',
+      'WKF no verifica las certificaciones de los kayaks una por una. La información proviene de un informe técnico interno del proyecto. Si tu kayak tiene datos diferentes en la placa del fabricante o en el manual, prevalecen siempre los del fabricante. La categoría WKF puede llevar una "c" al final (K4c). Esa "c" significa que el kayak tiene certificación oficial del fabricante (CE, UKCA o equivalente). Sin la "c", el kayak no tiene certificación oficial confirmada y WKF aplica conservadurismo.',
     verificado: 'Verificado',
     noCertificado: 'Sin certificar',
     brand: 'Marca',
