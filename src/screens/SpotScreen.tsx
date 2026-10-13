@@ -56,6 +56,7 @@ import {
   SUFIJO_TEMPERATURA,
   SUFIJO_PRESION,
   SUFIJO_CORRIENTE,
+  SUFIJO_PRECIPITACION,
   valorViento,
   valorOla,
   valorTemperatura,

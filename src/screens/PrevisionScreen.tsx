@@ -217,6 +217,7 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
   embarcacion,
 }) => {
   const ajustes = useAppStore((s) => s.ajustes);
+  const { t } = useTranslation();
   const u = ajustes.unidades;
 
   if (!weather || !weather.hourly || weather.hourly.length === 0) {
