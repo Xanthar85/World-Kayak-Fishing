@@ -1,8 +1,13 @@
 // src/screens/PrevisionScreen.tsx
 // WKF — Pantalla de Previsión meteorológica (tipo Windy).
-// Muestra gráfico de ola + viento del punto activo, día a día,
-// con 7 días seleccionables, franjas de veredicto, líneas de umbral
-// y tabla detallada de 72h.
+// v1.019: gráfico grande ampliado.
+//   - Eje izquierdo: ola (verde, continua) + deriva (naranja, punteada).
+//   - Eje derecho: viento (azul, continua).
+//   - Actividad: barras verticales finas, blancas, con número encima.
+//   - 7 líneas verticales: orto sol, mediodía solar, ocaso sol,
+//     orto luna, ocaso luna, crepúsculo civil mañana, crepúsculo civil tarde.
+//   - Iconos: ☀ en líneas solares, fase lunar en líneas lunares.
+//   - Leyenda ampliada.
 
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,6 +34,7 @@ import type { Kayak } from '../lib/kayaks.ts';
 import type { Pato } from '../lib/patos.ts';
 import { colorNumero } from '../lib/verdict-color.ts';
 import { calcularSol } from '../lib/sun.ts';
+import { calcularLuna, emojiFase } from '../lib/moon.ts';
 import { calcularActividadPorHora, type ActividadHora } from '../lib/actividad.ts';
 import { abreviaturaViento } from '../lib/wind.ts';
 import {
@@ -153,29 +159,34 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
   // 1. ESCALA DEL EJE Y: EXCLUSIVAMENTE a partir de los datos reales del día mostrado
   let olaMaxDia = 0;
   let vientoMaxDia = 0;
+  let derivaMaxDia = 0;
   for (const p of puntos) {
     const o = p.waveHeight ?? 0;
     const v = msAKmh(p.windSpeed) ?? 0;
+    const d = p.currentVelocity != null ? p.currentVelocity * 1.852 : 0;
     if (o > olaMaxDia) olaMaxDia = o;
     if (v > vientoMaxDia) vientoMaxDia = v;
+    if (d > derivaMaxDia) derivaMaxDia = d;
   }
 
-  // olaEscala = olaMaxDia * 1.15 redondeado hacia arriba a un decimal (mínimo 0.1)
-  let olaEscala = Math.ceil(olaMaxDia * 1.15 * 10) / 10;
-  if (olaEscala < 0.1) olaEscala = 0.1;
+  // Escala del eje izquierdo: la mayor de ola y deriva, con margen.
+  const maxIzquierda = Math.max(olaMaxDia, derivaMaxDia, 0.1);
+  let escalaIzquierda = Math.ceil(maxIzquierda * 1.15 * 10) / 10;
+  if (escalaIzquierda < 0.1) escalaIzquierda = 0.1;
 
-  // vientoEscala = vientoMaxDia * 1.15 redondeado hacia arriba al múltiplo de 5 (mínimo 5)
+  // Escala del eje derecho: viento, con margen al múltiplo de 5.
   let vientoEscala = Math.ceil((vientoMaxDia * 1.15) / 5) * 5;
   if (vientoEscala < 5) vientoEscala = 5;
 
   const xHora = (h: number) => paddingLeft + (h / 23) * plotW;
-  const yOla = (m: number) => paddingTop + plotH - (Math.min(m, olaEscala) / olaEscala) * plotH;
-  const yViento = (k: number) => paddingTop + plotH - (Math.min(k, vientoEscala) / vientoEscala) * plotH;
+  const yIzquierda = (v: number) =>
+    paddingTop + plotH - (Math.min(v, escalaIzquierda) / escalaIzquierda) * plotH;
+  const yDerecha = (v: number) =>
+    paddingTop + plotH - (Math.min(v, vientoEscala) / vientoEscala) * plotH;
 
-  // 2. LÍNEAS DE UMBRAL:
-  // Altura única: usar el umbral de la franja ACTIVA (ajustes.franjaActivaId).
-  // Si no hay franja activa, usar el umbral de la primera franja del día.
-  const franjaActiva = franjas.find((f) => f.id === ajustes.franjaActivaId) ?? franjas[0] ?? null;
+  // 2. LÍNEAS DE UMBRAL (solo ola y viento, como antes)
+  const franjaActiva =
+    franjas.find((f) => f.id === ajustes.franjaActivaId) ?? franjas[0] ?? null;
   let umbralActivo: Umbral | null = null;
   if (franjaActiva) {
     const inicio = franjaActiva.inicio;
@@ -200,12 +211,132 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
     umbralActivo = res.umbralAplicado;
   }
 
-  // Curvas y áreas
+  // 3. EVENTOS ASTRONÓMICOS (líneas verticales)
+  const sol = calcularSol(dia, spot?.lat ?? 0, spot?.lon ?? 0);
+  const luna = calcularLuna(dia, spot?.lat ?? 0, spot?.lon ?? 0);
+
+  const horaDecimal = (d: Date | null | undefined): number | null => {
+    if (!d) return null;
+    return d.getHours() + d.getMinutes() / 60;
+  };
+
+  interface LineaVertical {
+    hora: number;
+    color: string;
+    icono: string;
+    label: string;
+    strokeWidth: number;
+  }
+
+  const lineasVerticales: LineaVertical[] = [];
+  if (sol) {
+    const orto = horaDecimal(sol.orto);
+    const mediodia = horaDecimal(sol.mediodiaSolar);
+    const ocaso = horaDecimal(sol.ocaso);
+    const civilInicio = horaDecimal(sol.crepusculoCivilInicio);
+    const civilFin = horaDecimal(sol.crepusculoCivilFin);
+
+    if (orto != null) {
+      lineasVerticales.push({
+        hora: orto,
+        color: '#FFD500',
+        icono: '☀',
+        label: 'orto',
+        strokeWidth: 1.5,
+      });
+    }
+    if (mediodia != null) {
+      lineasVerticales.push({
+        hora: mediodia,
+        color: '#FFD500',
+        icono: '☀',
+        label: 'mediodía',
+        strokeWidth: 1,
+      });
+    }
+    if (ocaso != null) {
+      lineasVerticales.push({
+        hora: ocaso,
+        color: '#FFD500',
+        icono: '☀',
+        label: 'ocaso',
+        strokeWidth: 1.5,
+      });
+    }
+    if (civilInicio != null) {
+      lineasVerticales.push({
+        hora: civilInicio,
+        color: '#00B8FF',
+        icono: '🌅',
+        label: 'crepúsculo civil',
+        strokeWidth: 1,
+      });
+    }
+    if (civilFin != null) {
+      lineasVerticales.push({
+        hora: civilFin,
+        color: '#00B8FF',
+        icono: '🌇',
+        label: 'crepúsculo civil',
+        strokeWidth: 1,
+      });
+    }
+  }
+  if (luna) {
+    const ortoL = horaDecimal(luna.ortoLunar);
+    const ocasoL = horaDecimal(luna.ocasoLunar);
+    const emoji = emojiFase(luna.fase);
+    if (ortoL != null) {
+      lineasVerticales.push({
+        hora: ortoL,
+        color: '#B0B0B0',
+        icono: emoji,
+        label: 'orto lunar',
+        strokeWidth: 1,
+      });
+    }
+    if (ocasoL != null) {
+      lineasVerticales.push({
+        hora: ocasoL,
+        color: '#B0B0B0',
+        icono: emoji,
+        label: 'ocaso lunar',
+        strokeWidth: 1,
+      });
+    }
+  }
+
+  // 4. ACTIVIDAD (barras)
+  const actividad: ActividadHora[] = useMemo(() => {
+    if (!weather?.hourly || !spot) return [];
+    const mapa = new Map<string, { orto: Date | null; ocaso: Date | null }>();
+    for (const h of weather.hourly) {
+      const d = new Date(h.time);
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      if (!mapa.has(key)) {
+        const s = calcularSol(d, spot.lat, spot.lon);
+        mapa.set(key, { orto: s?.orto ?? null, ocaso: s?.ocaso ?? null });
+      }
+    }
+    return calcularActividadPorHora(weather.hourly, mapa);
+  }, [weather, spot]);
+
+  const actividadPorHora = useMemo(() => {
+    const m = new Map<number, number>();
+    for (const a of actividad) {
+      const h = new Date(a.hora).getHours();
+      const k = `${new Date(a.hora).getFullYear()}-${new Date(a.hora).getMonth()}-${new Date(a.hora).getDate()}`;
+      if (k === keyDia) m.set(h, a.coeficiente);
+    }
+    return m;
+  }, [actividad, keyDia]);
+
+  // 5. CURVAS
   const olaPath = puntos
     .map((p, i) => {
       if (p.waveHeight == null) return null;
       const x = xHora(new Date(p.time).getHours());
-      const y = yOla(p.waveHeight);
+      const y = yIzquierda(p.waveHeight);
       return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .filter((s): s is string => s !== null)
@@ -215,7 +346,7 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
     const validos = puntos
       .map((p) => {
         if (p.waveHeight == null) return null;
-        return { x: xHora(new Date(p.time).getHours()), y: yOla(p.waveHeight) };
+        return { x: xHora(new Date(p.time).getHours()), y: yIzquierda(p.waveHeight) };
       })
       .filter((v): v is { x: number; y: number } => v !== null);
     if (validos.length < 2) return '';
@@ -230,7 +361,7 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
       const v = msAKmh(p.windSpeed);
       if (v == null) return null;
       const x = xHora(new Date(p.time).getHours());
-      const y = yViento(v);
+      const y = yDerecha(v);
       return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .filter((s): s is string => s !== null)
@@ -241,7 +372,7 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
       .map((p) => {
         const v = msAKmh(p.windSpeed);
         if (v == null) return null;
-        return { x: xHora(new Date(p.time).getHours()), y: yViento(v) };
+        return { x: xHora(new Date(p.time).getHours()), y: yDerecha(v) };
       })
       .filter((v): v is { x: number; y: number } => v !== null);
     if (validos.length < 2) return '';
@@ -251,16 +382,30 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
     return `${lines.join(' ')} L ${last.x.toFixed(1)},${(paddingTop + plotH).toFixed(1)} L ${first.x.toFixed(1)},${(paddingTop + plotH).toFixed(1)} Z`;
   })();
 
+  const derivaPath = puntos
+    .map((p, i) => {
+      if (p.currentVelocity == null) return null;
+      const kmh = p.currentVelocity * 1.852;
+      const x = xHora(new Date(p.time).getHours());
+      const y = yIzquierda(kmh);
+      return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .filter((s): s is string => s !== null)
+    .join(' ');
+
   const marcasY = [0, 0.5, 1];
   const ahora = new Date();
   const esHoy = localDateKey(ahora) === keyDia;
   const horaAhora = ahora.getHours() + ahora.getMinutes() / 60;
 
-  // Umbrales para líneas horizontales
   const umbOlaExi = umbralActivo ? umbralActivo.ola.exi : null;
   const umbOlaDes = umbralActivo ? umbralActivo.ola.des : null;
   const umbVieExiKmh = umbralActivo ? bfAKmh(umbralActivo.viento.exi) : null;
   const umbVieDesKmh = umbralActivo ? bfAKmh(umbralActivo.viento.des) : null;
+
+  // Colores fijos de las series nuevas
+  const COLOR_DERIVA = '#FF8A00';
+  const COLOR_ACTIVIDAD = 'rgba(255, 255, 255, 0.55)';
 
   return (
     <div
@@ -277,7 +422,7 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
         preserveAspectRatio="xMidYMid meet"
         style={{ width: '100%', height: 'auto', display: 'block' }}
       >
-        {/* Franjas de veredicto: relleno translúcido (opacity 0.03) + línea inferior continua con strokeWidth 2 */}
+        {/* Franjas de veredicto: fondo translúcido + línea inferior */}
         {franjas.map((f) => {
           const v = veredictosPorFranja[f.id] ?? null;
           if (!v) return null;
@@ -333,10 +478,73 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           );
         })}
 
-        {/* LÍNEAS DE UMBRAL: RECTAS HORIZONTALES (solo se dibujan si caen dentro del rango visible) */}
-        {/* OLA - Inicio EXIGENTE */}
-        {umbOlaExi != null && umbOlaExi > 0 && umbOlaExi <= olaEscala && (() => {
-          const y = yOla(umbOlaExi);
+        {/* Líneas verticales de eventos astronómicos */}
+        {lineasVerticales.map((lv, i) => {
+          const x = xHora(lv.hora);
+          if (x < paddingLeft - 2 || x > paddingLeft + plotW + 2) return null;
+          return (
+            <g key={`lv-${i}`}>
+              <line
+                x1={x}
+                y1={paddingTop}
+                x2={x}
+                y2={paddingTop + plotH}
+                stroke={lv.color}
+                strokeWidth={lv.strokeWidth}
+                strokeDasharray={lv.strokeWidth < 1.5 ? '3 3' : undefined}
+                opacity={0.75}
+              />
+              <text
+                x={x}
+                y={paddingTop + 12}
+                fontSize={11}
+                fill={lv.color}
+                textAnchor="middle"
+                style={{ pointerEvents: 'none' }}
+              >
+                {lv.icono}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Barras de actividad (detrás de las curvas) */}
+        {Array.from({ length: 24 }, (_, h) => {
+          const coef = actividadPorHora.get(h);
+          if (coef == null || coef === 0) return null;
+          const x = xHora(h);
+          const altura = (coef / 10) * plotH * 0.9;
+          const barW = Math.max(2, plotW / 24 - 4);
+          const y = paddingTop + plotH - altura;
+          return (
+            <g key={`act-${h}`}>
+              <rect
+                x={x - barW / 2}
+                y={y}
+                width={barW}
+                height={altura}
+                fill={COLOR_ACTIVIDAD}
+                opacity={0.35}
+              />
+              {coef >= 7 && (
+                <text
+                  x={x}
+                  y={y - 3}
+                  fontSize={7}
+                  fill="rgba(255,255,255,0.85)"
+                  textAnchor="middle"
+                  fontFamily="Fira Code, monospace"
+                >
+                  {coef}
+                </text>
+              )}
+            </g>
+          );
+        })}
+
+        {/* Umbral ola EXIGENTE */}
+        {umbOlaExi != null && umbOlaExi > 0 && umbOlaExi <= escalaIzquierda && (() => {
+          const y = yIzquierda(umbOlaExi);
           const yText = y - 3 < paddingTop + 7 ? y + 9 : y - 3;
           const valConvertido = valorOla(umbOlaExi, u.ola) ?? umbOlaExi;
           return (
@@ -365,9 +573,9 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           );
         })()}
 
-        {/* OLA - Inicio DESACONSEJADO */}
-        {umbOlaDes != null && umbOlaDes > 0 && umbOlaDes <= olaEscala && (() => {
-          const y = yOla(umbOlaDes);
+        {/* Umbral ola DESACONSEJADO */}
+        {umbOlaDes != null && umbOlaDes > 0 && umbOlaDes <= escalaIzquierda && (() => {
+          const y = yIzquierda(umbOlaDes);
           const yText = y - 3 < paddingTop + 7 ? y + 9 : y - 3;
           const valConvertido = valorOla(umbOlaDes, u.ola) ?? umbOlaDes;
           return (
@@ -396,9 +604,9 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           );
         })()}
 
-        {/* VIENTO - Inicio EXIGENTE */}
+        {/* Umbral viento EXIGENTE */}
         {umbVieExiKmh != null && umbVieExiKmh > 0 && umbVieExiKmh <= vientoEscala && (() => {
-          const y = yViento(umbVieExiKmh);
+          const y = yDerecha(umbVieExiKmh);
           const yText = y - 3 < paddingTop + 7 ? y + 9 : y - 3;
           const valConvertido = valorViento(umbVieExiKmh, u.viento) ?? umbVieExiKmh;
           return (
@@ -428,9 +636,9 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           );
         })()}
 
-        {/* VIENTO - Inicio DESACONSEJADO */}
+        {/* Umbral viento DESACONSEJADO */}
         {umbVieDesKmh != null && umbVieDesKmh > 0 && umbVieDesKmh <= vientoEscala && (() => {
-          const y = yViento(umbVieDesKmh);
+          const y = yDerecha(umbVieDesKmh);
           const yText = y - 3 < paddingTop + 7 ? y + 9 : y - 3;
           const valConvertido = valorViento(umbVieDesKmh, u.viento) ?? umbVieDesKmh;
           return (
@@ -460,13 +668,13 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           );
         })()}
 
-        {/* Eje Y izquierdo: OLA */}
+        {/* Eje Y izquierdo: ola + deriva */}
         {marcasY.map((frac) => {
-          const valCrudo = frac * olaEscala;
+          const valCrudo = frac * escalaIzquierda;
           const valConvertido = valorOla(valCrudo, u.ola) ?? valCrudo;
           const y = paddingTop + plotH - frac * plotH;
           return (
-            <g key={`yola-${frac}`}>
+            <g key={`yizq-${frac}`}>
               <line x1={paddingLeft - 4} y1={y} x2={paddingLeft} y2={y} stroke="var(--text-dim)" strokeWidth={0.6} />
               <text x={paddingLeft - 6} y={y + 3} fontSize={9} fill="var(--text-dim)" textAnchor="end" fontFamily="Fira Code, monospace">
                 {valConvertido.toFixed(1)}
@@ -475,13 +683,13 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           );
         })}
 
-        {/* Eje Y derecho: VIENTO */}
+        {/* Eje Y derecho: viento */}
         {marcasY.map((frac) => {
           const valCrudo = frac * vientoEscala;
           const valConvertido = valorViento(valCrudo, u.viento) ?? valCrudo;
           const y = paddingTop + plotH - frac * plotH;
           return (
-            <g key={`yvie-${frac}`}>
+            <g key={`yder-${frac}`}>
               <line x1={paddingLeft + plotW} y1={y} x2={paddingLeft + plotW + 4} y2={y} stroke="var(--text-dim)" strokeWidth={0.6} />
               <text x={paddingLeft + plotW + 6} y={y + 3} fontSize={9} fill="var(--text-dim)" textAnchor="start" fontFamily="Fira Code, monospace">
                 {Math.round(valConvertido)}
@@ -499,12 +707,25 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           <path d={olaPath} fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
         )}
 
+        {derivaPath && (
+          <path
+            d={derivaPath}
+            fill="none"
+            stroke={COLOR_DERIVA}
+            strokeWidth={1.6}
+            strokeDasharray="3 3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity={0.85}
+          />
+        )}
+
         {vientoArea && <path d={vientoArea} fill="var(--accent-2)" opacity={0.12} />}
         {vientoPath && (
           <path d={vientoPath} fill="none" stroke="var(--accent-2)" strokeWidth={1.6} strokeDasharray="4 3" strokeLinecap="round" strokeLinejoin="round" />
         )}
 
-        {/* EJE X - FILA 2: NOMBRE DE FRANJA */}
+        {/* Nombres de franja (fila 1 del eje X) */}
         {franjas.map((f) => {
           const v = veredictosPorFranja[f.id] ?? null;
           const color = v ? veredictoAColor(v) : 'var(--text-dim)';
@@ -516,7 +737,6 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
             tramos.push({ a: 0, b: f.fin, len: f.fin });
           }
 
-          // Elegir el tramo mayor; si son iguales, el de la derecha
           let elegido = tramos[0];
           if (tramos.length > 1) {
             if (tramos[1].len >= tramos[0].len) {
@@ -543,7 +763,7 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           );
         })}
 
-        {/* EJE X - FILA 1: TODAS LAS 24 HORAS (0 a 23) */}
+        {/* Horas (fila 2 del eje X) */}
         {Array.from({ length: 24 }, (_, h) => {
           const x = xHora(h);
           const yTick = paddingTop + plotH;
@@ -591,11 +811,13 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
           ))}
       </div>
 
+      {/* Leyenda ampliada */}
       <div
         style={{
           display: 'flex',
+          flexWrap: 'wrap',
           justifyContent: 'center',
-          gap: 20,
+          gap: 14,
           padding: '6px 0 2px',
           fontSize: '0.7rem',
           fontFamily: 'var(--font-mono, Fira Code, monospace)',
@@ -604,6 +826,11 @@ const GraficoGrande: React.FC<GraficoGrandeProps> = ({
       >
         <span style={{ color: 'var(--accent)' }}>— Ola ({SUFIJO_OLA[u.ola]})</span>
         <span style={{ color: 'var(--accent-2)' }}>┄ Viento ({SUFIJO_VIENTO[u.viento]})</span>
+        <span style={{ color: COLOR_DERIVA }}>┈ Deriva (km/h)</span>
+        <span style={{ color: 'rgba(255,255,255,0.7)' }}>▮ Actividad (0-10)</span>
+        <span style={{ color: '#FFD500' }}>│ Sol</span>
+        <span style={{ color: '#B0B0B0' }}>│ Luna</span>
+        <span style={{ color: '#00B8FF' }}>│ Crepúsculo civil</span>
       </div>
     </div>
   );
@@ -863,17 +1090,14 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
               const franjaDia = obtenerFranjaDia(fecha);
               const horaTexto = `${String(fecha.getHours()).padStart(2, '0')}:00`;
 
-              // Clima
               const climaIcono = weatherCodeAIcono(
                 point?.weatherCode ?? null,
                 fecha.getHours() < 7 || fecha.getHours() >= 21
               );
 
-              // Temp (Temperatura del aire sin unidad)
               const tempVal = valorTemperatura(point?.temperature ?? null, u.temperatura);
               const tempTexto = tempVal != null ? tempVal.toFixed(1).replace('.', ',') : '—';
 
-              // Lluvia (0 o null -> "—", > 0 -> 1 decimal sin unidad)
               const precipVal = point?.precipitation ?? null;
               const lluviaTexto =
                 precipVal == null || precipVal === 0
@@ -882,7 +1106,6 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                       .toFixed(1)
                       .replace('.', ',');
 
-              // OlaF (swellWaveHeight)
               const olaFVal = valorOla(point?.swellWaveHeight ?? null, u.ola);
               const olaFTexto = olaFVal != null ? olaFVal.toFixed(1).replace('.', ',') : '—';
               const vOlaF =
@@ -904,7 +1127,6 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                   : null;
               const colorOlaF = colorNumero(vOlaF, ajustes.colorTabla);
 
-              // Per (periodo en segundos sin unidad)
               const perTexto =
                 point?.wavePeriod != null
                   ? `${Math.round(point.wavePeriod)}`
@@ -928,7 +1150,6 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                   : null;
               const colorPer = colorNumero(vPer, ajustes.colorTabla);
 
-              // OlaV (windWaveHeight)
               const olaVVal = valorOla(point?.windWaveHeight ?? null, u.ola);
               const olaVTexto = olaVVal != null ? olaVVal.toFixed(1).replace('.', ',') : '—';
               const vOlaV =
@@ -950,7 +1171,6 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                   : null;
               const colorOlaV = colorNumero(vOlaV, ajustes.colorTabla);
 
-              // Viento (formato "1,5/E90º", o solo velocidad, o "—")
               const vVmed =
                 point?.windSpeed != null && spot
                   ? calcularVeredicto(
@@ -983,7 +1203,6 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                 }
               }
 
-              // Racha (solo velocidad, rojo neón si >= 30 km/h)
               const vVmax =
                 point?.windGusts != null && spot
                   ? calcularVeredicto(
@@ -1008,7 +1227,6 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                 valorRachaNum != null ? valorRachaNum.toFixed(1).replace('.', ',') : '—';
               const esRachaFuerte = point?.windGusts != null && point.windGusts >= 30;
 
-              // Deriva (formato "1,5/E90º" en km/h, color de veredicto corriente)
               const vKN =
                 point?.currentVelocity != null && spot
                   ? calcularVeredicto(
@@ -1041,7 +1259,6 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                 }
               }
 
-              // Actividad (0-10)
               const actItem = point ? actividadMap.get(point.time) : null;
               const actTexto =
                 actItem != null ? String(actItem.coeficiente) : '—';
@@ -1073,13 +1290,7 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                       borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
                     }}
                   >
-                    <td
-                      style={{
-                        ...celdaBase,
-                        color: 'var(--text-dim)',
-                        fontWeight: 500,
-                      }}
-                    >
+                    <td style={{ ...celdaBase, color: 'var(--text-dim)', fontWeight: 500 }}>
                       {horaTexto}
                     </td>
                     <td style={{ ...celdaBase, fontSize: '0.82rem' }}>
