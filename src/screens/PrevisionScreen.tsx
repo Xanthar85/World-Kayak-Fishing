@@ -973,8 +973,8 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
         style={{
           maxHeight: '55vh',
           overflowY: 'auto',
-          overflowX: 'auto',
           WebkitOverflowScrolling: 'touch',
+          position: 'relative',
         }}
       >
         <table
@@ -990,7 +990,7 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
               position: 'sticky',
               top: 0,
               backgroundColor: 'var(--surface)',
-              zIndex: 2,
+              zIndex: 10,
               boxShadow: '0 1px 0 var(--border)',
             }}
           >
