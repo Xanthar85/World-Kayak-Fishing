@@ -21,6 +21,7 @@ import {
 import {
   CATALOGO_KAYAKS,
   buscarKayakPorId,
+  etiquetaCategoria,
   type Kayak,
   type CertificacionesKayak,
 } from '../lib/kayaks.ts';
@@ -798,7 +799,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                           flexShrink: 0,
                         }}
                       >
-                        ({kayak.categoriaWKF})
+                        ({'tipoEmbarcacion' in kayak && kayak.tipoEmbarcacion === 'pato'
+                            ? kayak.categoriaWKF
+                            : etiquetaCategoria(kayak as Kayak)})
                       </span>
                     </div>
                   ) : (
@@ -994,7 +997,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                         flexShrink: 0,
                       }}
                     >
-                      {k.categoriaWKF}
+                      {k.tipoVaso === 'pato' ? k.categoriaWKF : etiquetaCategoria(k)}
                     </span>
                   </button>
                 ))}
