@@ -5,6 +5,9 @@
 //     techo absoluto. Requiere las claves i18n `kayak.techoAbsoluto`,
 //     `kayak.certificaciones`, `kayak.fuente`.
 //   - Resto de la pantalla intacta respecto a v1.010.
+// v1.021:
+//   - Layout de "Mis kayaks" reestructurado para que el nombre
+//     completo sea visible antes que los botones de acción.
 
 import React, { useState, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -740,20 +743,17 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   border: '1px solid var(--border)',
                   marginBottom: slotIndex === 0 ? 10 : 0,
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
+                  flexDirection: 'column', // CAMBIO: de 'row' a 'column'
                   gap: 8,
                 }}
               >
+                {/* Fila 1: Nombre del kayak */}
                 <div style={{ minWidth: 0, flex: 1 }}>
                   {kayak ? (
                     <div
                       style={{
                         fontWeight: 700,
                         fontSize: '0.95rem',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
                         display: 'flex',
                         alignItems: 'center',
                         gap: 6,
@@ -787,13 +787,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                           ? 'Pato'
                           : 'Kayak'}
                       </span>
-                      <span
-                        style={{
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {kayak.marca} {kayak.modelo}
                       </span>
                       <span
@@ -813,16 +807,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                         fontWeight: 700,
                         fontSize: '0.95rem',
                         color: 'var(--text-muted)',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
                       }}
                     >
                       Slot {slotIndex + 1}
                     </div>
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                {/* Fila 2: Botones */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {kayak && (
                     <button
                       onClick={() => setFichaTecnicaKayak(kayak)}

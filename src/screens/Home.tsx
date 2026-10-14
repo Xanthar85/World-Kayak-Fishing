@@ -9,6 +9,9 @@
 //     de la chincheta.
 //   - Resto igual que en v1.010: Home 7 días, franjas clicables,
 //     reordenar por arrastre, aviso de actualización.
+// v1.021:
+//   - Añadido padding inferior extra a la lista de puntos para que
+//     el contador X/6 no quede oculto tras el botón "+ Añadir punto".
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -42,6 +45,7 @@ export const Home: React.FC = () => {
   const [cerrandoTutorial, setCerrandoTutorial] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [viewingSpotId, setViewingSpotId] = useState<string | null>(null);
+  const [viewingSpotDate, setViewingSpotDate] = useState<string | null>(null);
   const [mapMode, setMapMode] = useState<'new' | 'edit' | null>(null);
   const [mapFocus, setMapFocus] = useState<'general' | 'acceso'>('general');
   const [mostrarMapa, setMostrarMapa] = useState(false);
@@ -124,8 +128,9 @@ export const Home: React.FC = () => {
   }, [spots.length]);
 
   // Abrir un punto en concreto y, si aplica, activar una franja.
-  const abrirPunto = (spotId: string, franjaId?: string) => {
+  const abrirPunto = (spotId: string, franjaId?: string, fechaISO?: string) => {
     if (franjaId) setFranjaActiva(franjaId);
+    setViewingSpotDate(fechaISO ?? null);
     setViewingSpotId(spotId);
   };
 
@@ -314,7 +319,7 @@ export const Home: React.FC = () => {
               </button>
             </div>
           ) : (
-            <div>
+            <div style={{ paddingBottom: 80 }}> {/* <-- CAMBIO: paddingBottom añadido */}
               {spots.map((spot) => (
                 <SpotCard
                   key={spot.id}
@@ -328,7 +333,7 @@ export const Home: React.FC = () => {
                   onRefresh={() => handleRefreshSpot(spot.id, spot.lat, spot.lon)}
                   onEdit={() => setViewingSpotId(spot.id)}
                   onDelete={() => removeSpot(spot.id)}
-                  onOpenFranja={(franjaId) => abrirPunto(spot.id, franjaId)}
+                  onOpenFranja={(franjaId, fechaISO) => abrirPunto(spot.id, franjaId, fechaISO)}
                   draggable
                   isDragging={draggingId === spot.id}
                   onDragStart={handleDragStart(spot.id)}
@@ -532,12 +537,15 @@ export const Home: React.FC = () => {
           zIndex={200}
           onClose={() => {
             setViewingSpotId(null);
+            setViewingSpotDate(null);
             setCerrandoSpot(false);
           }}
         >
           <SpotScreen
             spotId={viewingSpotId}
             onClose={() => setCerrandoSpot(true)}
+            initialDate={viewingSpotDate}
+            onDateChange={(iso) => setViewingSpotDate(iso)}
             onEditSpot={(spotId, focus) => {
               const s = spots.find((x) => x.id === spotId);
               if (s) {

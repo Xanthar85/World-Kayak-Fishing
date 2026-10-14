@@ -1,15 +1,10 @@
-// src/screens/SpotScreen.tsx — v1.019 limpia
-// Cambios v1.019:
-//   - Cabecera de dos líneas (nombre + unidad) en TODAS las tablas.
-//   - Pestaña Oleaje reestructurada:
-//       Hora | O.Total | O.Fondo | Periodo | O.Viento | Corriente
-//       Dirección dentro de cada celda de ola.
-//       Corriente: velocidad + dirección + indicador textual.
-//   - Botón MAR CRUZADA en pestaña Oleaje (si aplica).
-//   - Modal explicativo de mar cruzada.
-// v1.020: limpieza UI. Unidades fuera de las celdas en
-//   SpotScreen. Solo va el número (y dirección abreviada cuando
-//   aplica) más el indicador textual de corriente en su línea.
+// src/screens/SpotScreen.tsx — v1.021
+// Cambios v1.021:
+//   - Selector de día (Hoy, Mañana, Pasado, etc.) en la cabecera.
+//   - Veredicto por franja calculado para el día seleccionado.
+//   - Cabecera reorganizada: fecha consultada a la izquierda (color
+//     del veredicto) y factor disparador a la derecha.
+//   - El scroll de la tabla de horas se centra en el día seleccionado.
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,6 +13,7 @@ import { SelectorEmbarcacionModal } from '../components/SelectorEmbarcacionModal
 import { formatearCoords } from '../lib/coords.ts';
 import {
   calcularVeredictoPorFranja,
+  calcularVeredictoFranjaDia,
   veredictoAColor,
   veredictoAClaveI18n,
   veredictoAccesoAColor,
@@ -71,6 +67,8 @@ export interface SpotScreenProps {
   spotId: string;
   onClose: () => void;
   onEditSpot: (spotId: string, focusSection?: 'general' | 'acceso') => void;
+  initialDate?: string | null;
+  onDateChange?: (dateISO: string) => void;
 }
 
 type TabId =
@@ -92,6 +90,16 @@ function localDateKey(d: Date): string {
 function fechaLarga(d: Date, lang: string): string {
   return d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'es-ES', {
     weekday: 'short', day: '2-digit', month: '2-digit',
+  });
+}
+
+function etiquetaDiaCorta(d: Date, offset: number, lang: string, t: (k: string, o?: Record<string, unknown>) => string): string {
+  if (offset === 0) return t('home.today');
+  if (offset === 1) return t('home.tomorrow');
+  if (offset === 2) return t('home.dayAfter');
+  return d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'es-ES', {
+    day: '2-digit',
+    month: '2-digit',
   });
 }
 
@@ -138,8 +146,6 @@ function formatearValorFactor(factor: keyof Umbral, h: HourlyPoint): string {
 // ============================================================
 // DETECCIÓN DE MAR CRUZADA
 // ============================================================
-// Criterio: windWaveHeight > 0.3 m Y swellWaveHeight > 0.3 m
-// Y diferencia angular entre windWaveDirection y swellWaveDirection > 60°.
 function diferenciaAngular(a: number, b: number): number {
   const d = Math.abs(((a - b) % 360 + 360) % 360);
   return d > 180 ? 360 - d : d;
@@ -288,13 +294,14 @@ interface ColumnaTabla<T> {
 }
 
 function TablaDatos<T extends { time: string }>({
-  horas, columnas, colorNivel, lang, tabId,
+  horas, columnas, colorNivel, lang, tabId, diaSeleccionadoKey,
 }: {
   horas: T[];
   columnas: ColumnaTabla<T>[];
   colorNivel: NivelColorTabla;
   lang: string;
   tabId: string;
+  diaSeleccionadoKey?: string | null;
 }) {
   const gruposPorDia = useMemo(() => {
     const mapa = new Map<string, { fecha: Date; horas: T[] }>();
@@ -307,6 +314,17 @@ function TablaDatos<T extends { time: string }>({
     return Array.from(mapa.entries());
   }, [horas]);
 
+  const refsDias = useRef<Record<string, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    if (diaSeleccionadoKey && refsDias.current[diaSeleccionadoKey]) {
+      refsDias.current[diaSeleccionadoKey]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }
+  }, [diaSeleccionadoKey]);
+
   if (horas.length === 0) return null;
 
   const gridCols = `minmax(54px, auto) repeat(${columnas.length}, 1fr)`;
@@ -317,7 +335,6 @@ function TablaDatos<T extends { time: string }>({
       borderRadius: 8, border: '1px solid var(--border)',
       overflow: 'hidden', fontSize: '0.72rem',
     }}>
-      {/* Cabecera de dos líneas */}
       <div style={{
         display: 'grid', gridTemplateColumns: gridCols,
         backgroundColor: 'var(--surface)', borderBottom: '1px solid var(--border)',
@@ -359,14 +376,17 @@ function TablaDatos<T extends { time: string }>({
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         {gruposPorDia.map(([key, { fecha, horas: horasDelDia }], diaIndex) => (
           <React.Fragment key={key}>
-            <div style={{
-              gridColumn: '1 / -1', backgroundColor: 'var(--bg)',
-              color: 'var(--accent)', fontFamily: 'var(--font-mono, Fira Code, monospace)',
-              fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase',
-              padding: '4px 8px',
-              borderTop: diaIndex > 0 ? '1px solid var(--border)' : 'none',
-              borderBottom: '1px solid var(--border)',
-            }}>
+            <div
+              ref={(el) => { refsDias.current[key] = el; }}
+              style={{
+                gridColumn: '1 / -1', backgroundColor: 'var(--bg)',
+                color: 'var(--accent)', fontFamily: 'var(--font-mono, Fira Code, monospace)',
+                fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase',
+                padding: '4px 8px',
+                borderTop: diaIndex > 0 ? '1px solid var(--border)' : 'none',
+                borderBottom: '1px solid var(--border)',
+              }}
+            >
               {fecha.toLocaleDateString(lang === 'en' ? 'en-GB' : 'es-ES', {
                 weekday: 'short', day: '2-digit', month: '2-digit',
               })}
@@ -458,7 +478,7 @@ const BotonAyuda: React.FC<{ tabId: string }> = ({ tabId }) => (
 // SPOTSCREEN
 // ============================================================
 export const SpotScreen: React.FC<SpotScreenProps> = ({
-  spotId, onClose, onEditSpot,
+  spotId, onClose, onEditSpot, initialDate, onDateChange,
 }) => {
   const { t, i18n } = useTranslation();
   const spots = useAppStore((s) => s.spots);
@@ -483,11 +503,58 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
   const errorTimeoutRef = useRef<number | null>(null);
   const fetchTriggeredRef = useRef(false);
 
+  // Estado para el día seleccionado (offset 0 = hoy).
+  const [diaOffset, setDiaOffset] = useState(0);
+
   const weatherEntry = spot ? getWeatherEntry(spot.id) : null;
   const weather = weatherEntry?.data ?? null;
   const stale = weatherEntry?.stale ?? false;
   const ageMin = weatherEntry?.ageMin ?? 0;
   const lang = i18n.language?.startsWith('en') ? 'en' : 'es';
+
+  // Lista de días (hoy a +6).
+  const dias = useMemo(() => {
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(hoy);
+      d.setDate(d.getDate() + i);
+      return { offset: i, fecha: d, key: localDateKey(d) };
+    });
+  }, []);
+
+  const fechaSeleccionada = useMemo(() => {
+    return dias[diaOffset]?.fecha ?? dias[0].fecha;
+  }, [dias, diaOffset]);
+
+  const diaSeleccionadoKey = useMemo(
+    () => localDateKey(fechaSeleccionada),
+    [fechaSeleccionada]
+  );
+
+  // Sincronizar el offset con initialDate (cuando se llega desde Inicio).
+  useEffect(() => {
+    if (initialDate) {
+      const target = new Date(initialDate);
+      target.setHours(0, 0, 0, 0);
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      const diff = Math.round(
+        (target.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      if (diff >= 0 && diff < 7) {
+        setDiaOffset(diff);
+      }
+    }
+  }, [initialDate]);
+
+  const handleSelectDay = (offset: number) => {
+    setDiaOffset(offset);
+    const fecha = dias[offset]?.fecha;
+    if (fecha && onDateChange) {
+      onDateChange(fecha.toISOString());
+    }
+  };
 
   useEffect(() => {
     return () => {
@@ -555,14 +622,23 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
   const franjaActiva = ajustes.franjas.find((f) => f.id === ajustes.franjaActivaId)
     ?? ajustes.franjas[0] ?? null;
 
+  // Veredictos por franja para el DÍA seleccionado.
   const veredictos = useMemo(() => {
     if (!spot) return {};
-    return calcularVeredictoPorFranja(
-      spot, weather, ajustes.franjas,
-      categoriaKayak, ajustes.perfil,
-      kayakActivo
-    );
-  }, [spot, weather, ajustes.franjas, categoriaKayak, ajustes.perfil, kayakActivo]);
+    const out: Record<string, Veredicto | null> = {};
+    for (const f of ajustes.franjas) {
+      out[f.id] = calcularVeredictoFranjaDia(
+        spot,
+        weather,
+        f,
+        fechaSeleccionada,
+        categoriaKayak,
+        ajustes.perfil,
+        kayakActivo
+      );
+    }
+    return out;
+  }, [spot, weather, ajustes.franjas, categoriaKayak, ajustes.perfil, kayakActivo, fechaSeleccionada]);
 
   const veredictoFranjaActiva = franjaActiva ? veredictos[franjaActiva.id] : null;
 
@@ -579,7 +655,9 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     let resultado: ResultadoVeredicto | null = null;
     let horaPeor: HourlyPoint | null = null;
     const orden = ['FAVORABLE', 'ACEPTABLE', 'EXIGENTE', 'DESACONSEJADO'];
+    const keyDia = localDateKey(fechaSeleccionada);
     for (const h of weather.hourly) {
+      if (localDateKey(new Date(h.time)) !== keyDia) continue;
       const localHour = new Date(h.time).getHours();
       let dentro = false;
       if (franjaActiva.inicio < franjaActiva.fin) {
@@ -600,7 +678,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     }
     if (!resultado || !horaPeor) return null;
     return { resultado, horaPeor };
-  }, [weather, franjaActiva, spot, categoriaKayak, ajustes.perfil, kayakActivo]);
+  }, [weather, franjaActiva, spot, categoriaKayak, ajustes.perfil, kayakActivo, fechaSeleccionada]);
 
   const { colorSalida, textoSalida } = useMemo(() => {
     if (!spot || spot.tipoAcceso == null) {
@@ -608,7 +686,9 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     }
     let olaCorregida = 0;
     if (weather && weather.hourly.length > 0 && franjaActiva) {
+      const keyDia = localDateKey(fechaSeleccionada);
       const horasFranja = weather.hourly.filter((h) => {
+        if (localDateKey(new Date(h.time)) !== keyDia) return false;
         const lh = new Date(h.time).getHours();
         if (franjaActiva.inicio < franjaActiva.fin) {
           return lh >= franjaActiva.inicio && lh < franjaActiva.fin;
@@ -624,7 +704,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
       colorSalida: veredictoAccesoAColor(resAcceso),
       textoSalida: t(veredictoAccesoAClaveI18n(resAcceso)),
     };
-  }, [spot, weather, franjaActiva, t]);
+  }, [spot, weather, franjaActiva, t, fechaSeleccionada]);
 
   const subpestanasVisibles = useMemo(() => {
     const baseTabs = ALL_TABS.filter((tab) => {
@@ -649,15 +729,15 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     return filtrarHoras(weather.hourly, franjaActiva, ajustes.filtroFranja, null);
   }, [weather, franjaActiva, ajustes.filtroFranja]);
 
-  // ¿Hay mar cruzada en el día actual (primer día del weather)?
-  const hayMarCruzadaHoy = useMemo(() => {
+  // ¿Hay mar cruzada en el día seleccionado?
+  const hayMarCruzadaDia = useMemo(() => {
     if (!weather?.hourly) return false;
-    const keyHoy = localDateKey(new Date());
-    const horasHoy = weather.hourly.filter(
-      (h) => localDateKey(new Date(h.time)) === keyHoy
+    const keyDia = localDateKey(fechaSeleccionada);
+    const horasDia = weather.hourly.filter(
+      (h) => localDateKey(new Date(h.time)) === keyDia
     );
-    return hayMarCruzadaEnHoras(horasHoy);
-  }, [weather]);
+    return hayMarCruzadaEnHoras(horasDia);
+  }, [weather, fechaSeleccionada]);
 
   const actividad: ActividadHora[] = useMemo(() => {
     if (!weather?.hourly || !spot) return [];
@@ -829,7 +909,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     }
   })();
 
-  // Indicador textual de corriente (universal, no depende de zona ni kayak)
   const indicadorCorriente = (kn: number | null): string | null => {
     if (kn == null) return null;
     if (kn < 0.05) return 'agua parada';
@@ -839,7 +918,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     return 'deriva fuerte';
   };
 
-  // Render de celda de ola con dirección al lado, SIN unidad
   const renderOlaConDireccion = (altura: number | null, dirGrados: number | null) => {
     if (altura == null) return '—';
     const alturaValor = valorOla(altura, u.ola);
@@ -919,6 +997,38 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
           fontSize: '0.7rem', color: 'var(--text-dim)',
           textAlign: 'center', marginBottom: 4,
         }}>{t(`zones.${spot.zona ?? 'mediterraneo_espanol'}`)}</div>
+
+        {/* Selector de día */}
+        <div style={{
+          display: 'flex', gap: 4, overflowX: 'auto',
+          paddingBottom: 6, marginBottom: 6,
+          justifyContent: 'center', flexWrap: 'wrap',
+        }}>
+          {dias.map(({ offset, fecha }) => {
+            const activo = offset === diaOffset;
+            const v = veredictos[ajustes.franjas[0]?.id] ?? null;
+            const colorBorde = activo && v ? veredictoAColor(v) : 'var(--border)';
+            return (
+              <button
+                key={offset}
+                onClick={() => handleSelectDay(offset)}
+                style={{
+                  flexShrink: 0,
+                  padding: '4px 9px',
+                  borderRadius: 6,
+                  border: `1px solid ${colorBorde}`,
+                  backgroundColor: activo ? 'var(--surface)' : 'transparent',
+                  color: activo ? 'var(--text)' : 'var(--text-dim)',
+                  fontSize: '0.7rem',
+                  fontWeight: activo ? 600 : 400,
+                  cursor: 'pointer',
+                }}
+              >
+                {etiquetaDiaCorta(fecha, offset, lang, t)}
+              </button>
+            );
+          })}
+        </div>
 
         <div style={{
           display: 'flex', flexWrap: 'wrap',
@@ -1117,18 +1227,36 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
             borderRadius: 6, border: '1px solid var(--border)',
             padding: '6px 10px', fontSize: '0.75rem',
           }}>
-            {factorDisparadorTexto && (
-              <div style={{
-                display: 'flex', alignItems: 'baseline', gap: 6,
-                marginBottom: 4, fontSize: '0.72rem',
-                textTransform: 'uppercase', letterSpacing: '0.04em',
-                color: veredictoAColor(detalleFranjaActiva.resultado.veredicto),
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 4,
+            }}>
+              <span style={{
+                fontSize: '0.72rem',
                 fontWeight: 700,
+                color: colorVeredictoFranja,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
               }}>
-                <span>{t('verdict.triggeringFactor')}</span>
-                <span style={{ textTransform: 'none', fontWeight: 600 }}>{factorDisparadorTexto}</span>
-              </div>
-            )}
+                {fechaLarga(fechaSeleccionada, lang)}
+              </span>
+              {factorDisparadorTexto && (
+                <span style={{
+                  fontSize: '0.72rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                  color: veredictoAColor(detalleFranjaActiva.resultado.veredicto),
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  gap: 6,
+                }}>
+                  {t('verdict.triggeringFactor')}
+                  <span style={{ textTransform: 'none', fontWeight: 600 }}>{factorDisparadorTexto}</span>
+                </span>
+              )}
+            </div>
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(85px, 1fr))',
@@ -1187,8 +1315,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
               </span>
             </div>
 
-            {/* Botón MAR CRUZADA (solo pestaña Oleaje, si aplica) */}
-            {tabActiva === 'waves' && hayMarCruzadaHoy && (
+            {tabActiva === 'waves' && hayMarCruzadaDia && (
               <button
                 type="button"
                 onClick={() => setModalMarCruzadaAbierto(true)}
@@ -1235,6 +1362,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
             horas={horasFiltradas}
             colorNivel={colorNivel}
             lang={lang}
+            diaSeleccionadoKey={diaSeleccionadoKey}
             columnas={[
               {
                 key: 'ot',
@@ -1306,6 +1434,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 
         {tabActiva === 'wind' && weather && (
           <TablaDatos tabId="wind" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
+            diaSeleccionadoKey={diaSeleccionadoKey}
             columnas={[
               { key: 'wd', label: 'Dir', unit: '',
                 render: (h) => {
@@ -1359,6 +1488,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 
         {tabActiva === 'weather' && weather && (
           <TablaDatos tabId="weather" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
+            diaSeleccionadoKey={diaSeleccionadoKey}
             columnas={[
               { key: 'ico', label: t('factors.weatherCode'), unit: '',
                 render: (h) => {
@@ -1393,6 +1523,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 
         {tabActiva === 'air' && weather && (
           <TablaDatos tabId="air" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
+            diaSeleccionadoKey={diaSeleccionadoKey}
             columnas={[
               { key: 't', label: t('factors.temperature'), unit: `(${SUFIJO_TEMPERATURA[u.temperatura]})`,
                 render: (h) => {
@@ -1415,6 +1546,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 
         {tabActiva === 'barometer' && weather && (
           <TablaDatos tabId="barometer" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
+            diaSeleccionadoKey={diaSeleccionadoKey}
             columnas={[
               { key: 'p', label: t('factors.pressure'), unit: `(${SUFIJO_PRESION[u.presion]})`,
                 render: (h) => {
@@ -1451,6 +1583,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 
         {tabActiva === 'activity' && weather && (
           <TablaDatos tabId="activity" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
+            diaSeleccionadoKey={diaSeleccionadoKey}
             columnas={[
               {
                 key: 'cv',
@@ -1528,6 +1661,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 
         {tabActiva === 'tides' && weather && (
           <TablaDatos tabId="tides" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
+            diaSeleccionadoKey={diaSeleccionadoKey}
             columnas={[
               { key: 'sl', label: t('factors.seaLevel'), unit: `(${SUFIJO_OLA[u.ola]})`,
                 render: (h) => {

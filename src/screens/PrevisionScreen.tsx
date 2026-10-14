@@ -1048,7 +1048,16 @@ const Tabla72Horas: React.FC<Tabla72HorasProps> = ({ weather, spot, lang }) => {
                       .replace('.', ',');
 
               const olaFVal = valorOla(point?.swellWaveHeight ?? null, u.ola);
-              const olaFTexto = olaFVal != null ? olaFVal.toFixed(1).replace('.', ',') : '—';
+              let olaFTexto = '—';
+              if (olaFVal != null) {
+                const alturaTxt = olaFVal.toFixed(1).replace('.', ',');
+                if (point?.swellWaveDirection != null) {
+                  const card = abreviaturaViento(point.swellWaveDirection);
+                  olaFTexto = `${alturaTxt}/${card}`;
+                } else {
+                  olaFTexto = alturaTxt;
+                }
+              }
               const vOlaF =
                 point?.swellWaveHeight != null && spot
                   ? calcularVeredicto(
