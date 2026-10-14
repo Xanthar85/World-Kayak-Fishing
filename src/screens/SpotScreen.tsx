@@ -294,7 +294,7 @@ interface ColumnaTabla<T> {
 }
 
 function TablaDatos<T extends { time: string }>({
-  horas, columnas, colorNivel, lang, tabId, diaSeleccionadoKey,
+  horas, columnas, colorNivel, lang, tabId, diaSeleccionadoKey, onSelectDay,
 }: {
   horas: T[];
   columnas: ColumnaTabla<T>[];
@@ -302,6 +302,7 @@ function TablaDatos<T extends { time: string }>({
   lang: string;
   tabId: string;
   diaSeleccionadoKey?: string | null;
+  onSelectDay?: (diaKey: string) => void;
 }) {
   const gruposPorDia = useMemo(() => {
     const mapa = new Map<string, { fecha: Date; horas: T[] }>();
@@ -314,7 +315,7 @@ function TablaDatos<T extends { time: string }>({
     return Array.from(mapa.entries());
   }, [horas]);
 
-  const refsDias = useRef<Record<string, HTMLDivElement | null>>({});
+  const refsDias = useRef<Record<string, HTMLElement | null>>({});
 
   useEffect(() => {
     if (diaSeleccionadoKey && refsDias.current[diaSeleccionadoKey]) {
@@ -376,21 +377,25 @@ function TablaDatos<T extends { time: string }>({
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         {gruposPorDia.map(([key, { fecha, horas: horasDelDia }], diaIndex) => (
           <React.Fragment key={key}>
-            <div
+            <button
+              type="button"
               ref={(el) => { refsDias.current[key] = el; }}
+              onClick={() => onSelectDay?.(key)}
               style={{
+                width: '100%', textAlign: 'left', border: 'none',
                 gridColumn: '1 / -1', backgroundColor: 'var(--bg)',
                 color: 'var(--accent)', fontFamily: 'var(--font-mono, Fira Code, monospace)',
                 fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase',
                 padding: '4px 8px',
                 borderTop: diaIndex > 0 ? '1px solid var(--border)' : 'none',
                 borderBottom: '1px solid var(--border)',
+                cursor: 'pointer',
               }}
             >
               {fecha.toLocaleDateString(lang === 'en' ? 'en-GB' : 'es-ES', {
                 weekday: 'short', day: '2-digit', month: '2-digit',
               })}
-            </div>
+            </button>
             {horasDelDia.map((h, i) => {
               const hora = new Date(h.time).toLocaleTimeString(
                 lang === 'en' ? 'en-GB' : 'es-ES',
@@ -1363,6 +1368,10 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
             colorNivel={colorNivel}
             lang={lang}
             diaSeleccionadoKey={diaSeleccionadoKey}
+            onSelectDay={(key) => {
+              const dia = dias.find((d) => d.key === key);
+              if (dia) handleSelectDay(dia.offset);
+            }}
             columnas={[
               {
                 key: 'ot',
@@ -1435,6 +1444,10 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {tabActiva === 'wind' && weather && (
           <TablaDatos tabId="wind" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
             diaSeleccionadoKey={diaSeleccionadoKey}
+            onSelectDay={(key) => {
+              const dia = dias.find((d) => d.key === key);
+              if (dia) handleSelectDay(dia.offset);
+            }}
             columnas={[
               { key: 'wd', label: 'Dir', unit: '',
                 render: (h) => {
@@ -1489,6 +1502,10 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {tabActiva === 'weather' && weather && (
           <TablaDatos tabId="weather" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
             diaSeleccionadoKey={diaSeleccionadoKey}
+            onSelectDay={(key) => {
+              const dia = dias.find((d) => d.key === key);
+              if (dia) handleSelectDay(dia.offset);
+            }}
             columnas={[
               { key: 'ico', label: t('factors.weatherCode'), unit: '',
                 render: (h) => {
@@ -1524,6 +1541,10 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {tabActiva === 'air' && weather && (
           <TablaDatos tabId="air" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
             diaSeleccionadoKey={diaSeleccionadoKey}
+            onSelectDay={(key) => {
+              const dia = dias.find((d) => d.key === key);
+              if (dia) handleSelectDay(dia.offset);
+            }}
             columnas={[
               { key: 't', label: t('factors.temperature'), unit: `(${SUFIJO_TEMPERATURA[u.temperatura]})`,
                 render: (h) => {
@@ -1547,6 +1568,10 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {tabActiva === 'barometer' && weather && (
           <TablaDatos tabId="barometer" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
             diaSeleccionadoKey={diaSeleccionadoKey}
+            onSelectDay={(key) => {
+              const dia = dias.find((d) => d.key === key);
+              if (dia) handleSelectDay(dia.offset);
+            }}
             columnas={[
               { key: 'p', label: t('factors.pressure'), unit: `(${SUFIJO_PRESION[u.presion]})`,
                 render: (h) => {
@@ -1584,6 +1609,10 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {tabActiva === 'activity' && weather && (
           <TablaDatos tabId="activity" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
             diaSeleccionadoKey={diaSeleccionadoKey}
+            onSelectDay={(key) => {
+              const dia = dias.find((d) => d.key === key);
+              if (dia) handleSelectDay(dia.offset);
+            }}
             columnas={[
               {
                 key: 'cv',
@@ -1662,6 +1691,10 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {tabActiva === 'tides' && weather && (
           <TablaDatos tabId="tides" horas={horasFiltradas} colorNivel={colorNivel} lang={lang}
             diaSeleccionadoKey={diaSeleccionadoKey}
+            onSelectDay={(key) => {
+              const dia = dias.find((d) => d.key === key);
+              if (dia) handleSelectDay(dia.offset);
+            }}
             columnas={[
               { key: 'sl', label: t('factors.seaLevel'), unit: `(${SUFIJO_OLA[u.ola]})`,
                 render: (h) => {
