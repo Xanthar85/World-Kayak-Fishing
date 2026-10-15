@@ -2,19 +2,21 @@
 // WKF — Calculadora experimental de autonomía y velocidad de crucero
 // para kayaks, patos y canoas con motor eléctrico.
 //
-// ADVERTENCIA: es una estimación. La autonomía real depende del viento,
-// la corriente, el peso total, la eficiencia de la hélice, el estado de
-// la batería y el estilo de conducción. No sustituye a las pruebas
-// reales ni a los datos del fabricante.
+// ADVERTENCIA: es una estimación. La autonomía real depende del
+// viento, la corriente, el peso total, la eficiencia de la hélice,
+// el estado de la batería y el estilo de conducción. No sustituye a
+// las pruebas reales ni a los datos del fabricante.
 //
 // Método de cálculo:
-//   1. Energía útil de la batería (Wh) = capacidadAh × voltajeV.
-//   2. Solo se puede usar ~80% de la energía nominal (regla de
-//      profundidad de descarga segura para no dañar la batería).
-//   3. Potencia consumida (W) = voltaje × amperaje del motor.
-//   4. Autonomía (h) = energía útil × eficiencia_hélice / potencia.
-//   5. Velocidad estimada: se deriva del empuje con una fórmula
-//      empírica que asume casco de kayak medio.
+//   1. Velocidad máxima teórica del conjunto: se iguala el empuje
+//      del motor con la resistencia del casco a esa velocidad.
+//      La resistencia usa la fórmula clásica de resistencia de
+//      olas + resistencia de fricción para un kayak medio.
+//   2. Energía útil de la batería: capacidadAh × voltajeV × 80%
+//      (profundidad de descarga segura).
+//   3. Autonomía: energía útil × eficiencia_hélice / potencia.
+//   4. Velocidad y autonomía se calculan para dos modos: máxima
+//      autonomía (35% del empuje) y crucero (65% del empuje).
 //
 // Aviso legal: es experimental. Lo dice la UI en cada cálculo.
 
@@ -24,7 +26,15 @@ import {
   estimarPotencia,
 } from './motores-electricos.ts';
 
+export interface DatosCasco {
+  esloraM: number;      // eslora en metros
+  mangaM: number;       // manga en metros
+  pesoKg: number;       // peso del kayak en vacío
+  tipoCasco: 'V' | 'U' | 'plano';
+}
+
 export interface EntradaAutonomia {
+  casco: DatosCasco | null;
   motor: MotorElectrico | null;
   motorCustom: {
     empujeLbs: number;
@@ -38,144 +48,213 @@ export interface EntradaAutonomia {
     capacidadAh: number;
     pesoKg: number;
   } | null;
-  /** Peso total del conjunto: kayak + motor + batería + kayakista + equipo. kg */
-  pesoTotalKg: number;
+  pesoKayakistaKg: number;   // por defecto 90
 }
 
 export interface ResultadoModo {
-  /** Velocidad estimada en nudos. */
   velocidadKt: number;
-  /** Autonomía estimada en horas. */
+  velocidadKmh: number;
   autonomiaHoras: number;
-  /** Autonomía estimada en millas náuticas. */
-  autonomiaMillas: number;
-  /** Consumo del motor a esa velocidad, en amperios. */
+  autonomiaKm: number;
+  autonomiaMn: number;
   amperajeA: number;
-  /** Potencia del motor a esa velocidad, en vatios. */
   potenciaW: number;
 }
 
 export interface ResultadoAutonomia {
   modoMaximaAutonomia: ResultadoModo;
   modoCrucero: ResultadoModo;
-  /** Energía útil de la batería en Wh (después de aplicar 80% DoD). */
   energiaUtilWh: number;
-  /** Eficiencia de hélice aplicada. Entre 0.35 y 0.55. */
   eficienciaHelice: number;
-  /** Peso total aplicado. */
   pesoTotalKg: number;
+  /** Velocidad máxima teórica del conjunto en kt (por encima de
+   *  esto el casco no da más, da igual el motor). */
+  velocidadTopeKt: number;
+  /** true si algún dato del casco falta o es cero. La UI debe
+   *  mostrar un aviso o bloquear la pestaña. */
+  datosIncompletos: boolean;
 }
 
-/** Eficiencia estimada según la calidad del conjunto. Se usa un valor
- *  conservador por defecto. En el futuro, el usuario podría ajustarlo. */
-const EFICIENCIA_HÉLICE_DEFECTO = 0.45;
+const EFICIENCIA_HÉLICE = 0.45;
 const PROFUNDIDAD_DESCARGA = 0.8;
-
-/** Factor de empuje a velocidad de crucero. Los motores eléctricos de
- *  kayak rinden mejor al 60-70% de su potencia máxima. */
 const FACTOR_CRUCERO = 0.65;
 const FACTOR_MAXIMA_AUTONOMIA = 0.35;
 
-/** Convierte empuje (lbs) a velocidad estimada (nudos) para un kayak
- *  medio. Fórmula empírica. Relación no lineal porque la resistencia
- *  al avance crece más rápido que el empuje. */
-function empujeAVelocidad(empujeLbs: number, factorPotencia: number): number {
-  if (empujeLbs <= 0) return 0;
-  const empujeEfectivo = empujeLbs * factorPotencia;
-  // Regla empírica: 1 nudo por cada 8-10 lbs de empuje efectivo en kayak medio.
-  // Se aplica un exponente para simular la resistencia no lineal.
-  const velocidad = Math.pow(empujeEfectivo / 8, 0.85);
-  return Math.round(velocidad * 100) / 100;
+/** Factor de forma del casco. A mayor valor, menos resistencia.
+ *  El casco en V corta mejor el agua, el plano golpea. */
+function factorForma(tipoCasco: 'V' | 'U' | 'plano'): number {
+  if (tipoCasco === 'V') return 1.05;
+  if (tipoCasco === 'U') return 1.0;
+  return 0.92;
 }
 
-export function calcularAutonomia(entrada: EntradaAutonomia): ResultadoAutonomia | null {
-  const { motor, motorCustom, bateria, bateriaCustom, pesoTotalKg } = entrada;
+/** Resistencia del casco a una velocidad dada (en kgf, aproximada).
+ *  Modelo simplificado de resistencia de olas para kayak medio:
+ *    R = k * desplazamiento * (v / sqrt(Lwl))^2
+ *  donde k engloba la forma del casco y la fricción.
+ *  Es una aproximación, no un modelo hidrodinámico completo. */
+function resistenciaCasco(
+  velocidadKt: number,
+  casco: DatosCasco,
+  pesoTotalKg: number
+): number {
+  if (velocidadKt <= 0) return 0;
+  const lwl = casco.esloraM * 0.95;   // eslora en flotación aproximada
+  const vRel = velocidadKt / Math.sqrt(lwl);
+  const k = 0.018 * factorForma(casco.tipoCasco);
+  const resistencia = k * pesoTotalKg * vRel * vRel;
+  return resistencia;
+}
 
-  // Determinar empuje, voltaje y amperaje del motor.
+/** Convierte empuje en lbs a fuerza en kgf. 1 lb ≈ 0.4536 kgf. */
+function empujeAKgf(empujeLbs: number): number {
+  return empujeLbs * 0.4536;
+}
+
+/** Calcula la velocidad tope del conjunto (casco + motor) resolviendo
+ *  empuje = resistencia por bisección. Devuelve velocidad en kt. */
+function calcularVelocidadTope(
+  empujeLbs: number,
+  casco: DatosCasco,
+  pesoTotalKg: number
+): number {
+  const fuerzaKgf = empujeAKgf(empujeLbs);
+  if (fuerzaKgf <= 0) return 0;
+  let lo = 0;
+  let hi = 8;   // 8 kt es un techo absurdo para kayak, se usa como límite superior
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    const r = resistenciaCasco(mid, casco, pesoTotalKg);
+    if (r < fuerzaKgf) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+export function calcularAutonomia(
+  entrada: EntradaAutonomia
+): ResultadoAutonomia | null {
+  const { casco, motor, motorCustom, bateria, bateriaCustom, pesoKayakistaKg } = entrada;
+
+  // Determinar motor
   let empujeLbs = 0;
   let voltajeMotorV = 12;
-  let amperajeCruceroA = 0;
+  let amperajeNominalA = 0;
 
   if (motor && !motor.generico) {
     empujeLbs = motor.empujeLbs;
     voltajeMotorV = motor.voltajeV;
-    amperajeCruceroA = motor.amperajeCruceroA ?? estimarAmperajePorEmpuje(motor.empujeLbs, motor.voltajeV);
+    amperajeNominalA = motor.amperajeCruceroA ?? estimarAmperajePorEmpuje(motor.empujeLbs, motor.voltajeV);
   } else if (motorCustom) {
     empujeLbs = motorCustom.empujeLbs;
     voltajeMotorV = motorCustom.voltajeV;
-    amperajeCruceroA = motorCustom.amperajeCruceroA ?? estimarAmperajePorEmpuje(motorCustom.empujeLbs, motorCustom.voltajeV);
+    amperajeNominalA = motorCustom.amperajeCruceroA ?? estimarAmperajePorEmpuje(motorCustom.empujeLbs, motorCustom.voltajeV);
   } else {
     return null;
   }
 
-  if (empujeLbs <= 0 || amperajeCruceroA <= 0) return null;
+  if (empujeLbs <= 0 || amperajeNominalA <= 0) return null;
 
-  // Determinar capacidad y voltaje de la batería.
+  // Determinar batería
   let capacidadAh = 0;
   let voltajeBateriaV = 12;
+  let pesoBateriaKg = 0;
 
   if (bateria && !bateria.generico) {
     capacidadAh = bateria.capacidadAh;
     voltajeBateriaV = bateria.voltajeV;
+    pesoBateriaKg = bateria.pesoKg;
   } else if (bateriaCustom) {
     capacidadAh = bateriaCustom.capacidadAh;
     voltajeBateriaV = bateriaCustom.voltajeV;
+    pesoBateriaKg = bateriaCustom.pesoKg;
   } else if (bateria && bateria.generico && bateria.capacidadAh > 0) {
     capacidadAh = bateria.capacidadAh;
     voltajeBateriaV = bateria.voltajeV;
+    pesoBateriaKg = bateria.pesoKg;
   } else {
     return null;
   }
 
   if (capacidadAh <= 0) return null;
 
-  // Energía útil de la batería.
+  // Energía útil
   const energiaNominalWh = capacidadAh * voltajeBateriaV;
   const energiaUtilWh = energiaNominalWh * PROFUNDIDAD_DESCARGA;
 
-  const eficiencia = EFICIENCIA_HÉLICE_DEFECTO;
+  // Datos del casco
+  const datosIncompletos =
+    !casco || casco.esloraM <= 0 || casco.mangaM <= 0 || casco.pesoKg <= 0;
 
-  // Modo máxima autonomía: se usa el 35% de la potencia.
+  if (datosIncompletos) {
+    return {
+      modoMaximaAutonomia: { velocidadKt: 0, velocidadKmh: 0, autonomiaHoras: 0, autonomiaKm: 0, autonomiaMn: 0, amperajeA: 0, potenciaW: 0 },
+      modoCrucero: { velocidadKt: 0, velocidadKmh: 0, autonomiaHoras: 0, autonomiaKm: 0, autonomiaMn: 0, amperajeA: 0, potenciaW: 0 },
+      energiaUtilWh: Math.round(energiaUtilWh),
+      eficienciaHelice: EFICIENCIA_HÉLICE,
+      pesoTotalKg: 0,
+      velocidadTopeKt: 0,
+      datosIncompletos: true,
+    };
+  }
+
+  // Peso total estimado
+  const pesoTotalKg = casco.pesoKg + pesoBateriaKg + pesoKayakistaKg + 3;   // 3 kg motor + cables
+  const cascoFinal: DatosCasco = { ...casco, pesoKg: pesoTotalKg };
+
+  // Velocidad tope del conjunto
+  const velocidadTopeKt = calcularVelocidadTope(empujeLbs, cascoFinal, pesoTotalKg);
+
+  // Modo crucero: 65% del empuje nominal
+  const empujeCrucero = empujeLbs * FACTOR_CRUCERO;
+  const velocidadCruceroTope = calcularVelocidadTope(empujeCrucero, cascoFinal, pesoTotalKg);
+  const velocidadCrucero = Math.min(velocidadCruceroTope, velocidadTopeKt);
+
+  // Consumo real a esa velocidad: proporcional al empuje usado
+  const fraccionEmpujeCrucero = empujeCrucero / empujeLbs;   // 0.65
+  const amperajeCrucero = amperajeNominalA * fraccionEmpujeCrucero;
+  const potenciaCrucero = estimarPotencia(voltajeBateriaV, amperajeCrucero);
+  const horasCrucero = potenciaCrucero > 0
+    ? (energiaUtilWh * EFICIENCIA_HÉLICE) / potenciaCrucero
+    : 0;
+
+  // Modo máxima autonomía: 35% del empuje nominal
   const empujeMaxAut = empujeLbs * FACTOR_MAXIMA_AUTONOMIA;
-  const amperajeMaxAut = amperajeCruceroA * FACTOR_MAXIMA_AUTONOMIA;
+  const velocidadMaxAutTope = calcularVelocidadTope(empujeMaxAut, cascoFinal, pesoTotalKg);
+  const velocidadMaxAut = Math.min(velocidadMaxAutTope, velocidadTopeKt);
+
+  const fraccionEmpujeMaxAut = empujeMaxAut / empujeLbs;
+  const amperajeMaxAut = amperajeNominalA * fraccionEmpujeMaxAut;
   const potenciaMaxAut = estimarPotencia(voltajeBateriaV, amperajeMaxAut);
   const horasMaxAut = potenciaMaxAut > 0
-    ? (energiaUtilWh * eficiencia) / potenciaMaxAut
+    ? (energiaUtilWh * EFICIENCIA_HÉLICE) / potenciaMaxAut
     : 0;
-  const velocidadMaxAut = empujeAVelocidad(empujeLbs, FACTOR_MAXIMA_AUTONOMIA);
-  const millasMaxAut = velocidadMaxAut * horasMaxAut;
 
-  // Modo crucero: se usa el 65% de la potencia.
-  const empujeCrucero = empujeLbs * FACTOR_CRUCERO;
-  const amperajeCruceroReal = amperajeCruceroA * FACTOR_CRUCERO;
-  const potenciaCrucero = estimarPotencia(voltajeBateriaV, amperajeCruceroReal);
-  const horasCrucero = potenciaCrucero > 0
-    ? (energiaUtilWh * eficiencia) / potenciaCrucero
-    : 0;
-  const velocidadCrucero = empujeAVelocidad(empujeLbs, FACTOR_CRUCERO);
-  const millasCrucero = velocidadCrucero * horasCrucero;
-
-  // Ajuste por peso: a más peso, menos velocidad y menos autonomía.
-  // Referencia: 150 kg. A más peso, se aplica un factor.
-  const factorPeso = Math.max(0.5, Math.min(1.2, 150 / Math.max(pesoTotalKg, 60)));
+  const ktAKmh = (kt: number) => kt * 1.852;
 
   return {
     modoMaximaAutonomia: {
-      velocidadKt: Math.round(velocidadMaxAut * factorPeso * 100) / 100,
-      autonomiaHoras: Math.round(horasMaxAut * factorPeso * 100) / 100,
-      autonomiaMillas: Math.round(millasMaxAut * factorPeso * 100) / 100,
+      velocidadKt: Math.round(velocidadMaxAut * 100) / 100,
+      velocidadKmh: Math.round(ktAKmh(velocidadMaxAut) * 100) / 100,
+      autonomiaHoras: Math.round(horasMaxAut * 100) / 100,
+      autonomiaKm: Math.round(velocidadMaxAut * ktAKmh(1) * horasMaxAut * 100) / 100,
+      autonomiaMn: Math.round(velocidadMaxAut * horasMaxAut * 100) / 100,
       amperajeA: Math.round(amperajeMaxAut * 10) / 10,
       potenciaW: Math.round(potenciaMaxAut),
     },
     modoCrucero: {
-      velocidadKt: Math.round(velocidadCrucero * factorPeso * 100) / 100,
-      autonomiaHoras: Math.round(horasCrucero * factorPeso * 100) / 100,
-      autonomiaMillas: Math.round(millasCrucero * factorPeso * 100) / 100,
-      amperajeA: Math.round(amperajeCruceroReal * 10) / 10,
+      velocidadKt: Math.round(velocidadCrucero * 100) / 100,
+      velocidadKmh: Math.round(ktAKmh(velocidadCrucero) * 100) / 100,
+      autonomiaHoras: Math.round(horasCrucero * 100) / 100,
+      autonomiaKm: Math.round(velocidadCrucero * ktAKmh(1) * horasCrucero * 100) / 100,
+      autonomiaMn: Math.round(velocidadCrucero * horasCrucero * 100) / 100,
+      amperajeA: Math.round(amperajeCrucero * 10) / 10,
       potenciaW: Math.round(potenciaCrucero),
     },
     energiaUtilWh: Math.round(energiaUtilWh),
-    eficienciaHelice: eficiencia,
+    eficienciaHelice: EFICIENCIA_HÉLICE,
     pesoTotalKg: Math.round(pesoTotalKg),
+    velocidadTopeKt: Math.round(velocidadTopeKt * 100) / 100,
+    datosIncompletos: false,
   };
 }

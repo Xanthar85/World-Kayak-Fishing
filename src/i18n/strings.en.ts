@@ -718,7 +718,7 @@ Please explain all this to me as if I had little technical experience. What does
       'A cross sea warning is issued when the wind wave and the swell each exceed 0.3 m and come from directions separated by more than 60°.',
   },
 
-  autonomia: {
+    autonomia: {
     tab: 'Range',
     avisoExperimental:
       'This is an experimental estimate. Actual range depends on wind, current, total weight, propeller efficiency, battery health, and driving style.',
@@ -729,5 +729,8 @@ Please explain all this to me as if I had little technical experience. What does
     configuracion: 'Current configuration',
     modoMaxima: 'Maximum range',
     modoCrucero: 'Cruising',
+    bloqueoTitulo: 'Kayak data missing',
+    bloqueoTexto:
+      'The active kayak has no length or beam registered. The range tab needs those data to calculate cruising speed. Edit it in Settings → My kayaks and try again.',
   },
 };

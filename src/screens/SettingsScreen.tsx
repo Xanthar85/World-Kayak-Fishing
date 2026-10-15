@@ -2342,22 +2342,39 @@ const ModalKayakPropio: React.FC<{
   const { t } = useTranslation();
   const [marca, setMarca] = useState(inicial?.marca ?? '');
   const [modelo, setModelo] = useState(inicial?.modelo ?? '');
-  const [eslora, setEslora] = useState(inicial?.eslora ?? 4.0);
-  const [manga, setManga] = useState(inicial?.manga ?? 0.75);
+  const [eslora, setEslora] = useState<string>(
+    inicial ? String(inicial.eslora) : '4.0'
+  );
+  const [manga, setManga] = useState<string>(
+    inicial ? String(inicial.manga) : '0.75'
+  );
   const [tipoCasco, setTipoCasco] = useState<'V' | 'U' | 'plano'>(inicial?.tipoCasco ?? 'U');
   const [autovaciable, setAutovaciable] = useState(inicial?.autovaciable ?? true);
   const [timon, setTimon] = useState(inicial?.timon ?? false);
   const [compartimentosEstancos, setCompartimentosEstancos] = useState(
     inicial?.compartimentosEstancos ?? false
   );
-  const [capacidadCarga, setCapacidadCarga] = useState(inicial?.capacidadCarga ?? 150);
+  const [capacidadCarga, setCapacidadCarga] = useState<string>(
+    inicial ? String(inicial.capacidadCarga) : '150'
+  );
   const [propulsion, setPropulsion] = useState<'pala' | 'pedal_aletas' | 'pedal_helice'>(
     inicial?.propulsion ?? 'pala'
   );
+  const [mostrarManual, setMostrarManual] = useState(false);
+
+  const esloraNum = parseFloat(eslora) || 0;
+  const mangaNum = parseFloat(manga) || 0;
+  const capacidadCargaNum = parseFloat(capacidadCarga) || 0;
 
   const entrada: EntradaKayakEditado = {
-    eslora, manga, tipoCasco, autovaciable, timon,
-    compartimentosEstancos, capacidadCarga, propulsion,
+    eslora: esloraNum,
+    manga: mangaNum,
+    tipoCasco,
+    autovaciable,
+    timon,
+    compartimentosEstancos,
+    capacidadCarga: capacidadCargaNum,
+    propulsion,
   };
   const categoriaDeducida = deducirCategoriaWKF(entrada);
 
@@ -2393,7 +2410,7 @@ const ModalKayakPropio: React.FC<{
         boxShadow: '0 12px 40px rgba(0, 0, 0, 0.6)',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between',
-          alignItems: 'center', marginBottom: 14 }}>
+          alignItems: 'center', marginBottom: 8 }}>
           <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700,
             color: 'var(--accent-2)' }}>
             {inicial ? t('kayak.editKayakPropio') : t('kayak.addKayakPropio')}
@@ -2404,6 +2421,65 @@ const ModalKayakPropio: React.FC<{
             fontSize: '1.2rem', padding: '4px 8px',
           }}>✕</button>
         </div>
+
+        {/* Enlace para ver u ocultar el manual de ayuda */}
+        <div style={{ marginBottom: 12 }}>
+          <button
+            type="button"
+            onClick={() => setMostrarManual(!mostrarManual)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--accent)',
+              cursor: 'pointer',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              padding: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            📖 {mostrarManual ? (t('kayak.manualCerrar') || 'Ocultar manual') : t('kayak.manualTitulo')}
+          </button>
+        </div>
+
+        {mostrarManual && (
+          <div style={{
+            marginBottom: 14,
+            padding: '12px 14px',
+            backgroundColor: 'var(--bg)',
+            border: '1px solid var(--accent)',
+            borderRadius: 8,
+            fontSize: '0.78rem',
+            lineHeight: 1.5,
+            color: 'var(--text-muted)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+          }}>
+            <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: '0.85rem' }}>
+              {t('kayak.manualTitulo')}
+            </div>
+            <div>{t('kayak.manualPaso1')}</div>
+            <div>{t('kayak.manualPaso2')}</div>
+            <div>{t('kayak.manualPaso3')}</div>
+            <div>{t('kayak.manualPaso4')}</div>
+            <div>{t('kayak.manualPaso5')}</div>
+            <div>{t('kayak.manualPaso6')}</div>
+            <div>{t('kayak.manualPaso7')}</div>
+            <div>{t('kayak.manualPaso8')}</div>
+            <div style={{
+              marginTop: 4,
+              paddingTop: 6,
+              borderTop: '1px dashed var(--border)',
+              color: 'var(--text-dim)',
+              fontStyle: 'italic',
+            }}>
+              {t('kayak.manualCategoriaAviso')}
+            </div>
+          </div>
+        )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* Marca y Modelo */}
@@ -2443,7 +2519,7 @@ const ModalKayakPropio: React.FC<{
                 min="1.0"
                 max="10.0"
                 value={eslora}
-                onChange={(e) => setEslora(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setEslora(e.target.value)}
                 style={inputStyle}
               />
             </div>
@@ -2456,7 +2532,7 @@ const ModalKayakPropio: React.FC<{
                 min="0.3"
                 max="2.0"
                 value={manga}
-                onChange={(e) => setManga(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setManga(e.target.value)}
                 style={inputStyle}
               />
             </div>
@@ -2500,7 +2576,7 @@ const ModalKayakPropio: React.FC<{
               min="30"
               max="600"
               value={capacidadCarga}
-              onChange={(e) => setCapacidadCarga(parseFloat(e.target.value) || 0)}
+              onChange={(e) => setCapacidadCarga(e.target.value)}
               style={inputStyle}
             />
           </div>
@@ -2564,6 +2640,23 @@ const ModalKayakPropio: React.FC<{
           </div>
         </div>
 
+        {/* Aviso de responsabilidad legal */}
+        <div style={{
+          marginTop: 12,
+          padding: '10px 12px',
+          backgroundColor: 'rgba(255, 180, 0, 0.08)',
+          border: '1px solid rgba(255, 180, 0, 0.35)',
+          borderRadius: 6,
+          fontSize: '0.75rem',
+          color: 'var(--text-muted)',
+          lineHeight: 1.45,
+        }}>
+          <div style={{ fontWeight: 700, color: 'var(--accent-2, #f59e0b)', marginBottom: 4 }}>
+            ⚠️ {t('kayak.responsabilidadTitulo')}
+          </div>
+          <div>{t('kayak.responsabilidadTexto')}</div>
+        </div>
+
         <div style={{ marginTop: 14, display: 'flex', gap: 8 }}>
           <button type="button" onClick={onCancel} style={{
             flex: 1, padding: '10px 16px', borderRadius: 8,
@@ -2571,14 +2664,34 @@ const ModalKayakPropio: React.FC<{
             color: 'var(--text)', fontSize: '0.9rem', cursor: 'pointer',
           }}>{t('kayak.cancelar')}</button>
           <button type="button" onClick={() => {
-            if (!marca.trim() || !modelo.trim()) return;
-            onSave({ marca: marca.trim(), modelo: modelo.trim(), entrada });
+            const marcaTrim = marca.trim();
+            const modeloTrim = modelo.trim();
+            let marcaFinal = marcaTrim;
+            let modeloFinal = modeloTrim;
+
+            if (!marcaTrim && !modeloTrim) {
+              marcaFinal = 'Kayak propio';
+              modeloFinal = '';
+            } else if (!marcaTrim) {
+              marcaFinal = modeloTrim;
+              modeloFinal = '';
+            }
+
+            onSave({
+              marca: marcaFinal,
+              modelo: modeloFinal,
+              entrada: {
+                ...entrada,
+                eslora: esloraNum || 4.0,
+                manga: mangaNum || 0.75,
+                capacidadCarga: capacidadCargaNum || 150,
+              },
+            });
           }} style={{
             flex: 1, padding: '10px 16px', borderRadius: 8,
             border: 'none', backgroundColor: 'var(--accent)',
             color: '#000', fontSize: '0.9rem', fontWeight: 600,
-            cursor: (!marca.trim() || !modelo.trim()) ? 'not-allowed' : 'pointer',
-            opacity: (!marca.trim() || !modelo.trim()) ? 0.6 : 1,
+            cursor: 'pointer',
           }}>{t('kayak.guardarKayakPropio')}</button>
         </div>
       </div>
@@ -2610,8 +2723,8 @@ const ModalSelectorMotor: React.FC<{
   const [busqueda, setBusqueda] = useState('');
 
   // Form custom
-  const [empujeLbs, setEmpujeLbs] = useState<number>(
-    motorElectricoCustomActual?.empujeLbs ?? 30
+  const [empujeLbs, setEmpujeLbs] = useState<string>(
+    motorElectricoCustomActual?.empujeLbs != null ? String(motorElectricoCustomActual.empujeLbs) : '30'
   );
   const [voltajeV, setVoltajeV] = useState<number>(
     motorElectricoCustomActual?.voltajeV ?? 12
@@ -2621,6 +2734,8 @@ const ModalSelectorMotor: React.FC<{
       ? String(motorElectricoCustomActual.amperajeCruceroA)
       : ''
   );
+
+  const empujeLbsNum = parseFloat(empujeLbs) || 0;
 
   const motoresFiltrados = useMemo(() => {
     const q = busqueda.toLowerCase().trim();
@@ -2636,8 +2751,8 @@ const ModalSelectorMotor: React.FC<{
   }, [busqueda]);
 
   const amperajeEstimado = useMemo(() => {
-    return estimarAmperajePorEmpuje(empujeLbs, voltajeV);
-  }, [empujeLbs, voltajeV]);
+    return estimarAmperajePorEmpuje(empujeLbsNum, voltajeV);
+  }, [empujeLbsNum, voltajeV]);
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
@@ -2843,7 +2958,7 @@ const ModalSelectorMotor: React.FC<{
                 min={5}
                 max={200}
                 value={empujeLbs}
-                onChange={(e) => setEmpujeLbs(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setEmpujeLbs(e.target.value)}
                 style={inputStyle}
               />
             </div>
@@ -2904,13 +3019,13 @@ const ModalSelectorMotor: React.FC<{
                   onSelect({
                     motorElectricoId: null,
                     motorElectricoCustom: {
-                      empujeLbs,
+                      empujeLbs: empujeLbsNum || 30,
                       voltajeV,
                       amperajeCruceroA: ampNum,
                     },
                   });
                 }}
-                disabled={empujeLbs <= 0}
+                disabled={empujeLbsNum <= 0}
                 style={{
                   flex: 1,
                   padding: '10px 14px',
@@ -2920,8 +3035,8 @@ const ModalSelectorMotor: React.FC<{
                   color: '#000',
                   fontSize: '0.85rem',
                   fontWeight: 600,
-                  cursor: empujeLbs <= 0 ? 'not-allowed' : 'pointer',
-                  opacity: empujeLbs <= 0 ? 0.5 : 1,
+                  cursor: empujeLbsNum <= 0 ? 'not-allowed' : 'pointer',
+                  opacity: empujeLbsNum <= 0 ? 0.5 : 1,
                 }}
               >
                 {t('common.save')}
@@ -2965,12 +3080,19 @@ const ModalSelectorBateria: React.FC<{
   const [voltajeV, setVoltajeV] = useState<number>(
     bateriaElectricaCustomActual?.voltajeV ?? 12
   );
-  const [capacidadAh, setCapacidadAh] = useState<number>(
-    bateriaElectricaCustomActual?.capacidadAh ?? 50
+  const [capacidadAh, setCapacidadAh] = useState<string>(
+    bateriaElectricaCustomActual?.capacidadAh != null
+      ? String(bateriaElectricaCustomActual.capacidadAh)
+      : '50'
   );
-  const [pesoKg, setPesoKg] = useState<number>(
-    bateriaElectricaCustomActual?.pesoKg ?? 10
+  const [pesoKg, setPesoKg] = useState<string>(
+    bateriaElectricaCustomActual?.pesoKg != null
+      ? String(bateriaElectricaCustomActual.pesoKg)
+      : '10'
   );
+
+  const capacidadAhNum = parseFloat(capacidadAh) || 0;
+  const pesoKgNum = parseFloat(pesoKg) || 0;
 
   const bateriasCatalogo = useMemo(() => {
     return CATALOGO_BATERIAS.filter((b) => b.capacidadAh > 0);
@@ -3186,7 +3308,7 @@ const ModalSelectorBateria: React.FC<{
                   min={5}
                   max={500}
                   value={capacidadAh}
-                  onChange={(e) => setCapacidadAh(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => setCapacidadAh(e.target.value)}
                   style={inputStyle}
                 />
               </div>
@@ -3214,7 +3336,7 @@ const ModalSelectorBateria: React.FC<{
                 min={1}
                 max={100}
                 value={pesoKg}
-                onChange={(e) => setPesoKg(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setPesoKg(e.target.value)}
                 style={inputStyle}
               />
             </div>
@@ -3244,12 +3366,12 @@ const ModalSelectorBateria: React.FC<{
                     bateriaElectricaCustom: {
                       quimica,
                       voltajeV,
-                      capacidadAh,
-                      pesoKg,
+                      capacidadAh: capacidadAhNum || 50,
+                      pesoKg: pesoKgNum || 10,
                     },
                   });
                 }}
-                disabled={capacidadAh <= 0}
+                disabled={capacidadAhNum <= 0}
                 style={{
                   flex: 1,
                   padding: '10px 14px',
@@ -3259,8 +3381,8 @@ const ModalSelectorBateria: React.FC<{
                   color: '#000',
                   fontSize: '0.85rem',
                   fontWeight: 600,
-                  cursor: capacidadAh <= 0 ? 'not-allowed' : 'pointer',
-                  opacity: capacidadAh <= 0 ? 0.5 : 1,
+                  cursor: capacidadAhNum <= 0 ? 'not-allowed' : 'pointer',
+                  opacity: capacidadAhNum <= 0 ? 0.5 : 1,
                 }}
               >
                 {t('common.save')}

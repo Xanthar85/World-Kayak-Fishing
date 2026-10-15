@@ -725,7 +725,7 @@ Por favor, explícame todo esto como si tuviera poca experiencia técnica. Qué 
       'Se avisa de mar cruzada cuando la ola de viento y la ola de fondo superan los 0,3 m cada una y vienen de direcciones separadas por más de 60°.',
   },
 
-  autonomia: {
+    autonomia: {
     tab: 'Autonomía',
     avisoExperimental: 'Es una estimación experimental. La autonomía real depende del viento, la corriente, el peso, la eficiencia de la hélice, el estado de la batería y el estilo de conducción.',
     avisoCrucero: 'La velocidad de crucero es la velocidad que puedes mantener de forma sostenida sin agotar la batería antes de lo previsto. No es la velocidad máxima del motor.',
@@ -733,6 +733,8 @@ Por favor, explícame todo esto como si tuviera poca experiencia técnica. Qué 
     configuracion: 'Configuración actual',
     modoMaxima: 'Máxima autonomía',
     modoCrucero: 'Crucero',
+    bloqueoTitulo: 'Faltan datos del kayak',
+    bloqueoTexto: 'El kayak activo no tiene eslora o manga registradas. La pestaña de autonomía necesita esos datos para calcular la velocidad de crucero. Edítalo en Ajustes → Mis kayaks y vuelve a intentarlo.',
   },
 };
 

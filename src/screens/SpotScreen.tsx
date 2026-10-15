@@ -268,36 +268,15 @@ const ModalMarCruzada: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           </button>
         </div>
 
-        <p
-          style={{
-            fontSize: '0.9rem',
-            lineHeight: 1.55,
-            color: 'var(--text)',
-            margin: '0 0 12px 0',
-          }}
-        >
+        <p style={{ fontSize: '0.9rem', lineHeight: 1.55, color: 'var(--text)', margin: '0 0 12px 0' }}>
           {t('marcruzada.intro')}
         </p>
 
-        <p
-          style={{
-            fontSize: '0.9rem',
-            lineHeight: 1.55,
-            color: 'var(--text)',
-            margin: '0 0 12px 0',
-          }}
-        >
+        <p style={{ fontSize: '0.9rem', lineHeight: 1.55, color: 'var(--text)', margin: '0 0 12px 0' }}>
           {t('marcruzada.cuerpo1')}
         </p>
 
-        <p
-          style={{
-            fontSize: '0.9rem',
-            lineHeight: 1.55,
-            color: 'var(--text)',
-            margin: '0 0 12px 0',
-          }}
-        >
+        <p style={{ fontSize: '0.9rem', lineHeight: 1.55, color: 'var(--text)', margin: '0 0 12px 0' }}>
           {t('marcruzada.cuerpo2')}
         </p>
 
@@ -807,17 +786,34 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     return null;
   }, [ajustes.perfil.bateriaElectricaId]);
 
+  // ============================================================
+  // CÁLCULO DE AUTONOMÍA — v1.022
+  // El cálculo usa el casco del kayak activo (eslora, manga,
+  // peso y tipo de casco). Si faltan eslora o manga, se devuelve
+  // un resultado con datosIncompletos = true y la pestaña se
+  // bloquea con un aviso en el centro.
+  // ============================================================
   const resultadoAutonomia = useMemo<ResultadoAutonomia | null>(() => {
     if (!tieneMotorConfigurado) return null;
-    const pesoBateria = bateriaInfo?.pesoKg ?? ajustes.perfil.bateriaElectricaCustom?.pesoKg ?? 12;
-    const pesoTotal = 115 + pesoBateria + 8;
+
+    const esloraM = (kayakActivo as { eslora?: number }).eslora ?? 0;
+    const mangaM = (kayakActivo as { manga?: number }).manga ?? 0;
+    const pesoCascoKg = (kayakActivo as { peso?: number }).peso ?? 30;
+    const tipoCasco =
+      (kayakActivo as { tipoCasco?: 'V' | 'U' | 'plano' }).tipoCasco ?? 'U';
+
+    const casco =
+      esloraM > 0 && mangaM > 0
+        ? { esloraM, mangaM, pesoKg: pesoCascoKg, tipoCasco }
+        : null;
 
     return calcularAutonomia({
+      casco,
       motor: motorInfo,
       motorCustom: ajustes.perfil.motorElectricoCustom ?? null,
       bateria: bateriaInfo,
       bateriaCustom: ajustes.perfil.bateriaElectricaCustom ?? null,
-      pesoTotalKg: pesoTotal,
+      pesoKayakistaKg: 90,
     });
   }, [
     tieneMotorConfigurado,
@@ -825,6 +821,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     ajustes.perfil.motorElectricoCustom,
     bateriaInfo,
     ajustes.perfil.bateriaElectricaCustom,
+    kayakActivo,
   ]);
 
   const horasFiltradas = useMemo(() => {
@@ -1056,6 +1053,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
       }
       case 'autonomia': {
         if (!resultadoAutonomia) return null;
+        if (resultadoAutonomia.datosIncompletos) return null;
         return {
           val: resultadoAutonomia.modoCrucero.autonomiaHoras.toFixed(1).replace('.', ','),
           unit: 'h (crucero)',
@@ -1886,277 +1884,333 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
           />
         )}
 
-        {tabActiva === 'autonomia' && (
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: 20 }}>
-            {resultadoAutonomia ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {/* Ficha configuración actual */}
-                <div style={{
-                  backgroundColor: 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 10,
-                  padding: '14px 16px',
-                }}>
-                  <div style={{
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                    color: 'var(--text-muted)',
-                    marginBottom: 8,
-                  }}>
-                    {t('autonomia.configuracion')}
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, fontSize: '0.85rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>{t('perfil.motorTitulo')}</span>
-                      <span style={{ fontWeight: 600, color: 'var(--text)' }}>
-                        {motorInfo ? etiquetaMotor(motorInfo) : ajustes.perfil.motorElectricoCustom ? `${t('perfil.motorPersonalizado')} (${ajustes.perfil.motorElectricoCustom.empujeLbs} lbs, ${ajustes.perfil.motorElectricoCustom.voltajeV} V)` : '—'}
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>{t('perfil.motorBateriaTitulo')}</span>
-                      <span style={{ fontWeight: 600, color: 'var(--text)' }}>
-                        {bateriaInfo ? etiquetaBateria(bateriaInfo) : ajustes.perfil.bateriaElectricaCustom ? `Personalizada (${ajustes.perfil.bateriaElectricaCustom.quimica.toUpperCase()}, ${ajustes.perfil.bateriaElectricaCustom.capacidadAh} Ah)` : '—'}
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Energía útil (80% DoD)</span>
-                      <span style={{ fontWeight: 600, color: 'var(--accent)', fontFamily: 'var(--font-mono, Fira Code, monospace)' }}>
-                        {resultadoAutonomia.energiaUtilWh} Wh
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Peso conjunto estimado</span>
-                      <span style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-mono, Fira Code, monospace)' }}>
-                        {resultadoAutonomia.pesoTotalKg} kg
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Dos modos comparativos */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
-                  {/* Modo Crucero */}
-                  <div style={{
-                    backgroundColor: 'var(--surface)',
-                    border: '1px solid var(--accent)',
-                    borderRadius: 12,
-                    padding: 16,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 12,
-                    boxShadow: '0 4px 20px rgba(0, 229, 106, 0.08)',
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{
-                        fontSize: '0.9rem',
-                        fontWeight: 700,
-                        color: 'var(--accent)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.04em',
-                      }}>
-                        {t('autonomia.modoCrucero')}
-                      </span>
-                      <span style={{
-                        fontSize: '0.7rem',
-                        padding: '2px 8px',
-                        borderRadius: 4,
-                        backgroundColor: 'rgba(0, 229, 106, 0.15)',
-                        color: 'var(--accent)',
-                        fontWeight: 600,
-                      }}>
-                        ~65% potencia
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                      <span style={{
-                        fontSize: '2.4rem',
-                        fontWeight: 800,
-                        fontFamily: 'var(--font-mono, Fira Code, monospace)',
-                        color: 'var(--accent)',
-                        lineHeight: 1,
-                      }}>
-                        {resultadoAutonomia.modoCrucero.autonomiaHoras.toFixed(1).replace('.', ',')}
-                      </span>
-                      <span style={{ fontSize: '1rem', color: 'var(--text-dim)', fontWeight: 600 }}>horas</span>
-                      <span style={{ margin: '0 4px', color: 'var(--text-dim)' }}>·</span>
-                      <span style={{
-                        fontSize: '1.4rem',
-                        fontWeight: 700,
-                        fontFamily: 'var(--font-mono, Fira Code, monospace)',
-                        color: 'var(--text)',
-                      }}>
-                        {resultadoAutonomia.modoCrucero.autonomiaMillas.toFixed(1).replace('.', ',')}
-                      </span>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>NM</span>
-                    </div>
-
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
-                      gap: 8,
-                      padding: '10px 12px',
-                      backgroundColor: 'var(--bg)',
-                      borderRadius: 8,
-                      border: '1px solid var(--border)',
-                      fontSize: '0.8rem',
-                    }}>
-                      <div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Velocidad crucero</div>
-                        <div style={{ fontWeight: 600, fontFamily: 'var(--font-mono, Fira Code, monospace)', marginTop: 2 }}>
-                          {resultadoAutonomia.modoCrucero.velocidadKt.toFixed(1)} kt
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginLeft: 4 }}>
-                            ({(resultadoAutonomia.modoCrucero.velocidadKt * 1.852).toFixed(1)} km/h)
-                          </span>
-                        </div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Consumo estimado</div>
-                        <div style={{ fontWeight: 600, fontFamily: 'var(--font-mono, Fira Code, monospace)', marginTop: 2 }}>
-                          {resultadoAutonomia.modoCrucero.amperajeA.toFixed(1)} A · {resultadoAutonomia.modoCrucero.potenciaW} W
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Modo Máxima Autonomía */}
-                  <div style={{
-                    backgroundColor: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 12,
-                    padding: 16,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 12,
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{
-                        fontSize: '0.9rem',
-                        fontWeight: 700,
-                        color: 'var(--text)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.04em',
-                      }}>
-                        {t('autonomia.modoMaxima')}
-                      </span>
-                      <span style={{
-                        fontSize: '0.7rem',
-                        padding: '2px 8px',
-                        borderRadius: 4,
-                        backgroundColor: 'var(--bg)',
-                        color: 'var(--text-dim)',
-                        fontWeight: 600,
-                        border: '1px solid var(--border)',
-                      }}>
-                        ~35% potencia
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                      <span style={{
-                        fontSize: '2.4rem',
-                        fontWeight: 800,
-                        fontFamily: 'var(--font-mono, Fira Code, monospace)',
-                        color: 'var(--text)',
-                        lineHeight: 1,
-                      }}>
-                        {resultadoAutonomia.modoMaximaAutonomia.autonomiaHoras.toFixed(1).replace('.', ',')}
-                      </span>
-                      <span style={{ fontSize: '1rem', color: 'var(--text-dim)', fontWeight: 600 }}>horas</span>
-                      <span style={{ margin: '0 4px', color: 'var(--text-dim)' }}>·</span>
-                      <span style={{
-                        fontSize: '1.4rem',
-                        fontWeight: 700,
-                        fontFamily: 'var(--font-mono, Fira Code, monospace)',
-                        color: 'var(--text)',
-                      }}>
-                        {resultadoAutonomia.modoMaximaAutonomia.autonomiaMillas.toFixed(1).replace('.', ',')}
-                      </span>
-                      <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>NM</span>
-                    </div>
-
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
-                      gap: 8,
-                      padding: '10px 12px',
-                      backgroundColor: 'var(--bg)',
-                      borderRadius: 8,
-                      border: '1px solid var(--border)',
-                      fontSize: '0.8rem',
-                    }}>
-                      <div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Velocidad reducida</div>
-                        <div style={{ fontWeight: 600, fontFamily: 'var(--font-mono, Fira Code, monospace)', marginTop: 2 }}>
-                          {resultadoAutonomia.modoMaximaAutonomia.velocidadKt.toFixed(1)} kt
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginLeft: 4 }}>
-                            ({(resultadoAutonomia.modoMaximaAutonomia.velocidadKt * 1.852).toFixed(1)} km/h)
-                          </span>
-                        </div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Consumo estimado</div>
-                        <div style={{ fontWeight: 600, fontFamily: 'var(--font-mono, Fira Code, monospace)', marginTop: 2 }}>
-                          {resultadoAutonomia.modoMaximaAutonomia.amperajeA.toFixed(1)} A · {resultadoAutonomia.modoMaximaAutonomia.potenciaW} W
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Avisos */}
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 8,
-                  padding: '12px 14px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 8,
-                  fontSize: '0.75rem',
-                  lineHeight: 1.45,
-                  color: 'var(--text-dim)',
-                }}>
-                  <div>
-                    <strong style={{ color: 'var(--text)' }}>Velocidad de crucero: </strong>
-                    {t('autonomia.avisoCrucero')}
-                  </div>
-                  <div>
-                    <strong style={{ color: 'var(--text)' }}>Estimación experimental: </strong>
-                    {t('autonomia.avisoExperimental')}
-                  </div>
-                  <div style={{ fontStyle: 'italic', borderTop: '1px solid var(--border)', paddingTop: 6 }}>
-                    {t('autonomia.avisoLegal')}
-                  </div>
-                </div>
+        {/* ============================================================
+            AUTONOMÍA — v1.022
+            Si faltan datos del casco, se bloquea con aviso central.
+            Si no, se muestran las dos tarjetas comparativas con
+            velocidad en km/h grande y kt entre paréntesis, y
+            distancia en km grande y mn entre paréntesis.
+            ============================================================ */}
+        {tabActiva === 'autonomia' && resultadoAutonomia && resultadoAutonomia.datosIncompletos && (
+          <div style={{
+            flex: 1, minHeight: 0, display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            padding: 24, textAlign: 'center',
+          }}>
+            <div style={{
+              maxWidth: 420, padding: '20px 24px',
+              backgroundColor: 'var(--surface)',
+              border: '1px solid var(--verdict-exigente)',
+              borderRadius: 12, fontSize: '0.9rem',
+              lineHeight: 1.55, color: 'var(--text)',
+            }}>
+              <div style={{
+                fontSize: '1.6rem', marginBottom: 12,
+                color: 'var(--verdict-exigente)',
+              }}>⚠</div>
+              <div style={{ fontWeight: 700, marginBottom: 8, color: 'var(--verdict-exigente)' }}>
+                {t('autonomia.bloqueoTitulo', { defaultValue: 'Faltan datos del kayak' })}
               </div>
-            ) : (
+              <div>
+                {t('autonomia.bloqueoTexto', {
+                  defaultValue: 'El kayak activo no tiene eslora o manga registradas. La pestaña de autonomía necesita esos datos para calcular la velocidad de crucero. Edítalo en Ajustes → Mis kayaks y vuelve a intentarlo.',
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tabActiva === 'autonomia' && resultadoAutonomia && !resultadoAutonomia.datosIncompletos && (
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: 20 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* Ficha configuración actual */}
               <div style={{
                 backgroundColor: 'var(--surface)',
                 border: '1px solid var(--border)',
                 borderRadius: 10,
-                padding: 24,
-                textAlign: 'center',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 12,
+                padding: '14px 16px',
               }}>
-                <div style={{ fontSize: '2rem' }}>⚡</div>
-                <div style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--text)' }}>
-                  Batería no configurada
+                <div style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  color: 'var(--text-muted)',
+                  marginBottom: 8,
+                }}>
+                  {t('autonomia.configuracion')}
                 </div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)', maxWidth: 420, lineHeight: 1.4 }}>
-                  Para calcular la autonomía y la velocidad estimada, necesitas configurar tu batería en el perfil de Ajustes.
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, fontSize: '0.85rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>{t('perfil.motorTitulo')}</span>
+                    <span style={{ fontWeight: 600, color: 'var(--text)' }}>
+                      {motorInfo ? etiquetaMotor(motorInfo) : ajustes.perfil.motorElectricoCustom ? `${t('perfil.motorPersonalizado')} (${ajustes.perfil.motorElectricoCustom.empujeLbs} lbs, ${ajustes.perfil.motorElectricoCustom.voltajeV} V)` : '—'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>{t('perfil.motorBateriaTitulo')}</span>
+                    <span style={{ fontWeight: 600, color: 'var(--text)' }}>
+                      {bateriaInfo ? etiquetaBateria(bateriaInfo) : ajustes.perfil.bateriaElectricaCustom ? `Personalizada (${ajustes.perfil.bateriaElectricaCustom.quimica.toUpperCase()}, ${ajustes.perfil.bateriaElectricaCustom.capacidadAh} Ah)` : '—'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Energía útil (80% DoD)</span>
+                    <span style={{ fontWeight: 600, color: 'var(--accent)', fontFamily: 'var(--font-mono, Fira Code, monospace)' }}>
+                      {resultadoAutonomia.energiaUtilWh} Wh
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Peso conjunto estimado</span>
+                    <span style={{ fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-mono, Fira Code, monospace)' }}>
+                      {resultadoAutonomia.pesoTotalKg} kg
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Velocidad tope del conjunto</span>
+                    <span style={{ fontWeight: 600, color: 'var(--accent-2)', fontFamily: 'var(--font-mono, Fira Code, monospace)' }}>
+                      {(resultadoAutonomia.velocidadTopeKt * 1.852).toFixed(1).replace('.', ',')} km/h
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginLeft: 6 }}>
+                        ({resultadoAutonomia.velocidadTopeKt.toFixed(1).replace('.', ',')} kt)
+                      </span>
+                    </span>
+                  </div>
                 </div>
               </div>
-            )}
+
+              {/* Dos modos comparativos */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
+                {/* Modo Crucero */}
+                <div style={{
+                  backgroundColor: 'var(--surface)',
+                  border: '1px solid var(--accent)',
+                  borderRadius: 12,
+                  padding: 16,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 12,
+                  boxShadow: '0 4px 20px rgba(0, 229, 106, 0.08)',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{
+                      fontSize: '0.9rem',
+                      fontWeight: 700,
+                      color: 'var(--accent)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                    }}>
+                      {t('autonomia.modoCrucero')}
+                    </span>
+                    <span style={{
+                      fontSize: '0.7rem',
+                      padding: '2px 8px',
+                      borderRadius: 4,
+                      backgroundColor: 'rgba(0, 229, 106, 0.15)',
+                      color: 'var(--accent)',
+                      fontWeight: 600,
+                    }}>
+                      ~65% potencia
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                    <span style={{
+                      fontSize: '2.4rem',
+                      fontWeight: 800,
+                      fontFamily: 'var(--font-mono, Fira Code, monospace)',
+                      color: 'var(--accent)',
+                      lineHeight: 1,
+                    }}>
+                      {resultadoAutonomia.modoCrucero.autonomiaHoras.toFixed(1).replace('.', ',')}
+                    </span>
+                    <span style={{ fontSize: '1rem', color: 'var(--text-dim)', fontWeight: 600 }}>horas</span>
+                    <span style={{ margin: '0 4px', color: 'var(--text-dim)' }}>·</span>
+                    <span style={{
+                      fontSize: '1.4rem',
+                      fontWeight: 700,
+                      fontFamily: 'var(--font-mono, Fira Code, monospace)',
+                      color: 'var(--text)',
+                    }}>
+                      {resultadoAutonomia.modoCrucero.autonomiaKm.toFixed(1).replace('.', ',')}
+                    </span>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>
+                      km
+                      <span style={{ fontSize: '0.7rem', opacity: 0.7, marginLeft: 6 }}>
+                        ({resultadoAutonomia.modoCrucero.autonomiaMn.toFixed(1).replace('.', ',')} mn)
+                      </span>
+                    </span>
+                  </div>
+
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 8,
+                    padding: '10px 12px',
+                    backgroundColor: 'var(--bg)',
+                    borderRadius: 8,
+                    border: '1px solid var(--border)',
+                    fontSize: '0.8rem',
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Velocidad crucero</div>
+                      <div style={{ fontWeight: 600, fontFamily: 'var(--font-mono, Fira Code, monospace)', marginTop: 2 }}>
+                        {resultadoAutonomia.modoCrucero.velocidadKmh.toFixed(1).replace('.', ',')} km/h
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginLeft: 4 }}>
+                          ({resultadoAutonomia.modoCrucero.velocidadKt.toFixed(1).replace('.', ',')} kt)
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Consumo estimado</div>
+                      <div style={{ fontWeight: 600, fontFamily: 'var(--font-mono, Fira Code, monospace)', marginTop: 2 }}>
+                        {resultadoAutonomia.modoCrucero.amperajeA.toFixed(1)} A · {resultadoAutonomia.modoCrucero.potenciaW} W
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Modo Máxima Autonomía */}
+                <div style={{
+                  backgroundColor: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 12,
+                  padding: 16,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 12,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{
+                      fontSize: '0.9rem',
+                      fontWeight: 700,
+                      color: 'var(--text)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                    }}>
+                      {t('autonomia.modoMaxima')}
+                    </span>
+                    <span style={{
+                      fontSize: '0.7rem',
+                      padding: '2px 8px',
+                      borderRadius: 4,
+                      backgroundColor: 'var(--bg)',
+                      color: 'var(--text-dim)',
+                      fontWeight: 600,
+                      border: '1px solid var(--border)',
+                    }}>
+                      ~35% potencia
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                    <span style={{
+                      fontSize: '2.4rem',
+                      fontWeight: 800,
+                      fontFamily: 'var(--font-mono, Fira Code, monospace)',
+                      color: 'var(--text)',
+                      lineHeight: 1,
+                    }}>
+                      {resultadoAutonomia.modoMaximaAutonomia.autonomiaHoras.toFixed(1).replace('.', ',')}
+                    </span>
+                    <span style={{ fontSize: '1rem', color: 'var(--text-dim)', fontWeight: 600 }}>horas</span>
+                    <span style={{ margin: '0 4px', color: 'var(--text-dim)' }}>·</span>
+                    <span style={{
+                      fontSize: '1.4rem',
+                      fontWeight: 700,
+                      fontFamily: 'var(--font-mono, Fira Code, monospace)',
+                      color: 'var(--text)',
+                    }}>
+                      {resultadoAutonomia.modoMaximaAutonomia.autonomiaKm.toFixed(1).replace('.', ',')}
+                    </span>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>
+                      km
+                      <span style={{ fontSize: '0.7rem', opacity: 0.7, marginLeft: 6 }}>
+                        ({resultadoAutonomia.modoMaximaAutonomia.autonomiaMn.toFixed(1).replace('.', ',')} mn)
+                      </span>
+                    </span>
+                  </div>
+
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 8,
+                    padding: '10px 12px',
+                    backgroundColor: 'var(--bg)',
+                    borderRadius: 8,
+                    border: '1px solid var(--border)',
+                    fontSize: '0.8rem',
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Velocidad reducida</div>
+                      <div style={{ fontWeight: 600, fontFamily: 'var(--font-mono, Fira Code, monospace)', marginTop: 2 }}>
+                        {resultadoAutonomia.modoMaximaAutonomia.velocidadKmh.toFixed(1).replace('.', ',')} km/h
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginLeft: 4 }}>
+                          ({resultadoAutonomia.modoMaximaAutonomia.velocidadKt.toFixed(1).replace('.', ',')} kt)
+                        </span>
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>Consumo estimado</div>
+                      <div style={{ fontWeight: 600, fontFamily: 'var(--font-mono, Fira Code, monospace)', marginTop: 2 }}>
+                        {resultadoAutonomia.modoMaximaAutonomia.amperajeA.toFixed(1)} A · {resultadoAutonomia.modoMaximaAutonomia.potenciaW} W
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Avisos */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                padding: '12px 14px',
+                backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                fontSize: '0.75rem',
+                lineHeight: 1.45,
+                color: 'var(--text-dim)',
+              }}>
+                <div>
+                  <strong style={{ color: 'var(--text)' }}>Velocidad de crucero: </strong>
+                  {t('autonomia.avisoCrucero')}
+                </div>
+                <div>
+                  <strong style={{ color: 'var(--text)' }}>Estimación experimental: </strong>
+                  {t('autonomia.avisoExperimental')}
+                </div>
+                <div style={{ fontStyle: 'italic', borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+                  {t('autonomia.avisoLegal')}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tabActiva === 'autonomia' && !resultadoAutonomia && (
+          <div style={{
+            flex: 1, minHeight: 0, display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            padding: 24, textAlign: 'center',
+          }}>
+            <div style={{
+              maxWidth: 420, padding: '20px 24px',
+              backgroundColor: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 12, fontSize: '0.9rem',
+              lineHeight: 1.55, color: 'var(--text)',
+            }}>
+              <div style={{ fontSize: '1.6rem', marginBottom: 12, color: 'var(--verdict-exigente)' }}>⚡</div>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>Batería no configurada</div>
+              <div style={{ color: 'var(--text-dim)' }}>
+                Para calcular la autonomía y la velocidad estimada, necesitas configurar tu motor y tu batería en el perfil de Ajustes.
+              </div>
+            </div>
           </div>
         )}
       </main>
