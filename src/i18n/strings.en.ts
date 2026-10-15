@@ -607,6 +607,20 @@ Please explain all this to me as if I had little technical experience. What does
     categoriaDeducida: 'Category deduced automatically: {{cat}}',
     categoriaDeducidaAyuda: 'WKF deduces the category from the technical features. In case of doubt, it applies conservatism (lower category).',
     kayakPropioNoCertificado: 'This is an own kayak. It is not officially certified. WKF applies conservatism.',
+    manualTitulo: 'How to enter your own kayak',
+    manualPaso1: '1. Brand and model. Write whatever you want. It does not have to be a commercial model. If your kayak is hand-made, write the name you know it by.',
+    manualPaso2: '2. Length and beam. Measure in metres. If you do not know them exactly, round to the nearest centimetre. Length is measured bow to stern along the keel line. Beam is the maximum width of the hull.',
+    manualPaso3: '3. Hull type. V if the bow cuts water at a marked angle. U if rounded. Flat if the bottom is flat. If in doubt, choose U.',
+    manualPaso4: '4. Sit-on-top. Tick Yes if your kayak has scupper holes and does not flood when capsized. Tick No if it has a closed cockpit.',
+    manualPaso5: '5. Rudder. Tick Yes if it has a rudder or retractable skeg. Tick No if it does not.',
+    manualPaso6: '6. Bulkheads. Tick Yes if your kayak has sealed chambers at bow, stern or both. Tick No if it does not.',
+    manualPaso7: '7. Load capacity. The maximum weight recommended by the manufacturer. If you do not know it, leave 150 kg.',
+    manualPaso8: '8. Propulsion. Paddle, fin drive or propeller drive. Choose the one you use.',
+    manualCategoriaAviso: 'WKF automatically deduces your kayak category from the data you entered. If you are unsure about any field, WKF applies the most conservative criterion and assigns a lower category. This is for safety.',
+    manualCerrar: 'Understood',
+    responsabilidadTitulo: 'Liability notice',
+    responsabilidadTexto: 'WKF is a decision aid. It does not replace your judgement as skipper. The category of your own kayak is deduced by you from the characteristics you declare. WKF does not certify or verify this kayak. The decision to go out to sea is yours and so is the responsibility. Before launching, assess the real conditions and your own experience.',
+    responsabilidadAceptar: 'I have read and understood',
   },
 
   perfil: {
@@ -624,6 +638,23 @@ Please explain all this to me as if I had little technical experience. What does
     equipmentCompartimentos: 'Bulkheads',
     disclaimer:
       'WKF cannot verify this information. We take your word for it. The decision is yours.',
+    motorTitulo: 'Electric motor',
+    motorDescripcion: 'If you use an electric motor on your kayak, float tube or canoe, choose the model. WKF will estimate range and cruising speed.',
+    motorSinMotor: 'No motor',
+    motorDelCatalogo: 'From catalogue',
+    motorPersonalizado: 'Custom',
+    motorCampoEmpuje: 'Thrust (lbs)',
+    motorCampoVoltaje: 'Voltage (V)',
+    motorCampoAmperaje: 'Cruising amperage (A)',
+    motorCampoAmperajeAyuda: 'If you do not know, leave blank. WKF will estimate it from the thrust.',
+    motorBateriaTitulo: 'Battery',
+    motorBateriaDescripcion: 'Choose the type and characteristics of your battery. The battery matters as much as the motor for range.',
+    motorBateriaQuimica: 'Chemistry',
+    motorBateriaLitio: 'Lithium (LiFePO4)',
+    motorBateriaAGM: 'Lead-acid (AGM)',
+    motorBateriaGel: 'Gel',
+    motorBateriaCapacidad: 'Capacity (Ah)',
+    motorBateriaPeso: 'Weight (kg)',
   },
 
   franjas: {
@@ -685,5 +716,18 @@ Please explain all this to me as if I had little technical experience. What does
       'If you go out in a cross sea, take extreme care. Do not stray far from the coast. Keep the kayak bow into one of the two wave systems at all times. And if the sea gets worse, turn back before the situation becomes complicated.',
     criterio:
       'A cross sea warning is issued when the wind wave and the swell each exceed 0.3 m and come from directions separated by more than 60°.',
+  },
+
+  autonomia: {
+    tab: 'Range',
+    avisoExperimental:
+      'This is an experimental estimate. Actual range depends on wind, current, total weight, propeller efficiency, battery health, and driving style.',
+    avisoCrucero:
+      'Cruising speed is the speed you can maintain sustainably without draining the battery earlier than planned. It is not the motor’s maximum speed.',
+    avisoLegal:
+      'This calculator is for guidance only. WKF is not responsible for decisions made based on these estimates. Always consult the manufacturer data for your motor and battery.',
+    configuracion: 'Current configuration',
+    modoMaxima: 'Maximum range',
+    modoCrucero: 'Cruising',
   },
 };

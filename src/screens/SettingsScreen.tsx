@@ -37,6 +37,17 @@ import {
   TECHOS_PATOS,
 } from '../lib/patos.ts';
 import {
+  CATALOGO_MOTORES,
+  CATALOGO_BATERIAS,
+  buscarMotorPorId,
+  buscarBateriaPorId,
+  etiquetaMotor,
+  etiquetaBateria,
+  estimarAmperajePorEmpuje,
+  type MotorElectrico,
+  type BateriaElectrica,
+} from '../lib/motores-electricos.ts';
+import {
   NIVELES_EXPERIENCIA,
   type CategoriaKayak,
   type NivelExperiencia,
@@ -160,6 +171,55 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [editandoKayakPropio, setEditandoKayakPropio] = useState<
     KayakEditado | 'nuevo' | null
   >(null);
+  const [modalMotorAbierto, setModalMotorAbierto] = useState(false);
+  const [modalBateriaAbierto, setModalBateriaAbierto] = useState(false);
+
+  const motorSeleccionado = useMemo(() => {
+    if (ajustes.perfil.motorElectricoId) {
+      return buscarMotorPorId(ajustes.perfil.motorElectricoId) ?? null;
+    }
+    return null;
+  }, [ajustes.perfil.motorElectricoId]);
+
+  const bateriaSeleccionada = useMemo(() => {
+    if (ajustes.perfil.bateriaElectricaId) {
+      return buscarBateriaPorId(ajustes.perfil.bateriaElectricaId) ?? null;
+    }
+    return null;
+  }, [ajustes.perfil.bateriaElectricaId]);
+
+  const motorActivoLabel = useMemo(() => {
+    if (motorSeleccionado) return etiquetaMotor(motorSeleccionado);
+    if (ajustes.perfil.motorElectricoCustom) {
+      const c = ajustes.perfil.motorElectricoCustom;
+      return `${t('perfil.motorPersonalizado')}: ${c.empujeLbs} lbs (${c.voltajeV} V)`;
+    }
+    return t('perfil.motorSinMotor');
+  }, [motorSeleccionado, ajustes.perfil.motorElectricoCustom, t]);
+
+  const motorSubLabel = useMemo(() => {
+    if (motorSeleccionado) return motorSeleccionado.notas;
+    if (ajustes.perfil.motorElectricoCustom) {
+      const c = ajustes.perfil.motorElectricoCustom;
+      return c.amperajeCruceroA ? `Amperaje estimado: ~${c.amperajeCruceroA} A` : null;
+    }
+    return null;
+  }, [motorSeleccionado, ajustes.perfil.motorElectricoCustom]);
+
+  const bateriaActivaLabel = useMemo(() => {
+    if (bateriaSeleccionada) return etiquetaBateria(bateriaSeleccionada);
+    if (ajustes.perfil.bateriaElectricaCustom) {
+      const c = ajustes.perfil.bateriaElectricaCustom;
+      const q = c.quimica === 'litio' ? t('perfil.motorBateriaLitio') : c.quimica === 'agm' ? t('perfil.motorBateriaAGM') : t('perfil.motorBateriaGel');
+      return `${q}: ${c.capacidadAh} Ah · ${c.voltajeV} V · ${c.pesoKg} kg`;
+    }
+    return 'Sin batería';
+  }, [bateriaSeleccionada, ajustes.perfil.bateriaElectricaCustom, t]);
+
+  const bateriaSubLabel = useMemo(() => {
+    if (bateriaSeleccionada) return bateriaSeleccionada.notas;
+    return null;
+  }, [bateriaSeleccionada]);
 
   const kayakSlot1 = ajustes.kayakIds[0]
     ? buscarEmbarcacionPorId(ajustes.kayakIds[0], kayaksEditados)
@@ -1298,6 +1358,113 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               })}
             </div>
           </div>
+
+          {/* Motor eléctrico */}
+          <div style={{ marginBottom: 14, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>
+              {t('perfil.motorTitulo')}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginBottom: 8, lineHeight: 1.4 }}>
+              {t('perfil.motorDescripcion')}
+            </div>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+              padding: '10px 12px', backgroundColor: 'var(--bg)', borderRadius: 8,
+              border: '1px solid var(--border)',
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {motorActivoLabel}
+                </div>
+                {motorSubLabel && (
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {motorSubLabel}
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                <button
+                  type="button"
+                  onClick={() => setModalMotorAbierto(true)}
+                  style={{
+                    padding: '6px 12px', borderRadius: 6, border: '1px solid var(--accent)',
+                    backgroundColor: 'transparent', color: 'var(--accent)', fontSize: '0.8rem',
+                    fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  {ajustes.perfil.motorElectricoId || ajustes.perfil.motorElectricoCustom ? t('common.edit') : t('common.add')}
+                </button>
+                {(ajustes.perfil.motorElectricoId || ajustes.perfil.motorElectricoCustom) && (
+                  <button
+                    type="button"
+                    onClick={() => setPerfil({ motorElectricoId: null, motorElectricoCustom: null })}
+                    style={{
+                      padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)',
+                      backgroundColor: 'transparent', color: 'var(--text-muted)', fontSize: '0.8rem',
+                      cursor: 'pointer',
+                    }}
+                    title={t('common.delete')}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Batería */}
+          <div style={{ marginBottom: 14, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 4 }}>
+              {t('perfil.motorBateriaTitulo')}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginBottom: 8, lineHeight: 1.4 }}>
+              {t('perfil.motorBateriaDescripcion')}
+            </div>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+              padding: '10px 12px', backgroundColor: 'var(--bg)', borderRadius: 8,
+              border: '1px solid var(--border)',
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {bateriaActivaLabel}
+                </div>
+                {bateriaSubLabel && (
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {bateriaSubLabel}
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                <button
+                  type="button"
+                  onClick={() => setModalBateriaAbierto(true)}
+                  style={{
+                    padding: '6px 12px', borderRadius: 6, border: '1px solid var(--accent)',
+                    backgroundColor: 'transparent', color: 'var(--accent)', fontSize: '0.8rem',
+                    fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  {ajustes.perfil.bateriaElectricaId || ajustes.perfil.bateriaElectricaCustom ? t('common.edit') : t('common.add')}
+                </button>
+                {(ajustes.perfil.bateriaElectricaId || ajustes.perfil.bateriaElectricaCustom) && (
+                  <button
+                    type="button"
+                    onClick={() => setPerfil({ bateriaElectricaId: null, bateriaElectricaCustom: null })}
+                    style={{
+                      padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)',
+                      backgroundColor: 'transparent', color: 'var(--text-muted)', fontSize: '0.8rem',
+                      cursor: 'pointer',
+                    }}
+                    title={t('common.delete')}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div
             style={{
               fontSize: '0.75rem',
@@ -2140,6 +2307,29 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </div>
         </div>
       )}
+      {modalMotorAbierto && (
+        <ModalSelectorMotor
+          motorElectricoIdActual={ajustes.perfil.motorElectricoId}
+          motorElectricoCustomActual={ajustes.perfil.motorElectricoCustom}
+          onSelect={(datos) => {
+            setPerfil(datos);
+            setModalMotorAbierto(false);
+          }}
+          onClose={() => setModalMotorAbierto(false)}
+        />
+      )}
+
+      {modalBateriaAbierto && (
+        <ModalSelectorBateria
+          bateriaElectricaIdActual={ajustes.perfil.bateriaElectricaId}
+          bateriaElectricaCustomActual={ajustes.perfil.bateriaElectricaCustom}
+          onSelect={(datos) => {
+            setPerfil(datos);
+            setModalBateriaAbierto(false);
+          }}
+          onClose={() => setModalBateriaAbierto(false)}
+        />
+      )}
     </div>
   );
 };
@@ -2386,6 +2576,688 @@ const ModalKayakPropio: React.FC<{
             opacity: (!marca.trim() || !modelo.trim()) ? 0.6 : 1,
           }}>{t('kayak.guardarKayakPropio')}</button>
         </div>
+      </div>
+    </div>
+  );
+};
+
+const ModalSelectorMotor: React.FC<{
+  motorElectricoIdActual: string | null;
+  motorElectricoCustomActual: {
+    empujeLbs: number;
+    voltajeV: number;
+    amperajeCruceroA: number | null;
+  } | null;
+  onSelect: (datos: {
+    motorElectricoId: string | null;
+    motorElectricoCustom: {
+      empujeLbs: number;
+      voltajeV: number;
+      amperajeCruceroA: number | null;
+    } | null;
+  }) => void;
+  onClose: () => void;
+}> = ({ motorElectricoIdActual, motorElectricoCustomActual, onSelect, onClose }) => {
+  const { t } = useTranslation();
+  const [tab, setTab] = useState<'catalogo' | 'custom'>(
+    motorElectricoCustomActual ? 'custom' : 'catalogo'
+  );
+  const [busqueda, setBusqueda] = useState('');
+
+  // Form custom
+  const [empujeLbs, setEmpujeLbs] = useState<number>(
+    motorElectricoCustomActual?.empujeLbs ?? 30
+  );
+  const [voltajeV, setVoltajeV] = useState<number>(
+    motorElectricoCustomActual?.voltajeV ?? 12
+  );
+  const [amperajeA, setAmperajeA] = useState<string>(
+    motorElectricoCustomActual?.amperajeCruceroA != null
+      ? String(motorElectricoCustomActual.amperajeCruceroA)
+      : ''
+  );
+
+  const motoresFiltrados = useMemo(() => {
+    const q = busqueda.toLowerCase().trim();
+    return CATALOGO_MOTORES.filter((m) => {
+      if (m.generico) return false;
+      if (!q) return true;
+      return (
+        m.marca.toLowerCase().includes(q) ||
+        m.modelo.toLowerCase().includes(q) ||
+        `${m.empujeLbs}`.includes(q)
+      );
+    });
+  }, [busqueda]);
+
+  const amperajeEstimado = useMemo(() => {
+    return estimarAmperajePorEmpuje(empujeLbs, voltajeV);
+  }, [empujeLbs, voltajeV]);
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '8px 10px',
+    backgroundColor: 'var(--bg)',
+    border: '1px solid var(--border)',
+    borderRadius: 6,
+    color: 'var(--text)',
+    fontSize: '0.85rem',
+    boxSizing: 'border-box',
+    marginTop: 4,
+  };
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: '0.75rem',
+    fontWeight: 600,
+    color: 'var(--text-muted)',
+    display: 'block',
+    marginTop: 8,
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+        zIndex: 2000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          backgroundColor: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 12,
+          padding: 20,
+          maxWidth: 520,
+          width: '100%',
+          maxHeight: '85vh',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 12px 40px rgba(0, 0, 0, 0.6)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>
+            {t('perfil.motorTitulo')}
+          </h2>
+          <button
+            onClick={onClose}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--text-muted)',
+              fontSize: '1.2rem',
+              cursor: 'pointer',
+              lineHeight: 1,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Tabs de tipo de motor */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+          <button
+            type="button"
+            onClick={() => setTab('catalogo')}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              borderRadius: 6,
+              border: `1px solid ${tab === 'catalogo' ? 'var(--accent)' : 'var(--border)'}`,
+              backgroundColor: tab === 'catalogo' ? 'var(--accent-subtle, rgba(0,229,106,0.1))' : 'transparent',
+              color: tab === 'catalogo' ? 'var(--accent)' : 'var(--text-muted)',
+              fontSize: '0.82rem',
+              fontWeight: tab === 'catalogo' ? 600 : 400,
+              cursor: 'pointer',
+            }}
+          >
+            {t('perfil.motorDelCatalogo')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('custom')}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              borderRadius: 6,
+              border: `1px solid ${tab === 'custom' ? 'var(--accent)' : 'var(--border)'}`,
+              backgroundColor: tab === 'custom' ? 'var(--accent-subtle, rgba(0,229,106,0.1))' : 'transparent',
+              color: tab === 'custom' ? 'var(--accent)' : 'var(--text-muted)',
+              fontSize: '0.82rem',
+              fontWeight: tab === 'custom' ? 600 : 400,
+              cursor: 'pointer',
+            }}
+          >
+            {t('perfil.motorPersonalizado')}
+          </button>
+        </div>
+
+        {tab === 'catalogo' && (
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+            <input
+              type="text"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar por marca o modelo…"
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                backgroundColor: 'var(--bg)',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                color: 'var(--text)',
+                fontSize: '0.85rem',
+                marginBottom: 10,
+                boxSizing: 'border-box',
+              }}
+            />
+
+            <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 4 }}>
+              <button
+                type="button"
+                onClick={() => onSelect({ motorElectricoId: null, motorElectricoCustom: null })}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 6,
+                  border: '1px dashed var(--border)',
+                  backgroundColor: 'transparent',
+                  color: 'var(--text-dim)',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                ✕ {t('perfil.motorSinMotor')}
+              </button>
+
+              {motoresFiltrados.map((m) => {
+                const activo = motorElectricoIdActual === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => onSelect({ motorElectricoId: m.id, motorElectricoCustom: null })}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: 8,
+                      border: `1px solid ${activo ? 'var(--accent)' : 'var(--border)'}`,
+                      backgroundColor: activo ? 'var(--accent-subtle, rgba(0,229,106,0.1))' : 'var(--bg)',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 4,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text)' }}>
+                        {m.marca} {m.modelo}
+                      </span>
+                      <span style={{
+                        fontSize: '0.75rem',
+                        fontFamily: 'Fira Code, monospace',
+                        color: 'var(--accent)',
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        backgroundColor: 'rgba(0,229,106,0.1)',
+                      }}>
+                        {m.empujeLbs} lbs · {m.voltajeV} V
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+                      Crucero: ~{m.amperajeCruceroA ?? estimarAmperajePorEmpuje(m.empujeLbs, m.voltajeV)} A · {m.potenciaW ?? (m.voltajeV * (m.amperajeCruceroA ?? estimarAmperajePorEmpuje(m.empujeLbs, m.voltajeV)))} W
+                    </div>
+                    {m.notas && (
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                        {m.notas}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {tab === 'custom' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, overflowY: 'auto' }}>
+            <div>
+              <label style={labelStyle}>{t('perfil.motorCampoEmpuje')}</label>
+              <input
+                type="number"
+                min={5}
+                max={200}
+                value={empujeLbs}
+                onChange={(e) => setEmpujeLbs(parseFloat(e.target.value) || 0)}
+                style={inputStyle}
+              />
+            </div>
+
+            <div>
+              <label style={labelStyle}>{t('perfil.motorCampoVoltaje')}</label>
+              <select
+                value={voltajeV}
+                onChange={(e) => setVoltajeV(parseInt(e.target.value, 10) || 12)}
+                style={inputStyle}
+              >
+                <option value={12}>12 V</option>
+                <option value={24}>24 V</option>
+                <option value={36}>36 V</option>
+                <option value={48}>48 V</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={labelStyle}>{t('perfil.motorCampoAmperaje')}</label>
+              <input
+                type="number"
+                step="0.5"
+                min={0}
+                max={150}
+                placeholder={`Estimado: ~${amperajeEstimado} A`}
+                value={amperajeA}
+                onChange={(e) => setAmperajeA(e.target.value)}
+                style={inputStyle}
+              />
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: 4 }}>
+                {t('perfil.motorCampoAmperajeAyuda')} (Estimación WKF: ~{amperajeEstimado} A).
+              </div>
+            </div>
+
+            <div style={{ marginTop: 'auto', paddingTop: 14, display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={onClose}
+                style={{
+                  flex: 1,
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  border: '1px solid var(--border)',
+                  backgroundColor: 'transparent',
+                  color: 'var(--text)',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                }}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const ampNum = amperajeA.trim() !== '' ? parseFloat(amperajeA) || null : null;
+                  onSelect({
+                    motorElectricoId: null,
+                    motorElectricoCustom: {
+                      empujeLbs,
+                      voltajeV,
+                      amperajeCruceroA: ampNum,
+                    },
+                  });
+                }}
+                disabled={empujeLbs <= 0}
+                style={{
+                  flex: 1,
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  border: 'none',
+                  backgroundColor: 'var(--accent)',
+                  color: '#000',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: empujeLbs <= 0 ? 'not-allowed' : 'pointer',
+                  opacity: empujeLbs <= 0 ? 0.5 : 1,
+                }}
+              >
+                {t('common.save')}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const ModalSelectorBateria: React.FC<{
+  bateriaElectricaIdActual: string | null;
+  bateriaElectricaCustomActual: {
+    quimica: 'litio' | 'agm' | 'gel';
+    voltajeV: number;
+    capacidadAh: number;
+    pesoKg: number;
+  } | null;
+  onSelect: (datos: {
+    bateriaElectricaId: string | null;
+    bateriaElectricaCustom: {
+      quimica: 'litio' | 'agm' | 'gel';
+      voltajeV: number;
+      capacidadAh: number;
+      pesoKg: number;
+    } | null;
+  }) => void;
+  onClose: () => void;
+}> = ({ bateriaElectricaIdActual, bateriaElectricaCustomActual, onSelect, onClose }) => {
+  const { t } = useTranslation();
+  const [tab, setTab] = useState<'catalogo' | 'custom'>(
+    bateriaElectricaCustomActual ? 'custom' : 'catalogo'
+  );
+
+  // Form custom
+  const [quimica, setQuimica] = useState<'litio' | 'agm' | 'gel'>(
+    bateriaElectricaCustomActual?.quimica ?? 'litio'
+  );
+  const [voltajeV, setVoltajeV] = useState<number>(
+    bateriaElectricaCustomActual?.voltajeV ?? 12
+  );
+  const [capacidadAh, setCapacidadAh] = useState<number>(
+    bateriaElectricaCustomActual?.capacidadAh ?? 50
+  );
+  const [pesoKg, setPesoKg] = useState<number>(
+    bateriaElectricaCustomActual?.pesoKg ?? 10
+  );
+
+  const bateriasCatalogo = useMemo(() => {
+    return CATALOGO_BATERIAS.filter((b) => b.capacidadAh > 0);
+  }, []);
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '8px 10px',
+    backgroundColor: 'var(--bg)',
+    border: '1px solid var(--border)',
+    borderRadius: 6,
+    color: 'var(--text)',
+    fontSize: '0.85rem',
+    boxSizing: 'border-box',
+    marginTop: 4,
+  };
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: '0.75rem',
+    fontWeight: 600,
+    color: 'var(--text-muted)',
+    display: 'block',
+    marginTop: 8,
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+        zIndex: 2000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          backgroundColor: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 12,
+          padding: 20,
+          maxWidth: 520,
+          width: '100%',
+          maxHeight: '85vh',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 12px 40px rgba(0, 0, 0, 0.6)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>
+            {t('perfil.motorBateriaTitulo')}
+          </h2>
+          <button
+            onClick={onClose}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              color: 'var(--text-muted)',
+              fontSize: '1.2rem',
+              cursor: 'pointer',
+              lineHeight: 1,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Tabs de tipo de batería */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+          <button
+            type="button"
+            onClick={() => setTab('catalogo')}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              borderRadius: 6,
+              border: `1px solid ${tab === 'catalogo' ? 'var(--accent)' : 'var(--border)'}`,
+              backgroundColor: tab === 'catalogo' ? 'var(--accent-subtle, rgba(0,229,106,0.1))' : 'transparent',
+              color: tab === 'catalogo' ? 'var(--accent)' : 'var(--text-muted)',
+              fontSize: '0.82rem',
+              fontWeight: tab === 'catalogo' ? 600 : 400,
+              cursor: 'pointer',
+            }}
+          >
+            {t('perfil.motorDelCatalogo')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('custom')}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              borderRadius: 6,
+              border: `1px solid ${tab === 'custom' ? 'var(--accent)' : 'var(--border)'}`,
+              backgroundColor: tab === 'custom' ? 'var(--accent-subtle, rgba(0,229,106,0.1))' : 'transparent',
+              color: tab === 'custom' ? 'var(--accent)' : 'var(--text-muted)',
+              fontSize: '0.82rem',
+              fontWeight: tab === 'custom' ? 600 : 400,
+              cursor: 'pointer',
+            }}
+          >
+            {t('perfil.motorPersonalizado')}
+          </button>
+        </div>
+
+        {tab === 'catalogo' && (
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+            <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 4 }}>
+              <button
+                type="button"
+                onClick={() => onSelect({ bateriaElectricaId: null, bateriaElectricaCustom: null })}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 6,
+                  border: '1px dashed var(--border)',
+                  backgroundColor: 'transparent',
+                  color: 'var(--text-dim)',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                ✕ Sin batería
+              </button>
+
+              {bateriasCatalogo.map((b) => {
+                const activo = bateriaElectricaIdActual === b.id;
+                const quimicaLabel = b.quimica === 'litio' ? t('perfil.motorBateriaLitio') : b.quimica === 'agm' ? t('perfil.motorBateriaAGM') : t('perfil.motorBateriaGel');
+                return (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => onSelect({ bateriaElectricaId: b.id, bateriaElectricaCustom: null })}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: 8,
+                      border: `1px solid ${activo ? 'var(--accent)' : 'var(--border)'}`,
+                      backgroundColor: activo ? 'var(--accent-subtle, rgba(0,229,106,0.1))' : 'var(--bg)',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 4,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text)' }}>
+                        {quimicaLabel} {b.capacidadAh} Ah
+                      </span>
+                      <span style={{
+                        fontSize: '0.75rem',
+                        fontFamily: 'Fira Code, monospace',
+                        color: 'var(--accent)',
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        backgroundColor: 'rgba(0,229,106,0.1)',
+                      }}>
+                        {b.voltajeV} V · {b.pesoKg} kg
+                      </span>
+                    </div>
+                    {b.notas && (
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        {b.notas}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {tab === 'custom' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, overflowY: 'auto' }}>
+            <div>
+              <label style={labelStyle}>{t('perfil.motorBateriaQuimica')}</label>
+              <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                {(['litio', 'agm', 'gel'] as const).map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => setQuimica(q)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 6px',
+                      borderRadius: 6,
+                      border: `1px solid ${quimica === q ? 'var(--accent)' : 'var(--border)'}`,
+                      backgroundColor: quimica === q ? 'var(--accent-subtle, rgba(0,229,106,0.1))' : 'transparent',
+                      color: quimica === q ? 'var(--accent)' : 'var(--text-muted)',
+                      fontSize: '0.78rem',
+                      fontWeight: quimica === q ? 600 : 400,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {q === 'litio' ? t('perfil.motorBateriaLitio') : q === 'agm' ? t('perfil.motorBateriaAGM') : t('perfil.motorBateriaGel')}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div>
+                <label style={labelStyle}>{t('perfil.motorBateriaCapacidad')}</label>
+                <input
+                  type="number"
+                  min={5}
+                  max={500}
+                  value={capacidadAh}
+                  onChange={(e) => setCapacidadAh(parseFloat(e.target.value) || 0)}
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>{t('perfil.motorCampoVoltaje')}</label>
+                <select
+                  value={voltajeV}
+                  onChange={(e) => setVoltajeV(parseInt(e.target.value, 10) || 12)}
+                  style={inputStyle}
+                >
+                  <option value={12}>12 V</option>
+                  <option value={24}>24 V</option>
+                  <option value={36}>36 V</option>
+                  <option value={48}>48 V</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label style={labelStyle}>{t('perfil.motorBateriaPeso')}</label>
+              <input
+                type="number"
+                step="0.5"
+                min={1}
+                max={100}
+                value={pesoKg}
+                onChange={(e) => setPesoKg(parseFloat(e.target.value) || 0)}
+                style={inputStyle}
+              />
+            </div>
+
+            <div style={{ marginTop: 'auto', paddingTop: 14, display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={onClose}
+                style={{
+                  flex: 1,
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  border: '1px solid var(--border)',
+                  backgroundColor: 'transparent',
+                  color: 'var(--text)',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                }}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onSelect({
+                    bateriaElectricaId: null,
+                    bateriaElectricaCustom: {
+                      quimica,
+                      voltajeV,
+                      capacidadAh,
+                      pesoKg,
+                    },
+                  });
+                }}
+                disabled={capacidadAh <= 0}
+                style={{
+                  flex: 1,
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  border: 'none',
+                  backgroundColor: 'var(--accent)',
+                  color: '#000',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: capacidadAh <= 0 ? 'not-allowed' : 'pointer',
+                  opacity: capacidadAh <= 0 ? 0.5 : 1,
+                }}
+              >
+                {t('common.save')}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

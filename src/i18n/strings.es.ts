@@ -614,6 +614,20 @@ Por favor, explícame todo esto como si tuviera poca experiencia técnica. Qué 
     categoriaDeducida: 'Categoría deducida automáticamente: {{cat}}',
     categoriaDeducidaAyuda: 'WKF deduce la categoría a partir de las características. En caso de duda, aplica conservadurismo (categoría más baja).',
     kayakPropioNoCertificado: 'Este kayak es propio. No está certificado oficialmente. WKF aplica conservadurismo.',
+    manualTitulo: 'Cómo introducir tu kayak propio',
+    manualPaso1: '1. Marca y modelo. Escribe lo que quieras. No hace falta que sea un modelo comercial. Si tu kayak es artesanal, escribe el nombre con el que lo conoces tú.',
+    manualPaso2: '2. Eslora y manga. Mídelas en metros. Si no las sabes exactas, redondea al centímetro más cercano. La eslora se mide de proa a popa por el eje. La manga es la anchura máxima del casco.',
+    manualPaso3: '3. Tipo de casco. V si la proa corta el agua con un ángulo marcado. U si es redondeado. Plano si el fondo es plano. En caso de duda, elige U.',
+    manualPaso4: '4. Autovaciable. Marca Sí si tu kayak tiene orificios de drenaje y no se inunda al volcar. Marca No si es de bañera cerrada.',
+    manualPaso5: '5. Timón. Marca Sí si tiene timón o quilla retráctil. Marca No si no lo tiene.',
+    manualPaso6: '6. Compartimentos estancos. Marca Sí si tu kayak tiene cámaras selladas a proa, popa o ambas. Marca No si no tiene.',
+    manualPaso7: '7. Capacidad de carga. El peso máximo recomendado por el fabricante. Si no lo sabes, deja 150 kg.',
+    manualPaso8: '8. Propulsión. Pala, pedal de aletas o pedal de hélice. Elige la que uses.',
+    manualCategoriaAviso: 'WKF deduce automáticamente la categoría de tu kayak a partir de los datos que has introducido. Si en algún campo dudas, WKF aplica el criterio más conservador y te asigna una categoría inferior. Esto es por seguridad.',
+    manualCerrar: 'Entendido',
+    responsabilidadTitulo: 'Aviso de responsabilidad',
+    responsabilidadTexto: 'WKF es una herramienta de ayuda a la decisión. No sustituye tu criterio como patrón. La categoría de tu kayak propio la deduces tú a partir de las características que declaras. WKF no certifica ni verifica este kayak. La decisión de salir al mar es tuya y la responsabilidad también. Antes de salir, valora las condiciones reales y tu propia experiencia.',
+    responsabilidadAceptar: 'He leído y entiendo',
   },
 
   perfil: {
@@ -631,6 +645,23 @@ Por favor, explícame todo esto como si tuviera poca experiencia técnica. Qué 
     equipmentCompartimentos: 'Compartimentos estancos',
     disclaimer:
       'WKF no puede verificar esta información. Solo podemos tomar tu palabra. La responsabilidad de la decisión es tuya.',
+    motorTitulo: 'Motor eléctrico',
+    motorDescripcion: 'Si usas motor eléctrico en tu kayak, pato o canoa, elige el modelo. WKF calculará la autonomía y la velocidad de crucero.',
+    motorSinMotor: 'Sin motor',
+    motorDelCatalogo: 'Del catálogo',
+    motorPersonalizado: 'Personalizado',
+    motorCampoEmpuje: 'Empuje (lbs)',
+    motorCampoVoltaje: 'Voltaje (V)',
+    motorCampoAmperaje: 'Amperaje a crucero (A)',
+    motorCampoAmperajeAyuda: 'Si no lo sabes, déjalo en blanco. WKF lo estimará a partir del empuje.',
+    motorBateriaTitulo: 'Batería',
+    motorBateriaDescripcion: 'Elige el tipo y las características de tu batería. La batería es tan importante como el motor para la autonomía.',
+    motorBateriaQuimica: 'Química',
+    motorBateriaLitio: 'Litio (LiFePO4)',
+    motorBateriaAGM: 'Plomo-ácido (AGM)',
+    motorBateriaGel: 'Gel',
+    motorBateriaCapacidad: 'Capacidad (Ah)',
+    motorBateriaPeso: 'Peso (kg)',
   },
 
   franjas: {
@@ -692,6 +723,16 @@ Por favor, explícame todo esto como si tuviera poca experiencia técnica. Qué 
       'Si sales con mar cruzada, extrema la precaución. No te alejes de la costa. Mantén el kayak siempre con la proa a una de las dos olas. Y si el mar se pone peor, vuelve antes de que la situación se complique.',
     criterio:
       'Se avisa de mar cruzada cuando la ola de viento y la ola de fondo superan los 0,3 m cada una y vienen de direcciones separadas por más de 60°.',
+  },
+
+  autonomia: {
+    tab: 'Autonomía',
+    avisoExperimental: 'Es una estimación experimental. La autonomía real depende del viento, la corriente, el peso, la eficiencia de la hélice, el estado de la batería y el estilo de conducción.',
+    avisoCrucero: 'La velocidad de crucero es la velocidad que puedes mantener de forma sostenida sin agotar la batería antes de lo previsto. No es la velocidad máxima del motor.',
+    avisoLegal: 'Esta calculadora es orientativa. WKF no se responsabiliza de las consecuencias de las decisiones tomadas a partir de sus estimaciones. Consulta siempre los datos del fabricante de tu motor y tu batería.',
+    configuracion: 'Configuración actual',
+    modoMaxima: 'Máxima autonomía',
+    modoCrucero: 'Crucero',
   },
 };
 

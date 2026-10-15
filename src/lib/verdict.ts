@@ -58,6 +58,25 @@ export interface PerfilKayakista {
   remoRepuesto: boolean;
   ropaSeca: boolean;
   compartimentosEstancos: boolean;
+  /** Id del motor del catálogo, o null si no usa motor o si es
+   *  personalizado. */
+  motorElectricoId: string | null;
+  /** Datos del motor si es personalizado (fuera de catálogo). */
+  motorElectricoCustom: {
+    empujeLbs: number;
+    voltajeV: number;
+    amperajeCruceroA: number | null;
+  } | null;
+  /** Id de la batería del catálogo, o null si no usa o si es
+   *  personalizada. */
+  bateriaElectricaId: string | null;
+  /** Datos de la batería si es personalizada (fuera de catálogo). */
+  bateriaElectricaCustom: {
+    quimica: 'litio' | 'agm' | 'gel';
+    voltajeV: number;
+    capacidadAh: number;
+    pesoKg: number;
+  } | null;
 }
 
 export interface ResultadoVeredicto {

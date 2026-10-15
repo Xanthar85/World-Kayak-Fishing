@@ -134,6 +134,10 @@ const PERFIL_DEFECTO: PerfilKayakista = {
   remoRepuesto: true,
   ropaSeca: true,
   compartimentosEstancos: true,
+  motorElectricoId: null,
+  motorElectricoCustom: null,
+  bateriaElectricaId: null,
+  bateriaElectricaCustom: null,
 };
 
 const CATEGORIAS_VALIDAS: CategoriaKayak[] = ['K1', 'K2', 'K3', 'K4', 'K5'];
@@ -276,6 +280,23 @@ function validarPerfil(raw: unknown): raw is PerfilKayakista {
   if (typeof raw.remoRepuesto !== 'boolean') return false;
   if (typeof raw.ropaSeca !== 'boolean') return false;
   if (typeof raw.compartimentosEstancos !== 'boolean') return false;
+
+  if (raw.motorElectricoId !== undefined &&
+      raw.motorElectricoId !== null &&
+      typeof raw.motorElectricoId !== 'string') return false;
+
+  if (raw.motorElectricoCustom !== undefined &&
+      raw.motorElectricoCustom !== null &&
+      !esObjeto(raw.motorElectricoCustom)) return false;
+
+  if (raw.bateriaElectricaId !== undefined &&
+      raw.bateriaElectricaId !== null &&
+      typeof raw.bateriaElectricaId !== 'string') return false;
+
+  if (raw.bateriaElectricaCustom !== undefined &&
+      raw.bateriaElectricaCustom !== null &&
+      !esObjeto(raw.bateriaElectricaCustom)) return false;
+
   return true;
 }
 
@@ -717,6 +738,15 @@ export const useAppStore = create<AppState>()(
           state.ajustes.unidades = {
             ...UNIDADES_POR_DEFECTO,
             ...state.ajustes.unidades,
+          };
+        }
+
+        if (!state.ajustes.perfil) {
+          state.ajustes.perfil = { ...PERFIL_DEFECTO };
+        } else {
+          state.ajustes.perfil = {
+            ...PERFIL_DEFECTO,
+            ...state.ajustes.perfil,
           };
         }
 
