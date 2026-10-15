@@ -1,13 +1,6 @@
 // src/i18n/strings.es.ts
 // WKF — Strings en español.
-// v1.010: nuevos textos para:
-//   - Estructura Home: home.dayN ya existía.
-//   - Veredicto: appliedThresholdPrefix, launch.
-//   - Factores: fishActivity, date, sunrise, solarNoon, sunset,
-//     twilightAstro, twilightNautical, twilightCivil, moonPhase,
-//     moonAge, moonIllum, moonrise, moonTransit, moonset.
-//   - detalle.noDepth ya existía. Se mantiene "Sin dato".
-//   - Import: motivo ya existía.
+// v1.022: añadidas claves peso y pesoAyuda en el objeto perfil.
 
 export const stringsEs = {
   app: { name: 'WKF', tagline: 'World Kayak Fishing' },
@@ -191,7 +184,6 @@ export const stringsEs = {
     currentKmh: 'Corriente (km/h)',
     currentDirection: 'Dirección',
     fishActivity: 'Actividad peces',
-    // Cabeceras de tabla Sol / Luna.
     date: 'Fecha',
     sunrise: 'Orto',
     solarNoon: 'Mediodía',
@@ -638,6 +630,8 @@ Por favor, explícame todo esto como si tuviera poca experiencia técnica. Qué 
     experienceIntermedio: 'Intermedio (2-5 años)',
     experienceAvanzado: 'Avanzado (5-10 años)',
     experienceExperto: 'Experto (más de 10 años)',
+    peso: 'Peso del kayakista',
+    pesoAyuda: 'Se usa para calcular la autonomía y el peso total del conjunto. Un kayakista más pesado obtiene menos velocidad y menos autonomía con el mismo motor y batería.',
     equipment: 'Equipo',
     equipmentVhf: 'VHF',
     equipmentRemoRepuesto: 'Remo de repuesto',
@@ -725,7 +719,7 @@ Por favor, explícame todo esto como si tuviera poca experiencia técnica. Qué 
       'Se avisa de mar cruzada cuando la ola de viento y la ola de fondo superan los 0,3 m cada una y vienen de direcciones separadas por más de 60°.',
   },
 
-    autonomia: {
+  autonomia: {
     tab: 'Autonomía',
     avisoExperimental: 'Es una estimación experimental. La autonomía real depende del viento, la corriente, el peso, la eficiencia de la hélice, el estado de la batería y el estilo de conducción.',
     avisoCrucero: 'La velocidad de crucero es la velocidad que puedes mantener de forma sostenida sin agotar la batería antes de lo previsto. No es la velocidad máxima del motor.',

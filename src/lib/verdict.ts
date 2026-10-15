@@ -1,6 +1,7 @@
 // src/lib/verdict.ts
 // WKF — Núcleo de cálculo de veredictos.
-// Sin cambios en v1.010.
+// Sin cambios funcionales desde v1.010.
+// v1.022: añadido pesoKayakistaKg al perfil (para cálculo de autonomía).
 
 import {
   UMBRALES_BASE,
@@ -58,6 +59,8 @@ export interface PerfilKayakista {
   remoRepuesto: boolean;
   ropaSeca: boolean;
   compartimentosEstancos: boolean;
+  /** Peso del kayakista en kg. Se usa para el cálculo de autonomía. */
+  pesoKayakistaKg: number;
   /** Id del motor del catálogo, o null si no usa motor o si es
    *  personalizado. */
   motorElectricoId: string | null;

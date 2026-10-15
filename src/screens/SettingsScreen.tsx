@@ -1,13 +1,6 @@
 // src/screens/SettingsScreen.tsx
 // WKF — Pantalla de Ajustes.
-// v1.014:
-//   - Ficha técnica de kayak ampliada: certificaciones múltiples y
-//     techo absoluto. Requiere las claves i18n `kayak.techoAbsoluto`,
-//     `kayak.certificaciones`, `kayak.fuente`.
-//   - Resto de la pantalla intacta respecto a v1.010.
-// v1.021:
-//   - Layout de "Mis kayaks" reestructurado para que el nombre
-//     completo sea visible antes que los botones de acción.
+// v1.022: añadido campo "Peso del kayakista" en Mi perfil de kayakista.
 
 import React, { useState, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -823,11 +816,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   border: '1px solid var(--border)',
                   marginBottom: slotIndex === 0 ? 10 : 0,
                   display: 'flex',
-                  flexDirection: 'column', // CAMBIO: de 'row' a 'column'
+                  flexDirection: 'column',
                   gap: 8,
                 }}
               >
-                {/* Fila 1: Nombre del kayak */}
                 <div style={{ minWidth: 0, flex: 1 }}>
                   {kayak ? (
                     <div
@@ -911,7 +903,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     </div>
                   )}
                 </div>
-                {/* Fila 2: Botones */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {kayak && (
                     <button
@@ -987,7 +978,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     border: '1px solid var(--border)',
                   }}
                 >
-                  {/* Fila 1: Nombre del kayak propio */}
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div
                       style={{
@@ -1030,7 +1020,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     </div>
                   </div>
 
-                  {/* Fila 2: Botones */}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     <button
                       type="button"
@@ -1086,7 +1075,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 </div>
               ))}
 
-              {/* Botón + Añadir kayak propio */}
               <button
                 type="button"
                 disabled={kayaksEditados.length >= 2}
@@ -1303,6 +1291,61 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               })}
             </div>
           </div>
+
+          {/* Peso del kayakista */}
+          <div style={{ marginBottom: 14 }}>
+            <div
+              style={{
+                fontSize: '0.8rem',
+                color: 'var(--text-muted)',
+                marginBottom: 6,
+              }}
+            >
+              {t('perfil.peso')}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input
+                type="number"
+                min={40}
+                max={160}
+                step={1}
+                value={ajustes.perfil.pesoKayakistaKg}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  if (Number.isFinite(v)) {
+                    const clamped = Math.max(40, Math.min(160, v));
+                    setPerfil({ pesoKayakistaKg: clamped });
+                  }
+                }}
+                style={{
+                  width: 90,
+                  padding: '8px 10px',
+                  backgroundColor: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 6,
+                  color: 'var(--text)',
+                  fontFamily: 'Fira Code, monospace',
+                  fontSize: '0.9rem',
+                  textAlign: 'center',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                kg
+              </span>
+            </div>
+            <div
+              style={{
+                fontSize: '0.72rem',
+                color: 'var(--text-muted)',
+                marginTop: 4,
+                lineHeight: 1.4,
+              }}
+            >
+              {t('perfil.pesoAyuda')}
+            </div>
+          </div>
+
           <div style={{ marginBottom: 12 }}>
             <div
               style={{
@@ -2422,7 +2465,6 @@ const ModalKayakPropio: React.FC<{
           }}>✕</button>
         </div>
 
-        {/* Enlace para ver u ocultar el manual de ayuda */}
         <div style={{ marginBottom: 12 }}>
           <button
             type="button"
@@ -2482,7 +2524,6 @@ const ModalKayakPropio: React.FC<{
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* Marca y Modelo */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <label style={labelStyle}>{t('kayak.campoMarca')}</label>
@@ -2508,7 +2549,6 @@ const ModalKayakPropio: React.FC<{
             </div>
           </div>
 
-          {/* Eslora y Manga */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <label style={labelStyle}>{t('kayak.campoEslora')}</label>
@@ -2538,7 +2578,6 @@ const ModalKayakPropio: React.FC<{
             </div>
           </div>
 
-          {/* Casco y Propulsión */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <label style={labelStyle}>{t('kayak.campoCasco')}</label>
@@ -2566,7 +2605,6 @@ const ModalKayakPropio: React.FC<{
             </div>
           </div>
 
-          {/* Capacidad de carga */}
           <div>
             <label style={labelStyle}>{t('kayak.campoCapacidad')}</label>
             <input
@@ -2581,7 +2619,6 @@ const ModalKayakPropio: React.FC<{
             />
           </div>
 
-          {/* Checkboxes: Autovaciable, Timón, Compartimentos */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
             <label style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -2640,7 +2677,6 @@ const ModalKayakPropio: React.FC<{
           </div>
         </div>
 
-        {/* Aviso de responsabilidad legal */}
         <div style={{
           marginTop: 12,
           padding: '10px 12px',
@@ -2722,7 +2758,6 @@ const ModalSelectorMotor: React.FC<{
   );
   const [busqueda, setBusqueda] = useState('');
 
-  // Form custom
   const [empujeLbs, setEmpujeLbs] = useState<string>(
     motorElectricoCustomActual?.empujeLbs != null ? String(motorElectricoCustomActual.empujeLbs) : '30'
   );
@@ -2822,7 +2857,6 @@ const ModalSelectorMotor: React.FC<{
           </button>
         </div>
 
-        {/* Tabs de tipo de motor */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
           <button
             type="button"
@@ -3073,7 +3107,6 @@ const ModalSelectorBateria: React.FC<{
     bateriaElectricaCustomActual ? 'custom' : 'catalogo'
   );
 
-  // Form custom
   const [quimica, setQuimica] = useState<'litio' | 'agm' | 'gel'>(
     bateriaElectricaCustomActual?.quimica ?? 'litio'
   );
@@ -3166,7 +3199,6 @@ const ModalSelectorBateria: React.FC<{
           </button>
         </div>
 
-        {/* Tabs de tipo de batería */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
           <button
             type="button"

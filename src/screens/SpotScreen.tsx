@@ -8,6 +8,8 @@
 //     Quedan 4 columnas: Dir, Bf, V., R.
 //   - Indicador grande de viento = racha máxima + viento medio entre
 //     paréntesis.
+//   - Pestaña Autonomía: bloqueo si faltan datos del casco, cálculo
+//     con el peso del kayakista configurable desde el perfil.
 // Cambios v1.021:
 //   - Selector de día (Hoy, Mañana, Pasado, etc.) en la cabecera.
 //   - Veredicto por franja calculado para el día seleccionado.
@@ -305,8 +307,6 @@ interface ColumnaTabla<T> {
   unit?: string;
   render: (h: T) => React.ReactNode;
   veredicto?: (h: T) => Veredicto | null;
-  /** Ancho mínimo de la columna. Se usa para que la columna BF
-   *  pueda crecer con el nombre de Beaufort debajo del número. */
   minWidth?: string;
 }
 
@@ -345,8 +345,6 @@ function TablaDatos<T extends { time: string }>({
 
   if (horas.length === 0) return null;
 
-  // Construimos el grid: Hora + cada columna. Si la columna define
-  // minWidth, se usa; si no, minmax(0, 1fr) por defecto.
   const cols = columnas
     .map((c) => c.minWidth ?? 'minmax(0, 1fr)')
     .join(' ');
@@ -530,7 +528,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
   const errorTimeoutRef = useRef<number | null>(null);
   const fetchTriggeredRef = useRef(false);
 
-  // Estado para el día seleccionado (offset 0 = hoy).
   const [diaOffset, setDiaOffset] = useState(0);
 
   const weatherEntry = spot ? getWeatherEntry(spot.id) : null;
@@ -539,7 +536,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
   const ageMin = weatherEntry?.ageMin ?? 0;
   const lang = i18n.language?.startsWith('en') ? 'en' : 'es';
 
-  // Lista de días (hoy a +6).
   const dias = useMemo(() => {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
@@ -559,7 +555,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     [fechaSeleccionada]
   );
 
-  // Sincronizar el offset con initialDate (cuando se llega desde Inicio).
   useEffect(() => {
     if (initialDate) {
       const target = new Date(initialDate);
@@ -649,7 +644,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
   const franjaActiva = ajustes.franjas.find((f) => f.id === ajustes.franjaActivaId)
     ?? ajustes.franjas[0] ?? null;
 
-  // Veredictos por franja para el DÍA seleccionado.
   const veredictos = useMemo(() => {
     if (!spot) return {};
     const out: Record<string, Veredicto | null> = {};
@@ -789,9 +783,9 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
   // ============================================================
   // CÁLCULO DE AUTONOMÍA — v1.022
   // El cálculo usa el casco del kayak activo (eslora, manga,
-  // peso y tipo de casco). Si faltan eslora o manga, se devuelve
-  // un resultado con datosIncompletos = true y la pestaña se
-  // bloquea con un aviso en el centro.
+  // peso y tipo de casco) y el peso del kayakista configurado
+  // en el perfil. Si faltan eslora o manga, se devuelve un
+  // resultado con datosIncompletos = true y la pestaña se bloquea.
   // ============================================================
   const resultadoAutonomia = useMemo<ResultadoAutonomia | null>(() => {
     if (!tieneMotorConfigurado) return null;
@@ -813,7 +807,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
       motorCustom: ajustes.perfil.motorElectricoCustom ?? null,
       bateria: bateriaInfo,
       bateriaCustom: ajustes.perfil.bateriaElectricaCustom ?? null,
-      pesoKayakistaKg: 90,
+      pesoKayakistaKg: ajustes.perfil.pesoKayakistaKg,
     });
   }, [
     tieneMotorConfigurado,
@@ -821,6 +815,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     ajustes.perfil.motorElectricoCustom,
     bateriaInfo,
     ajustes.perfil.bateriaElectricaCustom,
+    ajustes.perfil.pesoKayakistaKg,
     kayakActivo,
   ]);
 
@@ -829,7 +824,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     return filtrarHoras(weather.hourly, franjaActiva, ajustes.filtroFranja, null);
   }, [weather, franjaActiva, ajustes.filtroFranja]);
 
-  // ¿Hay mar cruzada en el día seleccionado?
   const hayMarCruzadaDia = useMemo(() => {
     if (!weather?.hourly) return false;
     const keyDia = localDateKey(fechaSeleccionada);
@@ -973,13 +967,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 
   const u = ajustes.unidades;
 
-  // ============================================================
-  // INDICADOR GRANDE — v1.022
-  // Calculado sobre el día + franja seleccionados.
-  // - waves, weather, air, activity, tides: máximo de la franja.
-  // - wind: racha máxima + viento medio entre paréntesis.
-  // - barometer: presión MEDIA de la franja.
-  // ============================================================
   const numeroGrande = (() => {
     const horas = horasFiltradas;
     const maxDe = (getter: (h: HourlyPoint) => number | null): number | null => {
@@ -1153,7 +1140,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
           textAlign: 'center', marginBottom: 4,
         }}>{t(`zones.${spot.zona ?? 'mediterraneo_espanol'}`)}</div>
 
-        {/* Selector de día */}
         <div style={{
           display: 'flex', gap: 4, overflowX: 'auto',
           paddingBottom: 6, marginBottom: 6,
@@ -1923,7 +1909,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         {tabActiva === 'autonomia' && resultadoAutonomia && !resultadoAutonomia.datosIncompletos && (
           <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: 20 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {/* Ficha configuración actual */}
               <div style={{
                 backgroundColor: 'var(--surface)',
                 border: '1px solid var(--border)',
@@ -1982,9 +1967,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                 </div>
               </div>
 
-              {/* Dos modos comparativos */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
-                {/* Modo Crucero */}
                 <div style={{
                   backgroundColor: 'var(--surface)',
                   border: '1px solid var(--accent)',
@@ -2073,7 +2056,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                   </div>
                 </div>
 
-                {/* Modo Máxima Autonomía */}
                 <div style={{
                   backgroundColor: 'var(--surface)',
                   border: '1px solid var(--border)',
@@ -2163,7 +2145,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                 </div>
               </div>
 
-              {/* Avisos */}
               <div style={{
                 display: 'flex',
                 flexDirection: 'column',

@@ -1,6 +1,7 @@
 // src/state/store.ts
 // WKF — Estado global Zustand con persistencia en localStorage.
 // Persist version 3. Clave "wkf-state-v1".
+// v1.022: perfil con pesoKayakistaKg (default 90).
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
@@ -134,6 +135,7 @@ const PERFIL_DEFECTO: PerfilKayakista = {
   remoRepuesto: true,
   ropaSeca: true,
   compartimentosEstancos: true,
+  pesoKayakistaKg: 90,
   motorElectricoId: null,
   motorElectricoCustom: null,
   bateriaElectricaId: null,
@@ -280,6 +282,19 @@ function validarPerfil(raw: unknown): raw is PerfilKayakista {
   if (typeof raw.remoRepuesto !== 'boolean') return false;
   if (typeof raw.ropaSeca !== 'boolean') return false;
   if (typeof raw.compartimentosEstancos !== 'boolean') return false;
+
+  // pesoKayakistaKg es opcional en ficheros antiguos: si falta, se
+  // rellena con 90 al hacer merge. Si viene, debe ser un número
+  // razonable.
+  if (raw.pesoKayakistaKg !== undefined) {
+    if (
+      typeof raw.pesoKayakistaKg !== 'number' ||
+      !Number.isFinite(raw.pesoKayakistaKg) ||
+      raw.pesoKayakistaKg < 30 ||
+      raw.pesoKayakistaKg > 250
+    )
+      return false;
+  }
 
   if (raw.motorElectricoId !== undefined &&
       raw.motorElectricoId !== null &&
@@ -692,6 +707,10 @@ export const useAppStore = create<AppState>()(
           ordenSubpestanas: ajustesImportados.ordenSubpestanas ?? [],
           unidades: (ajustesImportados.unidades as SistemaUnidades | undefined)
             ?? { ...UNIDADES_POR_DEFECTO },
+          perfil: {
+            ...PERFIL_DEFECTO,
+            ...ajustesImportados.perfil,
+          },
         };
 
         set(() => ({
@@ -748,6 +767,16 @@ export const useAppStore = create<AppState>()(
             ...PERFIL_DEFECTO,
             ...state.ajustes.perfil,
           };
+        }
+
+        // Reforzar el peso del kayakista por si viene de un perfil antiguo.
+        if (
+          typeof state.ajustes.perfil.pesoKayakistaKg !== 'number' ||
+          !Number.isFinite(state.ajustes.perfil.pesoKayakistaKg) ||
+          state.ajustes.perfil.pesoKayakistaKg < 30 ||
+          state.ajustes.perfil.pesoKayakistaKg > 250
+        ) {
+          state.ajustes.perfil.pesoKayakistaKg = 90;
         }
 
         return state;

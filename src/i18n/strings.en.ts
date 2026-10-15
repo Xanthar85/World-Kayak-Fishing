@@ -1,6 +1,6 @@
 // src/i18n/strings.en.ts
 // WKF — Strings en inglés.
-// v1.010: nuevos textos, en paralelo con strings.es.ts.
+// v1.022: añadidas claves peso y pesoAyuda en el objeto perfil.
 
 import type { StringsSchema } from './strings.es.ts';
 
@@ -631,6 +631,8 @@ Please explain all this to me as if I had little technical experience. What does
     experienceIntermedio: 'Intermediate (2-5 years)',
     experienceAvanzado: 'Advanced (5-10 years)',
     experienceExperto: 'Expert (over 10 years)',
+    peso: 'Kayaker weight',
+    pesoAyuda: 'Used to calculate range and total weight of the setup. A heavier kayaker gets less speed and less range with the same motor and battery.',
     equipment: 'Equipment',
     equipmentVhf: 'VHF radio',
     equipmentRemoRepuesto: 'Spare paddle',
@@ -718,7 +720,7 @@ Please explain all this to me as if I had little technical experience. What does
       'A cross sea warning is issued when the wind wave and the swell each exceed 0.3 m and come from directions separated by more than 60°.',
   },
 
-    autonomia: {
+  autonomia: {
     tab: 'Range',
     avisoExperimental:
       'This is an experimental estimate. Actual range depends on wind, current, total weight, propeller efficiency, battery health, and driving style.',
