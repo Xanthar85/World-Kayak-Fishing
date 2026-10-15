@@ -5,12 +5,24 @@
 // Si un espacio no tiene embarcación configurada, ofrece el botón
 // "Asignar embarcación" para ir a Ajustes.
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAppStore, buscarEmbarcacionPorId, type Embarcacion } from '../state/store.ts';
+import { useAppStore, buscarEmbarcacionPorId } from '../state/store.ts';
 import { FichaTecnicaModal } from './FichaTecnicaModal.tsx';
-import type { Kayak } from '../lib/kayaks.ts';
-import type { Pato } from '../lib/patos.ts';
+import {
+  CATALOGO_KAYAKS,
+  etiquetaCategoria,
+  type Kayak,
+  type KayakEditado,
+} from '../lib/kayaks.ts';
+import {
+  CATALOGO_PATOS,
+  CATALOGO_CANOAS,
+  type Pato,
+  type Canoa,
+} from '../lib/patos.ts';
+
+type Embarcacion = Kayak | Pato | Canoa | KayakEditado;
 
 interface SelectorEmbarcacionModalProps {
   /** Id de la embarcación actualmente asignada al punto (o null si usa la activa) */
@@ -28,16 +40,38 @@ export const SelectorEmbarcacionModal: React.FC<
 > = ({ embarcacionIdActual, onSelect, onClose, onIrAAjustes }) => {
   const { t } = useTranslation();
   const kayakIds = useAppStore((s) => s.ajustes.kayakIds);
+  const kayaksEditados = useAppStore((s) => s.kayaksEditados);
 
   const [fichaTecnicaKayak, setFichaTecnicaKayak] = useState<Embarcacion | null>(null);
 
-  const slot1 = kayakIds[0] ? buscarEmbarcacionPorId(kayakIds[0]) : null;
-  const slot2 = kayakIds[1] ? buscarEmbarcacionPorId(kayakIds[1]) : null;
+  type EmbarcacionConTipo =
+    | (Kayak & { tipoVaso: 'kayak' })
+    | (Pato & { tipoVaso: 'pato' })
+    | (Canoa & { tipoVaso: 'canoa' })
+    | (KayakEditado & { tipoVaso: 'kayak_propio' });
 
-  // Si embarcacionIdActual es igual a slot2.id -> activo es slot2.
-  // En cualquier otro caso (null o igual a slot1.id) -> activo es slot1.
-  const slot2Activo = slot2 != null && embarcacionIdActual === slot2.id;
-  const slot1Activo = slot1 != null && !slot2Activo;
+  const catalogoUnificado: EmbarcacionConTipo[] = useMemo(() => [
+    ...CATALOGO_KAYAKS.map((k) => ({ ...k, tipoVaso: 'kayak' as const })),
+    ...CATALOGO_PATOS.map((p) => ({ ...p, tipoVaso: 'pato' as const })),
+    ...CATALOGO_CANOAS.map((c) => ({ ...c, tipoVaso: 'canoa' as const })),
+    ...kayaksEditados.map((k) => ({ ...k, tipoVaso: 'kayak_propio' as const })),
+  ], [kayaksEditados]);
+
+  const slot1 = kayakIds[0] ? buscarEmbarcacionPorId(kayakIds[0], kayaksEditados) : null;
+  const slot2 = kayakIds[1] ? buscarEmbarcacionPorId(kayakIds[1], kayaksEditados) : null;
+
+  // Embarcaciones disponibles del usuario: slot1, slot2 y sus kayaks propios
+  const embarcacionesDisponibles = useMemo(() => {
+    const list: Embarcacion[] = [];
+    if (slot1) list.push(slot1);
+    if (slot2 && slot2.id !== slot1?.id) list.push(slot2);
+    for (const ke of kayaksEditados) {
+      if (!list.some((e) => e.id === ke.id)) {
+        list.push(ke);
+      }
+    }
+    return list;
+  }, [slot1, slot2, kayaksEditados]);
 
   const handleIrAAjustes = () => {
     onClose();
@@ -51,6 +85,46 @@ export const SelectorEmbarcacionModal: React.FC<
     kayak: Embarcacion,
     activo: boolean
   ) => {
+    const esPato = 'tipoEmbarcacion' in kayak && kayak.tipoEmbarcacion === 'pato';
+    const esCanoa = 'tipoEmbarcacion' in kayak && kayak.tipoEmbarcacion === 'canoa';
+    const esPropio = 'origen' in kayak && kayak.origen === 'usuario';
+
+    const badgeTexto = esPato
+      ? 'Pato'
+      : esCanoa
+      ? 'Canoa'
+      : esPropio
+      ? t('kayak.editadoBadge')
+      : 'Kayak';
+
+    const badgeColor = esPato
+      ? '#38bdf8'
+      : esCanoa
+      ? '#eab308'
+      : esPropio
+      ? '#06b6d4'
+      : 'var(--accent)';
+
+    const badgeBg = esPato
+      ? 'rgba(56, 189, 248, 0.15)'
+      : esCanoa
+      ? 'rgba(234, 179, 8, 0.15)'
+      : esPropio
+      ? 'rgba(6, 182, 212, 0.15)'
+      : 'rgba(0, 229, 106, 0.15)';
+
+    const badgeBorder = esPato
+      ? 'rgba(56, 189, 248, 0.3)'
+      : esCanoa
+      ? 'rgba(234, 179, 8, 0.3)'
+      : esPropio
+      ? 'rgba(6, 182, 212, 0.3)'
+      : 'rgba(0, 229, 106, 0.3)';
+
+    const etiquetaCat = esPato || esCanoa
+      ? kayak.categoriaWKF
+      : etiquetaCategoria(kayak as Kayak);
+
     return (
       <div
         key={kayak.id}
@@ -82,15 +156,41 @@ export const SelectorEmbarcacionModal: React.FC<
             width: '100%',
           }}
         >
-          <span
-            style={{
-              fontSize: '0.9rem',
-              fontWeight: 600,
-              color: activo ? 'var(--accent)' : 'var(--text)',
-            }}
-          >
-            {kayak.marca} {kayak.modelo}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span
+              style={{
+                fontSize: '0.65rem',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                padding: '1px 5px',
+                borderRadius: 4,
+                flexShrink: 0,
+                backgroundColor: badgeBg,
+                color: badgeColor,
+                border: `1px solid ${badgeBorder}`,
+              }}
+            >
+              {badgeTexto}
+            </span>
+            <span
+              style={{
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                color: activo ? 'var(--accent)' : 'var(--text)',
+              }}
+            >
+              {kayak.marca} {kayak.modelo}
+            </span>
+            <span
+              style={{
+                fontFamily: 'Fira Code, monospace',
+                fontSize: '0.8rem',
+                color: 'var(--accent)',
+              }}
+            >
+              ({etiquetaCat})
+            </span>
+          </div>
           {activo && (
             <span
               style={{
@@ -245,13 +345,18 @@ export const SelectorEmbarcacionModal: React.FC<
             </button>
           </div>
 
-          {/* Lista de opciones: Solo las embarcaciones disponibles o botón para asignar */}
+          {/* Lista de opciones: Embarcaciones disponibles o botón para asignar */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {/* Opción 1 */}
-            {slot1 ? renderCardKayak(slot1, slot1Activo) : renderBotonAsignar('asignar-1')}
-
-            {/* Opción 2 */}
-            {slot2 ? renderCardKayak(slot2, slot2Activo) : renderBotonAsignar('asignar-2')}
+            {embarcacionesDisponibles.length > 0 ? (
+              embarcacionesDisponibles.map((emb, idx) => {
+                const activo =
+                  embarcacionIdActual === emb.id ||
+                  (embarcacionIdActual === null && idx === 0);
+                return renderCardKayak(emb, activo);
+              })
+            ) : (
+              renderBotonAsignar('asignar-1')
+            )}
           </div>
         </div>
       </div>

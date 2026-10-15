@@ -60,6 +60,62 @@ export interface Kayak<C = any> {
   techoAbsoluto: TechoAbsoluto;
 }
 
+export interface KayakEditado extends Kayak {
+  origen: 'usuario';
+}
+
+export interface EntradaKayakEditado {
+  eslora: number;
+  manga: number;
+  tipoCasco: 'V' | 'U' | 'plano';
+  autovaciable: boolean;
+  timon: boolean;
+  compartimentosEstancos: boolean;
+  capacidadCarga: number;
+  propulsion: 'pala' | 'pedal_aletas' | 'pedal_helice';
+}
+
+// Deduce la categoría WKF (K1-K5) a partir de los datos técnicos.
+// Regla: conservadurismo por defecto. En caso de duda, categoría
+// inferior. La eslora manda; los demás factores suben o bajan un
+// escalón como máximo.
+export function deducirCategoriaWKF(
+  entrada: EntradaKayakEditado
+): CategoriaKayak {
+  const { eslora, timon, compartimentosEstancos, autovaciable, propulsion } = entrada;
+
+  // Base por eslora.
+  let base: CategoriaKayak;
+  if (eslora < 3.0) base = 'K1';
+  else if (eslora < 3.6) base = 'K2';
+  else if (eslora < 4.2) base = 'K3';
+  else if (eslora < 4.8) base = 'K4';
+  else base = 'K5';
+
+  // Contamos cuántos factores "buenos" tiene.
+  // Si tiene al menos 2 de los 3 (timón, compartimentos, autovaciable
+  // + propulsión de pedal), sube un escalón. Si tiene 0 de esos
+  // factores, baja un escalón. Si tiene 1, se queda igual.
+  let factoresBuenos = 0;
+  if (timon) factoresBuenos++;
+  if (compartimentosEstancos) factoresBuenos++;
+  if (autovaciable) factoresBuenos++;
+  if (propulsion === 'pedal_aletas' || propulsion === 'pedal_helice') {
+    factoresBuenos++;
+  }
+
+  const orden: CategoriaKayak[] = ['K1', 'K2', 'K3', 'K4', 'K5'];
+  let idx = orden.indexOf(base);
+
+  if (factoresBuenos >= 2) {
+    idx = Math.min(idx + 1, 4);
+  } else if (factoresBuenos === 0) {
+    idx = Math.max(idx - 1, 0);
+  }
+
+  return orden[idx];
+}
+
 const SIN_CERTIFICAR: CertificacionesKayak = {
   ce: null, ukca: null, uscg: false, abyc: false, nmma: false,
   as_nzs: false, jci: false, iso_12217: false, iso_14946: false, iso_10087: false,
@@ -524,6 +580,9 @@ export function buscarKayaksPorNombre(texto: string): Kayak[] {
   ).slice(0, 50);
 }
 
-export function etiquetaCategoria(kayak: Kayak): string {
+export function etiquetaCategoria(kayak: Kayak | KayakEditado): string {
+  if ('origen' in kayak && kayak.origen === 'usuario') {
+    return `${kayak.categoriaWKF}e`;
+  }
   return `${kayak.categoriaWKF}${kayak.certificadoOficial ? 'c' : ''}`;
 }

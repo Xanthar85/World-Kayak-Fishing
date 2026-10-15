@@ -22,13 +22,18 @@ import {
   CATALOGO_KAYAKS,
   buscarKayakPorId,
   etiquetaCategoria,
+  deducirCategoriaWKF,
   type Kayak,
+  type KayakEditado,
   type CertificacionesKayak,
+  type EntradaKayakEditado,
 } from '../lib/kayaks.ts';
 import {
   CATALOGO_PATOS,
+  CATALOGO_CANOAS,
   buscarPatoPorId,
   type Pato,
+  type Canoa,
   TECHOS_PATOS,
 } from '../lib/patos.ts';
 import {
@@ -143,16 +148,24 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const exportState = useAppStore((s) => s.exportState);
   const importState = useAppStore((s) => s.importState);
 
+  const kayaksEditados = useAppStore((s) => s.kayaksEditados);
+  const addKayakEditado = useAppStore((s) => s.addKayakEditado);
+  const updateKayakEditado = useAppStore((s) => s.updateKayakEditado);
+  const removeKayakEditado = useAppStore((s) => s.removeKayakEditado);
+
   const [activeSlotPicker, setActiveSlotPicker] = useState<number | null>(null);
   const [kayakSearchQuery, setKayakSearchQuery] = useState('');
   const [fichaTecnicaKayak, setFichaTecnicaKayak] = useState<Embarcacion | null>(null);
   const [feedbackImport, setFeedbackImport] = useState<FeedbackImport>(null);
+  const [editandoKayakPropio, setEditandoKayakPropio] = useState<
+    KayakEditado | 'nuevo' | null
+  >(null);
 
   const kayakSlot1 = ajustes.kayakIds[0]
-    ? buscarEmbarcacionPorId(ajustes.kayakIds[0])
+    ? buscarEmbarcacionPorId(ajustes.kayakIds[0], kayaksEditados)
     : null;
   const kayakSlot2 = ajustes.kayakIds[1]
-    ? buscarEmbarcacionPorId(ajustes.kayakIds[1])
+    ? buscarEmbarcacionPorId(ajustes.kayakIds[1], kayaksEditados)
     : null;
 
   const handleSelectKayak = (slotIndex: number, embarcacion: Embarcacion) => {
@@ -169,12 +182,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     setKayakIds(current);
   };
 
-  type EmbarcacionConTipo = (Kayak & { tipoVaso: 'kayak' }) | (Pato & { tipoVaso: 'pato' });
+  type EmbarcacionConTipo =
+    | (Kayak & { tipoVaso: 'kayak' })
+    | (Pato & { tipoVaso: 'pato' })
+    | (Canoa & { tipoVaso: 'canoa' })
+    | (KayakEditado & { tipoVaso: 'kayak_propio' });
 
   const catalogoUnificado: EmbarcacionConTipo[] = useMemo(() => [
     ...CATALOGO_KAYAKS.map((k) => ({ ...k, tipoVaso: 'kayak' as const })),
     ...CATALOGO_PATOS.map((p) => ({ ...p, tipoVaso: 'pato' as const })),
-  ], []);
+    ...CATALOGO_CANOAS.map((c) => ({ ...c, tipoVaso: 'canoa' as const })),
+    ...kayaksEditados.map((k) => ({ ...k, tipoVaso: 'kayak_propio' as const })),
+  ], [kayaksEditados]);
 
   const filteredKayaks = useMemo(() => {
     const terms = kayakSearchQuery.toLowerCase().trim().split(/\s+/).filter(Boolean);
@@ -772,20 +791,36 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                           backgroundColor:
                             'tipoEmbarcacion' in kayak && kayak.tipoEmbarcacion === 'pato'
                               ? 'rgba(56, 189, 248, 0.15)'
+                              : 'tipoEmbarcacion' in kayak && kayak.tipoEmbarcacion === 'canoa'
+                              ? 'rgba(234, 179, 8, 0.15)'
+                              : 'origen' in kayak && kayak.origen === 'usuario'
+                              ? 'rgba(6, 182, 212, 0.15)'
                               : 'rgba(0, 229, 106, 0.15)',
                           color:
                             'tipoEmbarcacion' in kayak && kayak.tipoEmbarcacion === 'pato'
-                              ? 'var(--info, #38bdf8)'
+                              ? '#38bdf8'
+                              : 'tipoEmbarcacion' in kayak && kayak.tipoEmbarcacion === 'canoa'
+                              ? '#eab308'
+                              : 'origen' in kayak && kayak.origen === 'usuario'
+                              ? '#06b6d4'
                               : 'var(--accent)',
                           border: `1px solid ${
                             'tipoEmbarcacion' in kayak && kayak.tipoEmbarcacion === 'pato'
                               ? 'rgba(56, 189, 248, 0.3)'
+                              : 'tipoEmbarcacion' in kayak && kayak.tipoEmbarcacion === 'canoa'
+                              ? 'rgba(234, 179, 8, 0.3)'
+                              : 'origen' in kayak && kayak.origen === 'usuario'
+                              ? 'rgba(6, 182, 212, 0.3)'
                               : 'rgba(0, 229, 106, 0.3)'
                           }`,
                         }}
                       >
                         {'tipoEmbarcacion' in kayak && kayak.tipoEmbarcacion === 'pato'
                           ? 'Pato'
+                          : 'tipoEmbarcacion' in kayak && kayak.tipoEmbarcacion === 'canoa'
+                          ? 'Canoa'
+                          : 'origen' in kayak && kayak.origen === 'usuario'
+                          ? t('kayak.editadoBadge')
                           : 'Kayak'}
                       </span>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -799,7 +834,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                           flexShrink: 0,
                         }}
                       >
-                        ({'tipoEmbarcacion' in kayak && kayak.tipoEmbarcacion === 'pato'
+                        ({'tipoEmbarcacion' in kayak && (kayak.tipoEmbarcacion === 'pato' || kayak.tipoEmbarcacion === 'canoa')
                             ? kayak.categoriaWKF
                             : etiquetaCategoria(kayak as Kayak)})
                       </span>
@@ -871,6 +906,152 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               </div>
             );
           })}
+
+          {/* Sub-sección: Mis kayaks propios */}
+          <div style={{ marginTop: 20, marginBottom: 8 }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>
+              {t('kayak.miKayakPropio')}
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {kayaksEditados.map((kPropio) => (
+                <div
+                  key={kPropio.id}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 10,
+                    padding: 12,
+                    backgroundColor: 'var(--surface)',
+                    borderRadius: 8,
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  {/* Fila 1: Nombre del kayak propio */}
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div
+                      style={{
+                        fontWeight: 700,
+                        fontSize: '0.95rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                      title={`${kPropio.marca} ${kPropio.modelo}`}
+                    >
+                      <span
+                        style={{
+                          fontSize: '0.65rem',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          padding: '1px 5px',
+                          borderRadius: 4,
+                          flexShrink: 0,
+                          backgroundColor: 'rgba(6, 182, 212, 0.15)',
+                          color: '#06b6d4',
+                          border: '1px solid rgba(6, 182, 212, 0.3)',
+                        }}
+                      >
+                        {t('kayak.editadoBadge')}
+                      </span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {kPropio.marca} {kPropio.modelo}
+                      </span>
+                      <span
+                        style={{
+                          fontFamily: 'Fira Code, monospace',
+                          fontSize: '0.85rem',
+                          color: 'var(--accent)',
+                          flexShrink: 0,
+                        }}
+                      >
+                        ({etiquetaCategoria(kPropio)})
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Fila 2: Botones */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => setFichaTecnicaKayak(kPropio)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 6,
+                        border: '1px solid var(--border)',
+                        backgroundColor: 'transparent',
+                        color: 'var(--accent-2)',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {t('kayak.viewSpec')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditandoKayakPropio(kPropio)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 6,
+                        border: '1px solid var(--border)',
+                        backgroundColor: 'var(--surface)',
+                        color: 'var(--text)',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {t('kayak.editKayakPropio')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        removeKayakEditado(kPropio.id);
+                        if (ajustes.kayakIds.includes(kPropio.id)) {
+                          setKayakIds(ajustes.kayakIds.filter((id) => id !== kPropio.id));
+                        }
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 6,
+                        border: '1px solid var(--border)',
+                        backgroundColor: 'transparent',
+                        color: 'var(--text-muted)',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {t('kayak.deleteKayakPropio')}
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {/* Botón + Añadir kayak propio */}
+              <button
+                type="button"
+                disabled={kayaksEditados.length >= 2}
+                onClick={() => setEditandoKayakPropio('nuevo')}
+                title={kayaksEditados.length >= 2 ? t('kayak.limiteKayaksPropios') : undefined}
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  border: '1px dashed var(--border)',
+                  backgroundColor: 'transparent',
+                  color: kayaksEditados.length >= 2 ? 'var(--text-muted)' : 'var(--accent)',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: kayaksEditados.length >= 2 ? 'not-allowed' : 'pointer',
+                  opacity: kayaksEditados.length >= 2 ? 0.5 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                }}
+              >
+                + {t('kayak.addKayakPropio')}
+              </button>
+            </div>
+          </div>
 
           {activeSlotPicker !== null && (
             <div
@@ -973,16 +1154,37 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                           backgroundColor:
                             k.tipoVaso === 'pato'
                               ? 'rgba(56, 189, 248, 0.15)'
+                              : k.tipoVaso === 'canoa'
+                              ? 'rgba(234, 179, 8, 0.15)'
+                              : k.tipoVaso === 'kayak_propio'
+                              ? 'rgba(6, 182, 212, 0.15)'
                               : 'rgba(0, 229, 106, 0.15)',
-                          color: k.tipoVaso === 'pato' ? '#38bdf8' : 'var(--accent)',
+                          color:
+                            k.tipoVaso === 'pato'
+                              ? '#38bdf8'
+                              : k.tipoVaso === 'canoa'
+                              ? '#eab308'
+                              : k.tipoVaso === 'kayak_propio'
+                              ? '#06b6d4'
+                              : 'var(--accent)',
                           border: `1px solid ${
                             k.tipoVaso === 'pato'
                               ? 'rgba(56, 189, 248, 0.3)'
+                              : k.tipoVaso === 'canoa'
+                              ? 'rgba(234, 179, 8, 0.3)'
+                              : k.tipoVaso === 'kayak_propio'
+                              ? 'rgba(6, 182, 212, 0.3)'
                               : 'rgba(0, 229, 106, 0.3)'
                           }`,
                         }}
                       >
-                        {k.tipoVaso === 'pato' ? 'Pato' : 'Kayak'}
+                        {k.tipoVaso === 'pato'
+                          ? 'Pato'
+                          : k.tipoVaso === 'canoa'
+                          ? 'Canoa'
+                          : k.tipoVaso === 'kayak_propio'
+                          ? t('kayak.editadoBadge')
+                          : 'Kayak'}
                       </span>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {k.marca} {k.modelo}
@@ -997,7 +1199,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                         flexShrink: 0,
                       }}
                     >
-                      {k.tipoVaso === 'pato' ? k.categoriaWKF : etiquetaCategoria(k)}
+                      {k.tipoVaso === 'pato' || k.tipoVaso === 'canoa' ? k.categoriaWKF : etiquetaCategoria(k)}
                     </span>
                   </button>
                 ))}
@@ -1651,6 +1853,33 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </div>
       </div>
 
+      {editandoKayakPropio !== null && (
+        <ModalKayakPropio
+          inicial={editandoKayakPropio === 'nuevo' ? null : editandoKayakPropio}
+          onSave={(datos) => {
+            if (editandoKayakPropio === 'nuevo') {
+              addKayakEditado(datos);
+            } else {
+              updateKayakEditado(editandoKayakPropio.id, {
+                marca: datos.marca,
+                modelo: datos.modelo,
+                eslora: datos.entrada.eslora,
+                manga: datos.entrada.manga,
+                tipoCasco: datos.entrada.tipoCasco,
+                autovaciable: datos.entrada.autovaciable,
+                timon: datos.entrada.timon,
+                compartimentosEstancos: datos.entrada.compartimentosEstancos,
+                capacidadCarga: datos.entrada.capacidadCarga,
+                propulsion: datos.entrada.propulsion,
+                categoriaWKF: deducirCategoriaWKF(datos.entrada),
+              });
+            }
+            setEditandoKayakPropio(null);
+          }}
+          onCancel={() => setEditandoKayakPropio(null)}
+        />
+      )}
+
       {fichaTecnicaKayak && (
         <div
           onClick={() => setFichaTecnicaKayak(null)}
@@ -1911,6 +2140,253 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+const ModalKayakPropio: React.FC<{
+  inicial: KayakEditado | null;
+  onSave: (datos: { marca: string; modelo: string; entrada: EntradaKayakEditado }) => void;
+  onCancel: () => void;
+}> = ({ inicial, onSave, onCancel }) => {
+  const { t } = useTranslation();
+  const [marca, setMarca] = useState(inicial?.marca ?? '');
+  const [modelo, setModelo] = useState(inicial?.modelo ?? '');
+  const [eslora, setEslora] = useState(inicial?.eslora ?? 4.0);
+  const [manga, setManga] = useState(inicial?.manga ?? 0.75);
+  const [tipoCasco, setTipoCasco] = useState<'V' | 'U' | 'plano'>(inicial?.tipoCasco ?? 'U');
+  const [autovaciable, setAutovaciable] = useState(inicial?.autovaciable ?? true);
+  const [timon, setTimon] = useState(inicial?.timon ?? false);
+  const [compartimentosEstancos, setCompartimentosEstancos] = useState(
+    inicial?.compartimentosEstancos ?? false
+  );
+  const [capacidadCarga, setCapacidadCarga] = useState(inicial?.capacidadCarga ?? 150);
+  const [propulsion, setPropulsion] = useState<'pala' | 'pedal_aletas' | 'pedal_helice'>(
+    inicial?.propulsion ?? 'pala'
+  );
+
+  const entrada: EntradaKayakEditado = {
+    eslora, manga, tipoCasco, autovaciable, timon,
+    compartimentosEstancos, capacidadCarga, propulsion,
+  };
+  const categoriaDeducida = deducirCategoriaWKF(entrada);
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '8px 12px',
+    backgroundColor: 'var(--bg)',
+    border: '1px solid var(--border)',
+    borderRadius: 6,
+    color: 'var(--text)',
+    fontSize: '0.85rem',
+    boxSizing: 'border-box',
+  };
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: '0.8rem',
+    color: 'var(--text-muted)',
+    marginBottom: 4,
+    display: 'block',
+    fontWeight: 500,
+  };
+
+  return (
+    <div onClick={onCancel} style={{
+      position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)',
+      zIndex: 2000, display: 'flex', alignItems: 'center',
+      justifyContent: 'center', padding: 20,
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        backgroundColor: 'var(--surface)', border: '1px solid var(--accent-2)',
+        borderRadius: 12, padding: 20, maxWidth: 520, width: '100%',
+        maxHeight: '85vh', overflowY: 'auto',
+        boxShadow: '0 12px 40px rgba(0, 0, 0, 0.6)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between',
+          alignItems: 'center', marginBottom: 14 }}>
+          <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700,
+            color: 'var(--accent-2)' }}>
+            {inicial ? t('kayak.editKayakPropio') : t('kayak.addKayakPropio')}
+          </h3>
+          <button type="button" onClick={onCancel} style={{
+            border: 'none', background: 'transparent',
+            color: 'var(--text-dim)', cursor: 'pointer',
+            fontSize: '1.2rem', padding: '4px 8px',
+          }}>✕</button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* Marca y Modelo */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={labelStyle}>{t('kayak.campoMarca')}</label>
+              <input
+                type="text"
+                value={marca}
+                onChange={(e) => setMarca(e.target.value)}
+                placeholder="Ej. Galaxy, Ocean..."
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>{t('kayak.campoModelo')}</label>
+              <input
+                type="text"
+                value={modelo}
+                onChange={(e) => setModelo(e.target.value)}
+                placeholder="Ej. Alborán, Cruz..."
+                style={inputStyle}
+              />
+            </div>
+          </div>
+
+          {/* Eslora y Manga */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={labelStyle}>{t('kayak.campoEslora')}</label>
+              <input
+                type="number"
+                step="0.01"
+                min="1.0"
+                max="10.0"
+                value={eslora}
+                onChange={(e) => setEslora(parseFloat(e.target.value) || 0)}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>{t('kayak.campoManga')}</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.3"
+                max="2.0"
+                value={manga}
+                onChange={(e) => setManga(parseFloat(e.target.value) || 0)}
+                style={inputStyle}
+              />
+            </div>
+          </div>
+
+          {/* Casco y Propulsión */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={labelStyle}>{t('kayak.campoCasco')}</label>
+              <select
+                value={tipoCasco}
+                onChange={(e) => setTipoCasco(e.target.value as 'V' | 'U' | 'plano')}
+                style={inputStyle}
+              >
+                <option value="V">V</option>
+                <option value="U">U</option>
+                <option value="plano">Plano</option>
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>{t('kayak.campoPropulsion')}</label>
+              <select
+                value={propulsion}
+                onChange={(e) => setPropulsion(e.target.value as 'pala' | 'pedal_aletas' | 'pedal_helice')}
+                style={inputStyle}
+              >
+                <option value="pala">{t('kayak.propulsionPaddle')}</option>
+                <option value="pedal_aletas">{t('kayak.propulsionFin')}</option>
+                <option value="pedal_helice">{t('kayak.propulsionProp')}</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Capacidad de carga */}
+          <div>
+            <label style={labelStyle}>{t('kayak.campoCapacidad')}</label>
+            <input
+              type="number"
+              step="5"
+              min="30"
+              max="600"
+              value={capacidadCarga}
+              onChange={(e) => setCapacidadCarga(parseFloat(e.target.value) || 0)}
+              style={inputStyle}
+            />
+          </div>
+
+          {/* Checkboxes: Autovaciable, Timón, Compartimentos */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+            <label style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '8px 10px', backgroundColor: 'var(--bg)', border: '1px solid var(--border)',
+              borderRadius: 6, cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text)',
+            }}>
+              <span>{t('kayak.campoAutovaciable')}</span>
+              <input
+                type="checkbox"
+                checked={autovaciable}
+                onChange={(e) => setAutovaciable(e.target.checked)}
+                style={{ width: 18, height: 18, accentColor: 'var(--accent)', cursor: 'pointer' }}
+              />
+            </label>
+
+            <label style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '8px 10px', backgroundColor: 'var(--bg)', border: '1px solid var(--border)',
+              borderRadius: 6, cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text)',
+            }}>
+              <span>{t('kayak.campoTimon')}</span>
+              <input
+                type="checkbox"
+                checked={timon}
+                onChange={(e) => setTimon(e.target.checked)}
+                style={{ width: 18, height: 18, accentColor: 'var(--accent)', cursor: 'pointer' }}
+              />
+            </label>
+
+            <label style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '8px 10px', backgroundColor: 'var(--bg)', border: '1px solid var(--border)',
+              borderRadius: 6, cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text)',
+            }}>
+              <span>{t('kayak.campoCompartimentos')}</span>
+              <input
+                type="checkbox"
+                checked={compartimentosEstancos}
+                onChange={(e) => setCompartimentosEstancos(e.target.checked)}
+                style={{ width: 18, height: 18, accentColor: 'var(--accent)', cursor: 'pointer' }}
+              />
+            </label>
+          </div>
+        </div>
+
+        <div style={{
+          marginTop: 14, padding: '8px 10px',
+          backgroundColor: 'var(--bg)', border: '1px solid var(--border)',
+          borderRadius: 6, fontSize: '0.75rem', color: 'var(--text-dim)',
+        }}>
+          <div style={{ fontWeight: 700, color: 'var(--accent)', marginBottom: 4 }}>
+            {t('kayak.categoriaDeducida', { cat: `${categoriaDeducida}e` })}
+          </div>
+          <div style={{ lineHeight: 1.4 }}>
+            {t('kayak.categoriaDeducidaAyuda')}
+          </div>
+        </div>
+
+        <div style={{ marginTop: 14, display: 'flex', gap: 8 }}>
+          <button type="button" onClick={onCancel} style={{
+            flex: 1, padding: '10px 16px', borderRadius: 8,
+            border: '1px solid var(--border)', backgroundColor: 'transparent',
+            color: 'var(--text)', fontSize: '0.9rem', cursor: 'pointer',
+          }}>{t('kayak.cancelar')}</button>
+          <button type="button" onClick={() => {
+            if (!marca.trim() || !modelo.trim()) return;
+            onSave({ marca: marca.trim(), modelo: modelo.trim(), entrada });
+          }} style={{
+            flex: 1, padding: '10px 16px', borderRadius: 8,
+            border: 'none', backgroundColor: 'var(--accent)',
+            color: '#000', fontSize: '0.9rem', fontWeight: 600,
+            cursor: (!marca.trim() || !modelo.trim()) ? 'not-allowed' : 'pointer',
+            opacity: (!marca.trim() || !modelo.trim()) ? 0.6 : 1,
+          }}>{t('kayak.guardarKayakPropio')}</button>
+        </div>
+      </div>
     </div>
   );
 };

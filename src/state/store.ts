@@ -7,7 +7,14 @@ import { persist } from 'zustand/middleware';
 import i18n, { detectInitialLanguage, STORAGE_KEY } from '../i18n/index.ts';
 import type { SpotWeather } from '../lib/openmeteo.ts';
 import type { NivelColorTabla } from '../lib/verdict-color.ts';
-import { CATALOGO_KAYAKS, buscarKayakPorId, type Kayak } from '../lib/kayaks.ts';
+import {
+  CATALOGO_KAYAKS,
+  buscarKayakPorId,
+  deducirCategoriaWKF,
+  type Kayak,
+  type KayakEditado,
+  type EntradaKayakEditado,
+} from '../lib/kayaks.ts';
 import {
   CATALOGO_PATOS,
   buscarPatoPorId,
@@ -27,9 +34,24 @@ import type {
 import type { FormatoCoords } from '../lib/coords.ts';
 import { UNIDADES_POR_DEFECTO, type SistemaUnidades } from '../lib/unidades.ts';
 
-export type Embarcacion = Kayak | Pato | Canoa;
+export type Embarcacion = Kayak | Pato | Canoa | KayakEditado;
 
-export function buscarEmbarcacionPorId(id: string): Embarcacion | undefined {
+export function buscarEmbarcacionPorId(
+  id: string,
+  kayaksEditados?: KayakEditado[]
+): Embarcacion | undefined {
+  if (kayaksEditados) {
+    const editado = kayaksEditados.find((k) => k.id === id);
+    if (editado) return editado;
+  } else if (/^user-/.test(id)) {
+    try {
+      const editados = typeof useAppStore !== 'undefined' ? useAppStore.getState?.()?.kayaksEditados : undefined;
+      const editado = editados?.find((k) => k.id === id);
+      if (editado) return editado;
+    } catch {
+      // ignore
+    }
+  }
   return buscarKayakPorId(id) ?? buscarPatoPorId(id) ?? buscarCanoaPorId(id);
 }
 
@@ -154,7 +176,13 @@ export function sanearKayakIds(ids: string[] | undefined): {
   }
 
   // Si alguna embarcación seleccionada ya no existe en el catálogo, se sustituye por la por defecto.
-  const mapeados = ids.map((id) => (buscarEmbarcacionPorId(id) ? id : defaultKayak.id));
+  const existeEnCatalogo = (id: string) =>
+    buscarKayakPorId(id) != null ||
+    buscarPatoPorId(id) != null ||
+    buscarCanoaPorId(id) != null ||
+    /^user-/.test(id);
+
+  const mapeados = ids.map((id) => (existeEnCatalogo(id) ? id : defaultKayak.id));
   const unicos = Array.from(new Set(mapeados)).slice(0, 2);
   const resultado = unicos.length > 0 ? unicos : [defaultKayak.id];
   const primeraEmbarcacion = buscarEmbarcacionPorId(resultado[0]);
@@ -165,14 +193,17 @@ export function sanearKayakIds(ids: string[] | undefined): {
   };
 }
 
-export function getKayakActivo(kayakIds?: string[]): Embarcacion {
+export function getKayakActivo(
+  kayakIds?: string[],
+  kayaksEditados?: KayakEditado[]
+): Embarcacion {
   const defaultKayak = CATALOGO_KAYAKS[0];
   if (!kayakIds || kayakIds.length === 0) {
     return defaultKayak;
   }
-  const e1 = kayakIds[0] ? buscarEmbarcacionPorId(kayakIds[0]) : null;
+  const e1 = kayakIds[0] ? buscarEmbarcacionPorId(kayakIds[0], kayaksEditados) : null;
   if (e1) return e1;
-  const e2 = kayakIds[1] ? buscarEmbarcacionPorId(kayakIds[1]) : null;
+  const e2 = kayakIds[1] ? buscarEmbarcacionPorId(kayakIds[1], kayaksEditados) : null;
   if (e2) return e2;
   return defaultKayak;
 }
@@ -295,7 +326,16 @@ export interface AppState {
   firstRunDone: boolean;
   spots: Spot[];
   weather: Record<string, SpotWeather>;
+  kayaksEditados: KayakEditado[];
   ajustes: AjustesApp;
+
+  addKayakEditado: (datos: {
+    marca: string;
+    modelo: string;
+    entrada: EntradaKayakEditado;
+  }) => KayakEditado | null;
+  updateKayakEditado: (id: string, patch: Partial<KayakEditado>) => void;
+  removeKayakEditado: (id: string) => void;
 
   setLanguage: (lang: 'es' | 'en') => void;
   setTheme: (theme: 'dark' | 'light') => void;
@@ -343,6 +383,7 @@ export const useAppStore = create<AppState>()(
       firstRunDone: false,
       spots: [],
       weather: {},
+      kayaksEditados: [],
       ajustes: {
         formatoCoords: 'dd',
         kayakIds: CATALOGO_KAYAKS[0] ? [CATALOGO_KAYAKS[0].id] : [],
@@ -462,8 +503,63 @@ export const useAppStore = create<AppState>()(
         }),
       setCategoriaKayak: (c) =>
         set((state) => ({ ajustes: { ...state.ajustes, categoriaKayak: c } })),
-      getKayakActivo: () => getKayakActivo(get().ajustes.kayakIds),
-      getEmbarcacionActiva: () => getKayakActivo(get().ajustes.kayakIds),
+      getKayakActivo: () => getKayakActivo(get().ajustes.kayakIds, get().kayaksEditados),
+      getEmbarcacionActiva: () => getKayakActivo(get().ajustes.kayakIds, get().kayaksEditados),
+
+      addKayakEditado: ({ marca, modelo, entrada }) => {
+        let creado: KayakEditado | null = null;
+        set((state) => {
+          if (state.kayaksEditados.length >= 2) return state;
+          const categoria = deducirCategoriaWKF(entrada);
+          const id = `user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+          const nuevo: KayakEditado = {
+            id,
+            marca,
+            modelo,
+            eslora: entrada.eslora,
+            manga: entrada.manga,
+            volumen: 0,
+            tipoCasco: entrada.tipoCasco,
+            autovaciable: entrada.autovaciable,
+            timon: entrada.timon,
+            compartimentosEstancos: entrada.compartimentosEstancos,
+            capacidadCarga: entrada.capacidadCarga,
+            propulsion: entrada.propulsion,
+            categoriaWKF: categoria,
+            categoriaDirectiva: 'no_certificado',
+            certificado: false,
+            certificadoOficial: false,
+            verificado: false,
+            certificaciones: {
+              ce: null, ukca: null, uscg: false, abyc: false, nmma: false,
+              as_nzs: false, jci: false, iso_12217: false, iso_14946: false,
+              iso_10087: false,
+            },
+            techoAbsoluto: {
+              vientoMaxBf: 4,
+              olaMaxM: 0.5,
+              fuente: 'estimado',
+            },
+            origen: 'usuario',
+          };
+          creado = nuevo;
+          return { kayaksEditados: [...state.kayaksEditados, nuevo] };
+        });
+        return creado;
+      },
+
+      updateKayakEditado: (id, patch) =>
+        set((state) => ({
+          kayaksEditados: state.kayaksEditados.map((k) =>
+            k.id === id ? { ...k, ...patch } : k
+          ),
+        })),
+
+      removeKayakEditado: (id) =>
+        set((state) => ({
+          kayaksEditados: state.kayaksEditados.filter((k) => k.id !== id),
+        })),
+
       setPerfil: (patch) =>
         set((state) => ({
           ajustes: {
@@ -501,6 +597,7 @@ export const useAppStore = create<AppState>()(
         set(() => ({
           spots: [],
           weather: {},
+          kayaksEditados: [],
           ajustes: {
             formatoCoords: 'dd',
             kayakIds: CATALOGO_KAYAKS[0] ? [CATALOGO_KAYAKS[0].id] : [],
@@ -522,6 +619,7 @@ export const useAppStore = create<AppState>()(
           version: PERSIST_VERSION,
           spots: s.spots,
           ajustes: s.ajustes,
+          kayaksEditados: s.kayaksEditados,
           language: s.language,
           theme: s.theme,
         };
@@ -578,6 +676,9 @@ export const useAppStore = create<AppState>()(
         set(() => ({
           spots: data.spots as Spot[],
           weather: {},
+          kayaksEditados: Array.isArray(data.kayaksEditados)
+            ? (data.kayaksEditados as KayakEditado[])
+            : [],
           ajustes: ajustesConDefaults,
           ...(lang ? { language: lang } : {}),
           ...(theme ? { theme } : {}),
@@ -604,7 +705,7 @@ export const useAppStore = create<AppState>()(
 
         const saneado = sanearKayakIds(state.ajustes.kayakIds);
         state.ajustes.kayakIds = saneado.kayakIds;
-        state.ajustes.categoriaKayak = getKayakActivo(saneado.kayakIds).categoriaWKF;
+        state.ajustes.categoriaKayak = getKayakActivo(saneado.kayakIds, state.kayaksEditados).categoriaWKF;
         if (!Array.isArray(state.ajustes.ordenSubpestanas)) {
           state.ajustes.ordenSubpestanas = [];
         }
@@ -625,7 +726,7 @@ export const useAppStore = create<AppState>()(
         if (!state) return;
         const currentIds = state.ajustes?.kayakIds;
         const saneado = sanearKayakIds(currentIds);
-        const kayakActivo = getKayakActivo(saneado.kayakIds);
+        const kayakActivo = getKayakActivo(saneado.kayakIds, state.kayaksEditados);
         state.setKayakIds(saneado.kayakIds);
         state.setCategoriaKayak(kayakActivo.categoriaWKF);
       },
@@ -641,7 +742,7 @@ export const useAppStore = create<AppState>()(
     const estadoInicial = useAppStore.getState();
     const currentIds = estadoInicial.ajustes?.kayakIds;
     const saneado = sanearKayakIds(currentIds);
-    const kayakActivo = getKayakActivo(saneado.kayakIds);
+    const kayakActivo = getKayakActivo(saneado.kayakIds, estadoInicial.kayaksEditados);
     useAppStore.setState((prev) => ({
       ajustes: {
         ...prev.ajustes,
