@@ -21,7 +21,7 @@ import {
   type FranjaDia,
   type Condiciones,
 } from './verdict.ts';
-import type { Spot, FranjaUsuario } from '../state/store.ts';
+import type { Spot, FranjaUsuario, Embarcacion } from '../state/store.ts';
 
 const ORDEN_VEREDICTO: Veredicto[] = [
   'FAVORABLE',
@@ -97,7 +97,7 @@ export function calcularVeredictoPorFranja(
   franjas: FranjaUsuario[],
   categoria: CategoriaKayak | CategoriaPato | string,
   perfil: PerfilKayakista,
-  embarcacion?: Kayak | Pato | TechoAbsoluto | null
+  embarcacion?: Embarcacion | TechoAbsoluto | null
 ): Record<string, Veredicto | null> {
   const res: Record<string, Veredicto | null> = {};
   for (const f of franjas) {
@@ -172,7 +172,7 @@ export function calcularVeredictoFranjaDia(
   fechaBase: Date,
   categoria: CategoriaKayak | CategoriaPato | string,
   perfil: PerfilKayakista,
-  embarcacion?: Kayak | Pato | TechoAbsoluto | null
+  embarcacion?: Embarcacion | TechoAbsoluto | null
 ): Veredicto | null {
   if (!weather) return null;
   const y = fechaBase.getFullYear();

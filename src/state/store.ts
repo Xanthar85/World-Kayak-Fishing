@@ -8,7 +8,13 @@ import i18n, { detectInitialLanguage, STORAGE_KEY } from '../i18n/index.ts';
 import type { SpotWeather } from '../lib/openmeteo.ts';
 import type { NivelColorTabla } from '../lib/verdict-color.ts';
 import { CATALOGO_KAYAKS, buscarKayakPorId, type Kayak } from '../lib/kayaks.ts';
-import { CATALOGO_PATOS, buscarPatoPorId, type Pato } from '../lib/patos.ts';
+import {
+  CATALOGO_PATOS,
+  buscarPatoPorId,
+  buscarCanoaPorId,
+  type Pato,
+  type Canoa,
+} from '../lib/patos.ts';
 import type {
   CategoriaKayak,
   CategoriaPato,
@@ -21,10 +27,10 @@ import type {
 import type { FormatoCoords } from '../lib/coords.ts';
 import { UNIDADES_POR_DEFECTO, type SistemaUnidades } from '../lib/unidades.ts';
 
-export type Embarcacion = Kayak | Pato;
+export type Embarcacion = Kayak | Pato | Canoa;
 
 export function buscarEmbarcacionPorId(id: string): Embarcacion | undefined {
-  return buscarKayakPorId(id) ?? buscarPatoPorId(id);
+  return buscarKayakPorId(id) ?? buscarPatoPorId(id) ?? buscarCanoaPorId(id);
 }
 
 export interface Spot {

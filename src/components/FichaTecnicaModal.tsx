@@ -4,9 +4,14 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Kayak, CertificacionesKayak } from '../lib/kayaks.ts';
-import { type Pato, TECHOS_PATOS } from '../lib/patos.ts';
+import {
+  type Pato,
+  TECHOS_PATOS,
+  type Canoa,
+  TECHOS_CANOAS,
+} from '../lib/patos.ts';
 
-type Embarcacion = Kayak | Pato;
+type Embarcacion = Kayak | Pato | Canoa;
 
 interface FilaCertificacion {
   labelKey: string;
@@ -60,8 +65,38 @@ export const FichaTecnicaModal: React.FC<FichaTecnicaModalProps> = ({
   };
 
   const esPato = 'tipoEmbarcacion' in embarcacion && embarcacion.tipoEmbarcacion === 'pato';
+  const esCanoa = 'tipoEmbarcacion' in embarcacion && embarcacion.tipoEmbarcacion === 'canoa';
 
-  const filas = esPato
+  const filas = esCanoa
+    ? (() => {
+        const canoa = embarcacion as Canoa;
+        const tc = TECHOS_CANOAS[canoa.categoriaWKF] ?? TECHOS_CANOAS.CA1;
+        return [
+          { label: t('kayak.length'), val: `${canoa.eslora.toFixed(2)} m` },
+          { label: t('kayak.beam'), val: `${canoa.manga.toFixed(2)} m` },
+          { label: 'Peso', val: `${canoa.peso} kg` },
+          { label: t('kayak.capacity'), val: `${canoa.capacidadCarga} kg` },
+          { label: 'Tripulantes', val: `${canoa.tripulantesMax}` },
+          { label: 'Material', val: canoa.material },
+          { label: t('kayak.category'), val: canoa.categoriaWKF },
+          {
+            label: t('kayak.techoAbsoluto'),
+            val: `${tc.vientoMaxBf} Bf / ${tc.olaMaxM.toFixed(1)} m`,
+          },
+          { label: t('kayak.fuente'), val: 'estimado' },
+          {
+            label: t('kayak.certificado'),
+            val: canoa.certificado
+              ? t('kayak.certificadoSiWkf')
+              : t('kayak.certificadoNoWkf'),
+          },
+          {
+            label: t('kayak.verificado'),
+            val: canoa.verificado ? '✓' : '—',
+          },
+        ];
+      })()
+    : esPato
     ? (() => {
         const pato = embarcacion as Pato;
         const tp = TECHOS_PATOS[pato.categoriaWKF] ?? TECHOS_PATOS.P1;

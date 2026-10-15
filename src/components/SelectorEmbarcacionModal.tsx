@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAppStore, buscarEmbarcacionPorId } from '../state/store.ts';
+import { useAppStore, buscarEmbarcacionPorId, type Embarcacion } from '../state/store.ts';
 import { FichaTecnicaModal } from './FichaTecnicaModal.tsx';
 import type { Kayak } from '../lib/kayaks.ts';
 import type { Pato } from '../lib/patos.ts';
@@ -29,7 +29,7 @@ export const SelectorEmbarcacionModal: React.FC<
   const { t } = useTranslation();
   const kayakIds = useAppStore((s) => s.ajustes.kayakIds);
 
-  const [fichaTecnicaKayak, setFichaTecnicaKayak] = useState<Kayak | Pato | null>(null);
+  const [fichaTecnicaKayak, setFichaTecnicaKayak] = useState<Embarcacion | null>(null);
 
   const slot1 = kayakIds[0] ? buscarEmbarcacionPorId(kayakIds[0]) : null;
   const slot2 = kayakIds[1] ? buscarEmbarcacionPorId(kayakIds[1]) : null;
@@ -48,7 +48,7 @@ export const SelectorEmbarcacionModal: React.FC<
   };
 
   const renderCardKayak = (
-    kayak: Kayak | Pato,
+    kayak: Embarcacion,
     activo: boolean
   ) => {
     return (

@@ -7,7 +7,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAppStore, getEmbarcacionParaSpot } from '../state/store.ts';
+import { useAppStore, getEmbarcacionParaSpot, type Embarcacion } from '../state/store.ts';
 import {
   calcularVeredictoFranjaDia,
   veredictoAColor,
@@ -193,7 +193,7 @@ interface GraficoGrandeProps {
   franjas: FranjaUsuario[];
   veredictosPorFranja: Record<string, Veredicto | null>;
   spot: Spot | null;
-  embarcacion: Kayak | Pato;
+  embarcacion: Embarcacion;
 }
 
 const GraficoGrande: React.FC<GraficoGrandeProps> = ({
