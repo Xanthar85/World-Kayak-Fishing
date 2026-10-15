@@ -5,21 +5,31 @@
 import {
   UMBRALES_BASE,
   UMBRALES_PATOS,
+  UMBRALES_CANOAS,
   type Umbral,
   type ZonaTabla,
   type CategoriaKayakTabla,
   type CategoriaPatoTabla,
+  type CategoriaCanoaTabla,
   type NivelExperienciaTabla,
   type FranjaDiaTabla,
   type TipoAccesoTabla,
 } from './verdict-tabla.ts';
 import type { Kayak, TechoAbsoluto } from './kayaks.ts';
-import { type Pato, TECHOS_PATOS, type CategoriaPato } from './patos.ts';
+import {
+  type Pato,
+  type Canoa,
+  TECHOS_PATOS,
+  type CategoriaPato,
+  TECHOS_CANOAS,
+  type CategoriaCanoa,
+} from './patos.ts';
 
 export type Zona = ZonaTabla;
 export type CategoriaKayak = CategoriaKayakTabla;
-export type { CategoriaPato };
-export type CategoriaEmbarcacion = CategoriaKayak | CategoriaPato;
+export type { CategoriaPato, CategoriaCanoa };
+export type CategoriaEmbarcacionLigera = CategoriaPato | CategoriaCanoa;
+export type CategoriaEmbarcacion = CategoriaKayak | CategoriaPato | CategoriaCanoa;
 export type NivelExperiencia = NivelExperienciaTabla;
 export type FranjaDia = FranjaDiaTabla;
 export type TipoAcceso = TipoAccesoTabla;
@@ -182,23 +192,43 @@ function aplicarAjuste(
 
 export function calcularVeredicto(
   zona: Zona,
-  categoria: CategoriaKayak | CategoriaPato | string,
+  categoria: CategoriaKayak | CategoriaPato | CategoriaCanoa | string,
   perfil: PerfilKayakista,
   franja: FranjaDia,
   condiciones: Condiciones,
-  embarcacion?: Kayak | Pato | TechoAbsoluto | null
+  embarcacion?: Kayak | Pato | Canoa | TechoAbsoluto | null
 ): ResultadoVeredicto {
+  const categoriaStr = typeof categoria === 'string' ? categoria : '';
   const esPato =
     (embarcacion && 'tipoEmbarcacion' in embarcacion && embarcacion.tipoEmbarcacion === 'pato') ||
-    categoria === 'P1' ||
-    categoria === 'P2' ||
-    categoria === 'P3' ||
-    categoria === 'P4';
+    categoriaStr === 'P1' || categoriaStr === 'P2' ||
+    categoriaStr === 'P3' || categoriaStr === 'P4';
+  const esCanoa =
+    (embarcacion && 'tipoEmbarcacion' in embarcacion && embarcacion.tipoEmbarcacion === 'canoa') ||
+    categoriaStr === 'CA1' || categoriaStr === 'CA2' || categoriaStr === 'CA3';
 
   let techo: TechoAbsoluto | undefined;
   let baseOriginal: Umbral;
 
-  if (esPato) {
+  if (esCanoa) {
+    const catCanoa: CategoriaCanoa =
+      (embarcacion && 'categoriaWKF' in embarcacion &&
+       (embarcacion.categoriaWKF === 'CA1' ||
+        embarcacion.categoriaWKF === 'CA2' ||
+        embarcacion.categoriaWKF === 'CA3'))
+        ? (embarcacion.categoriaWKF as CategoriaCanoa)
+        : (categoriaStr === 'CA1' || categoriaStr === 'CA2' || categoriaStr === 'CA3')
+        ? (categoriaStr as CategoriaCanoa)
+        : 'CA1';
+
+    baseOriginal = UMBRALES_CANOAS[catCanoa] ?? UMBRALES_CANOAS.CA1;
+    const tc = TECHOS_CANOAS[catCanoa] ?? TECHOS_CANOAS.CA1;
+    techo = {
+      vientoMaxBf: tc.vientoMaxBf,
+      olaMaxM: tc.olaMaxM,
+      fuente: 'estimado',
+    };
+  } else if (esPato) {
     const catPato: CategoriaPato =
       embarcacion && 'categoriaWKF' in embarcacion && (embarcacion.categoriaWKF === 'P1' || embarcacion.categoriaWKF === 'P2' || embarcacion.categoriaWKF === 'P3' || embarcacion.categoriaWKF === 'P4')
         ? (embarcacion.categoriaWKF as CategoriaPato)

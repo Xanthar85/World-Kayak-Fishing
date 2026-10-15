@@ -860,3 +860,29 @@ export const UMBRALES_PATOS: Record<CategoriaPatoTabla, Umbral> = {
     marea: { fav: 0.3, ace: 0.4, exi: 0.5, des: 0.6 },
   },
 };
+
+export type CategoriaCanoaTabla = 'CA1' | 'CA2' | 'CA3';
+
+export const UMBRALES_CANOAS: Record<CategoriaCanoaTabla, Umbral> = {
+  CA1: {
+    viento: { fav: 1, ace: 2, exi: 3, des: 4 },
+    ola: { fav: 0.1, ace: 0.2, exi: 0.4, des: 0.6 },
+    periodo: { fav: 5, ace: 4, exi: 3, des: 2 },
+    corriente: { fav: 0.2, ace: 0.4, exi: 0.6, des: 0.8 },
+    marea: { fav: 0.2, ace: 0.3, exi: 0.5, des: 0.6 },
+  },
+  CA2: {
+    viento: { fav: 2, ace: 3, exi: 4, des: 5 },
+    ola: { fav: 0.2, ace: 0.3, exi: 0.5, des: 0.7 },
+    periodo: { fav: 5, ace: 4, exi: 3, des: 2 },
+    corriente: { fav: 0.3, ace: 0.5, exi: 0.8, des: 1.1 },
+    marea: { fav: 0.2, ace: 0.3, exi: 0.5, des: 0.6 },
+  },
+  CA3: {
+    viento: { fav: 2, ace: 3, exi: 5, des: 6 },
+    ola: { fav: 0.3, ace: 0.4, exi: 0.7, des: 1.0 },
+    periodo: { fav: 5, ace: 4, exi: 3, des: 2 },
+    corriente: { fav: 0.4, ace: 0.6, exi: 1.0, des: 1.3 },
+    marea: { fav: 0.3, ace: 0.4, exi: 0.6, des: 0.8 },
+  },
+};
