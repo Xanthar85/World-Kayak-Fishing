@@ -2412,6 +2412,7 @@ const ModalKayakPropio: React.FC<{
               <label style={labelStyle}>{t('kayak.campoMarca')}</label>
               <input
                 type="text"
+                autoComplete="off"
                 value={marca}
                 onChange={(e) => setMarca(e.target.value)}
                 placeholder="Ej. Galaxy, Ocean..."
@@ -2422,6 +2423,7 @@ const ModalKayakPropio: React.FC<{
               <label style={labelStyle}>{t('kayak.campoModelo')}</label>
               <input
                 type="text"
+                autoComplete="off"
                 value={modelo}
                 onChange={(e) => setModelo(e.target.value)}
                 placeholder="Ej. Alborán, Cruz..."
@@ -2436,6 +2438,7 @@ const ModalKayakPropio: React.FC<{
               <label style={labelStyle}>{t('kayak.campoEslora')}</label>
               <input
                 type="number"
+                autoComplete="off"
                 step="0.01"
                 min="1.0"
                 max="10.0"
@@ -2448,6 +2451,7 @@ const ModalKayakPropio: React.FC<{
               <label style={labelStyle}>{t('kayak.campoManga')}</label>
               <input
                 type="number"
+                autoComplete="off"
                 step="0.01"
                 min="0.3"
                 max="2.0"
@@ -2491,6 +2495,7 @@ const ModalKayakPropio: React.FC<{
             <label style={labelStyle}>{t('kayak.campoCapacidad')}</label>
             <input
               type="number"
+              autoComplete="off"
               step="5"
               min="30"
               max="600"
@@ -2744,6 +2749,7 @@ const ModalSelectorMotor: React.FC<{
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
             <input
               type="text"
+              autoComplete="off"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               placeholder="Buscar por marca o modelo…"
@@ -2833,6 +2839,7 @@ const ModalSelectorMotor: React.FC<{
               <label style={labelStyle}>{t('perfil.motorCampoEmpuje')}</label>
               <input
                 type="number"
+                autoComplete="off"
                 min={5}
                 max={200}
                 value={empujeLbs}
@@ -2859,6 +2866,7 @@ const ModalSelectorMotor: React.FC<{
               <label style={labelStyle}>{t('perfil.motorCampoAmperaje')}</label>
               <input
                 type="number"
+                autoComplete="off"
                 step="0.5"
                 min={0}
                 max={150}
@@ -3174,6 +3182,7 @@ const ModalSelectorBateria: React.FC<{
                 <label style={labelStyle}>{t('perfil.motorBateriaCapacidad')}</label>
                 <input
                   type="number"
+                  autoComplete="off"
                   min={5}
                   max={500}
                   value={capacidadAh}
@@ -3200,6 +3209,7 @@ const ModalSelectorBateria: React.FC<{
               <label style={labelStyle}>{t('perfil.motorBateriaPeso')}</label>
               <input
                 type="number"
+                autoComplete="off"
                 step="0.5"
                 min={1}
                 max={100}
