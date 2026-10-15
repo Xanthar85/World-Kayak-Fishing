@@ -1,4 +1,13 @@
-// src/screens/SpotScreen.tsx — v1.021
+// src/screens/SpotScreen.tsx — v1.022
+// Cambios v1.022:
+//   - Indicador grande de la cabecera calculado sobre el día y la
+//     franja seleccionados (máximo por pestaña, media en barómetro).
+//   - Pestaña Viento: columna BF con nombre Beaufort completo debajo
+//     del número, columna BF más ancha.
+//   - Pestaña Viento: eliminadas las columnas V.unidad2 y R.unidad2.
+//     Quedan 4 columnas: Dir, Bf, V., R.
+//   - Indicador grande de viento = racha máxima + viento medio entre
+//     paréntesis.
 // Cambios v1.021:
 //   - Selector de día (Hoy, Mañana, Pasado, etc.) en la cabecera.
 //   - Veredicto por franja calculado para el día seleccionado.
@@ -79,6 +88,22 @@ const ALL_TABS: TabId[] = [
   'waves', 'wind', 'weather', 'air', 'barometer',
   'activity', 'sun', 'moon', 'tides',
 ];
+
+const NOMBRES_BEAUFORT: Record<number, string> = {
+  0: 'Calma',
+  1: 'Ventolina',
+  2: 'Flojito',
+  3: 'Flojo',
+  4: 'Bonancible',
+  5: 'Fresquito',
+  6: 'Fresco',
+  7: 'Frescachón',
+  8: 'Temporal',
+  9: 'Temporal Fuerte',
+  10: 'Temporal Duro',
+  11: 'Temporal muy Duro',
+  12: 'Temporal Huracanado',
+};
 
 function localDateKey(d: Date): string {
   const y = d.getFullYear();
@@ -291,6 +316,9 @@ interface ColumnaTabla<T> {
   unit?: string;
   render: (h: T) => React.ReactNode;
   veredicto?: (h: T) => Veredicto | null;
+  /** Ancho mínimo de la columna. Se usa para que la columna BF
+   *  pueda crecer con el nombre de Beaufort debajo del número. */
+  minWidth?: string;
 }
 
 function TablaDatos<T extends { time: string }>({
@@ -328,7 +356,12 @@ function TablaDatos<T extends { time: string }>({
 
   if (horas.length === 0) return null;
 
-  const gridCols = `minmax(54px, auto) repeat(${columnas.length}, 1fr)`;
+  // Construimos el grid: Hora + cada columna. Si la columna define
+  // minWidth, se usa; si no, minmax(0, 1fr) por defecto.
+  const cols = columnas
+    .map((c) => c.minWidth ?? 'minmax(0, 1fr)')
+    .join(' ');
+  const gridCols = `minmax(54px, auto) ${cols}`;
 
   return (
     <div style={{
@@ -878,37 +911,83 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 
   const u = ajustes.unidades;
 
+  // ============================================================
+  // INDICADOR GRANDE — v1.022
+  // Calculado sobre el día + franja seleccionados.
+  // - waves, weather, air, activity, tides: máximo de la franja.
+  // - wind: racha máxima + viento medio entre paréntesis.
+  // - barometer: presión MEDIA de la franja.
+  // ============================================================
   const numeroGrande = (() => {
+    const horas = horasFiltradas;
+    const maxDe = (getter: (h: HourlyPoint) => number | null): number | null => {
+      let max: number | null = null;
+      for (const h of horas) {
+        const v = getter(h);
+        if (v == null) continue;
+        if (max == null || v > max) max = v;
+      }
+      return max;
+    };
+
     switch (tabActiva) {
       case 'waves': {
-        const v = horasFiltradas.find((h) => h.waveHeight != null)?.waveHeight;
-        const valNum = valorOla(v ?? null, u.ola);
+        const v = maxDe((h) => h.waveHeight);
+        const valNum = valorOla(v, u.ola);
         return { val: valNum != null ? valNum.toFixed(1) : '—', unit: SUFIJO_OLA[u.ola], color: 'var(--accent)' };
       }
       case 'wind': {
-        const v = horasFiltradas.find((h) => h.windSpeed != null)?.windSpeed;
-        const valNum = valorViento(v ?? null, u.viento);
-        return { val: valNum != null ? valNum.toFixed(1) : '—', unit: SUFIJO_VIENTO[u.viento], color: 'var(--accent-2)' };
+        const rachaMax = maxDe((h) => h.windGusts);
+        const vientoMax = maxDe((h) => h.windSpeed);
+        const rachaNum = valorViento(rachaMax, u.viento);
+        const vientoNum = valorViento(vientoMax, u.viento);
+        let valStr = '—';
+        if (rachaNum != null && vientoNum != null) {
+          valStr = `${rachaNum.toFixed(1).replace('.', ',')} (${vientoNum.toFixed(1).replace('.', ',')})`;
+        } else if (rachaNum != null) {
+          valStr = rachaNum.toFixed(1).replace('.', ',');
+        } else if (vientoNum != null) {
+          valStr = vientoNum.toFixed(1).replace('.', ',');
+        }
+        return { val: valStr, unit: SUFIJO_VIENTO[u.viento], color: 'var(--accent-2)' };
       }
       case 'weather': {
-        const v = horasFiltradas.find((h) => h.temperature != null)?.temperature;
-        const valNum = valorTemperatura(v ?? null, u.temperatura);
-        return { val: valNum != null ? valNum.toFixed(1) : '—', unit: SUFIJO_TEMPERATURA[u.temperatura], color: '#f59e0b' };
+        const v = maxDe((h) => h.temperature);
+        const valNum = valorTemperatura(v, u.temperatura);
+        return { val: valNum != null ? valNum.toFixed(1).replace('.', ',') : '—', unit: SUFIJO_TEMPERATURA[u.temperatura], color: '#f59e0b' };
+      }
+      case 'air': {
+        const v = maxDe((h) => h.temperature);
+        const valNum = valorTemperatura(v, u.temperatura);
+        return { val: valNum != null ? valNum.toFixed(1).replace('.', ',') : '—', unit: SUFIJO_TEMPERATURA[u.temperatura], color: '#f59e0b' };
       }
       case 'barometer': {
-        const v = horasFiltradas.find((h) => h.pressure != null)?.pressure;
-        const valNum = valorPresion(v ?? null, u.presion);
-        return { val: valNum != null ? (u.presion === 'inhg' ? valNum.toFixed(2) : valNum.toFixed(0)) : '—', unit: SUFIJO_PRESION[u.presion], color: '#a855f7' };
+        let suma = 0;
+        let n = 0;
+        for (const h of horas) {
+          if (h.pressure == null) continue;
+          suma += h.pressure;
+          n++;
+        }
+        const media = n > 0 ? suma / n : null;
+        const valNum = valorPresion(media, u.presion);
+        return {
+          val: valNum != null
+            ? (u.presion === 'inhg' ? valNum.toFixed(2).replace('.', ',') : valNum.toFixed(0))
+            : '—',
+          unit: SUFIJO_PRESION[u.presion],
+          color: '#a855f7',
+        };
       }
       case 'activity': {
-        const v = horasFiltradas.find((h) => h.currentVelocity != null)?.currentVelocity;
-        const valNum = valorCorriente(v ?? null, u.corriente);
-        return { val: valNum != null ? valNum.toFixed(2) : '—', unit: SUFIJO_CORRIENTE[u.corriente], color: '#06b6d4' };
+        const v = maxDe((h) => h.currentVelocity);
+        const valNum = valorCorriente(v, u.corriente);
+        return { val: valNum != null ? valNum.toFixed(2).replace('.', ',') : '—', unit: SUFIJO_CORRIENTE[u.corriente], color: '#06b6d4' };
       }
       case 'tides': {
-        const v = horasFiltradas.find((h) => h.seaLevelHeight != null)?.seaLevelHeight;
-        const valNum = valorOla(v ?? null, u.ola);
-        return { val: valNum != null ? valNum.toFixed(2) : '—', unit: SUFIJO_OLA[u.ola], color: '#38bdf8' };
+        const v = maxDe((h) => h.seaLevelHeight);
+        const valNum = valorOla(v, u.ola);
+        return { val: valNum != null ? valNum.toFixed(2).replace('.', ',') : '—', unit: SUFIJO_OLA[u.ola], color: '#38bdf8' };
       }
       default: return null;
     }
@@ -1456,7 +1535,23 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                 },
                 veredicto: subVeredictoWind },
               { key: 'bf', label: 'Bf', unit: '',
-                render: (h) => { const b = kmhABf(h.windSpeed); return b != null ? `${b}` : '—'; },
+                minWidth: 'minmax(72px, 1fr)',
+                render: (h) => {
+                  const b = kmhABf(h.windSpeed);
+                  if (b == null) return '—';
+                  const nombre = NOMBRES_BEAUFORT[b] ?? '';
+                  return (
+                    <span style={{
+                      display: 'inline-flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      lineHeight: 1.1,
+                    }}>
+                      <span>{b}</span>
+                      <span style={{ fontSize: '0.6rem', opacity: 0.75 }}>{nombre}</span>
+                    </span>
+                  );
+                },
                 veredicto: subVeredictoWind },
               { key: 'w1', label: 'V.', unit: `(${SUFIJO_VIENTO[u.viento]})`,
                 render: (h) => {
@@ -1481,18 +1576,6 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
                       {esRachaFuerte && <BotonAyuda tabId="wind" />}
                     </span>
                   );
-                },
-                veredicto: subVeredictoWindGust },
-              { key: 'w2', label: 'V.', unit: `(${SUFIJO_VIENTO[u.viento2]})`,
-                render: (h) => {
-                  const val = valorViento(h.windSpeed, u.viento2);
-                  return val != null ? val.toFixed(1).replace('.', ',') : '—';
-                },
-                veredicto: subVeredictoWind },
-              { key: 'g2', label: 'R.', unit: `(${SUFIJO_VIENTO[u.viento2]})`,
-                render: (h) => {
-                  const val = valorViento(h.windGusts, u.viento2);
-                  return val != null ? val.toFixed(1).replace('.', ',') : '—';
                 },
                 veredicto: subVeredictoWindGust },
             ]}
