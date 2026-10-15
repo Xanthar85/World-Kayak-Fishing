@@ -1,6 +1,8 @@
 // src/screens/SettingsScreen.tsx
 // WKF — Pantalla de Ajustes.
 // v1.022: añadido campo "Peso del kayakista" en Mi perfil de kayakista.
+// v1.024: fix del input del peso en Android. type="text" inputMode="numeric",
+//         estado string, clamp en onBlur. Sigue la lección v1.021.
 
 import React, { useState, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -166,6 +168,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   >(null);
   const [modalMotorAbierto, setModalMotorAbierto] = useState(false);
   const [modalBateriaAbierto, setModalBateriaAbierto] = useState(false);
+  const [pesoTexto, setPesoTexto] = useState<string>(
+    String(ajustes.perfil.pesoKayakistaKg ?? 90)
+  );
 
   const motorSeleccionado = useMemo(() => {
     if (ajustes.perfil.motorElectricoId) {
@@ -1305,17 +1310,26 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <input
-                type="number"
-                min={40}
-                max={160}
-                step={1}
-                value={ajustes.perfil.pesoKayakistaKg}
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                value={pesoTexto}
                 onChange={(e) => {
-                  const v = parseInt(e.target.value, 10);
-                  if (Number.isFinite(v)) {
-                    const clamped = Math.max(40, Math.min(160, v));
-                    setPerfil({ pesoKayakistaKg: clamped });
-                  }
+                  const raw = e.target.value.replace(/[^0-9]/g, '');
+                  setPesoTexto(raw);
+                  if (raw === '') return;
+                  const v = parseInt(raw, 10);
+                  if (!Number.isFinite(v)) return;
+                  if (v < 40 || v > 160) return;
+                  setPerfil({ pesoKayakistaKg: v });
+                }}
+                onBlur={() => {
+                  const v = parseInt(pesoTexto, 10);
+                  const clamped = !Number.isFinite(v)
+                    ? 90
+                    : Math.max(40, Math.min(160, v));
+                  setPerfil({ pesoKayakistaKg: clamped });
+                  setPesoTexto(String(clamped));
                 }}
                 style={{
                   width: 90,
