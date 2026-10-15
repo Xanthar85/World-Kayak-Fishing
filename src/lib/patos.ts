@@ -1,29 +1,38 @@
 // src/lib/patos.ts
 // WKF — Catálogo de patos (float tubes, belly boats, pontones, plataformas
-// flotantes). Archivo separado del catálogo de kayaks.
+// flotantes) y canoas (embarcaciones ligeras no kayak con categoría CA).
+// Archivo separado del catálogo de kayaks.
 //
 // Nomenclatura:
 //   categoriaWKF para patos: 'P1'|'P2'|'P3'|'P4'
-//     P1 (<1.40 m)  → pato ligero, aguas tranquilas, 1 pescador.
+//     P1 (<1.40 m)   → pato ligero, aguas tranquilas, 1 pescador.
 //     P2 (1.40-1.70) → pato medio, 1 pescador, algo de viento.
 //     P3 (1.70-2.00) → pato grande, aguas abiertas, motor eléctrico.
 //     P4 (>2.00 m)   → pontón rígido, catamarán, motor, 2 pescadores.
 //
-//   tipoEmbarcacion: 'pato' → identifica que no es un kayak.
+//   categoriaWKF para canoas: 'CA1'|'CA2'|'CA3'
+//     CA1 (<3.50 m)   → canoa ligera, aguas tranquilas.
+//     CA2 (3.50-5.00) → canoa media, aguas costeras.
+//     CA3 (>5.00 m)   → canoa grande, aguas abiertas, doble/triple.
 //
-// Todos los patos se catalogan como NO certificados por defecto. Ningún
-// fabricante del CSV publica categoría de diseño oficial. Si alguno la
-// publica en el futuro, se actualiza la entrada correspondiente.
+//   tipoEmbarcacion: 'pato' | 'canoa' → identifica qué tipo de embarcación es.
+//
+// Todos los patos y canoas se catalogan como NO certificados por defecto.
+// Ningún fabricante de patos publica categoría de diseño oficial.
+// Las canoas de recreo están exentas de certificación CE si son
+// propulsadas exclusivamente a pala. Si algún fabricante publica
+// categoría en el futuro, se actualiza la entrada.
 
 export type CategoriaPato = 'P1' | 'P2' | 'P3' | 'P4';
+export type CategoriaCanoa = 'CA1' | 'CA2' | 'CA3';
 export type TipoEstructura = 'hinchable' | 'rigido' | 'mixto';
-export type TipoEmbarcacion = 'pato';
+export type TipoEmbarcacion = 'pato' | 'canoa';
 
 export interface Pato {
   id: string;
   marca: string;
   modelo: string;
-  tipoEmbarcacion: TipoEmbarcacion;
+  tipoEmbarcacion: 'pato';
   tipoEstructura: TipoEstructura;
   material: string;
   eslora: number;
@@ -36,6 +45,26 @@ export interface Pato {
   verificado: boolean;
   notas: string;
 }
+
+export interface Canoa {
+  id: string;
+  marca: string;
+  modelo: string;
+  tipoEmbarcacion: 'canoa';
+  material: string;
+  eslora: number;
+  manga: number;
+  peso: number;
+  capacidadCarga: number;
+  tripulantesMax: number;
+  categoriaWKF: CategoriaCanoa;
+  certificado: boolean;
+  certificadoOficial: boolean;
+  verificado: boolean;
+  notas: string;
+}
+
+export type EmbarcacionLigera = Pato | Canoa;
 
 export const CATALOGO_PATOS: Pato[] = [
   // ── Hart ──────────────────────────────────────────────────────────
@@ -427,8 +456,313 @@ export const CATALOGO_PATOS: Pato[] = [
   },
 ];
 
+// ────────────────────────────────────────────────────────────────────
+// CATÁLOGO DE CANOAS
+// Solo entradas reales y verificables. Nada de relleno.
+// Categorías: CA1, CA2, CA3.
+// ────────────────────────────────────────────────────────────────────
+
+export const CATALOGO_CANOAS: Canoa[] = [
+  // ── Old Town (USA, canoas de recreo) ──────────────────────────────
+  {
+    id: 'old-town-discovery-119',
+    marca: 'Old Town',
+    modelo: 'Discovery 119',
+    tipoEmbarcacion: 'canoa',
+    material: 'Polietileno de 3 capas',
+    eslora: 3.63,
+    manga: 0.79,
+    peso: 29,
+    capacidadCarga: 150,
+    tripulantesMax: 1,
+    categoriaWKF: 'CA2',
+    certificado: false,
+    certificadoOficial: false,
+    verificado: false,
+    notas: 'Canoa individual de recreo y pesca ligera.',
+  },
+  {
+    id: 'old-town-saranac-146',
+    marca: 'Old Town',
+    modelo: 'Saranac 146',
+    tipoEmbarcacion: 'canoa',
+    material: 'Polietileno de 3 capas',
+    eslora: 4.42,
+    manga: 0.91,
+    peso: 36,
+    capacidadCarga: 200,
+    tripulantesMax: 3,
+    categoriaWKF: 'CA2',
+    certificado: false,
+    certificadoOficial: false,
+    verificado: false,
+    notas: 'Canoa doble/triple familiar para lagos y ríos lentos.',
+  },
+
+  // ── Mad River (USA, canoas de recreo) ─────────────────────────────
+  {
+    id: 'mad-river-explorer-14',
+    marca: 'Mad River',
+    modelo: 'Explorer 14',
+    tipoEmbarcacion: 'canoa',
+    material: 'Polietileno',
+    eslora: 4.27,
+    manga: 0.84,
+    peso: 27,
+    capacidadCarga: 180,
+    tripulantesMax: 2,
+    categoriaWKF: 'CA2',
+    certificado: false,
+    certificadoOficial: false,
+    verificado: false,
+    notas: 'Canoa doble versátil para aguas tranquilas.',
+  },
+  {
+    id: 'mad-river-explorer-16',
+    marca: 'Mad River',
+    modelo: 'Explorer 16',
+    tipoEmbarcacion: 'canoa',
+    material: 'Polietileno',
+    eslora: 4.88,
+    manga: 0.89,
+    peso: 31,
+    capacidadCarga: 220,
+    tripulantesMax: 2,
+    categoriaWKF: 'CA2',
+    certificado: false,
+    certificadoOficial: false,
+    verificado: false,
+    notas: 'Canoa doble de carga, buena para expediciones cortas.',
+  },
+
+  // ── Wenonah (USA, canoas de recreo y expedición) ──────────────────
+  {
+    id: 'wenonah-adirondack-15',
+    marca: 'Wenonah',
+    modelo: 'Adirondack 15',
+    tipoEmbarcacion: 'canoa',
+    material: 'Kevlar / fibra',
+    eslora: 4.57,
+    manga: 0.86,
+    peso: 24,
+    capacidadCarga: 200,
+    tripulantesMax: 2,
+    categoriaWKF: 'CA2',
+    certificado: false,
+    certificadoOficial: false,
+    verificado: false,
+    notas: 'Canoa ligera de material compuesto, ideal para porteo.',
+  },
+  {
+    id: 'wenonah-minnesota-ii',
+    marca: 'Wenonah',
+    modelo: 'Minnesota II',
+    tipoEmbarcacion: 'canoa',
+    material: 'Kevlar / fibra',
+    eslora: 5.49,
+    manga: 0.91,
+    peso: 30,
+    capacidadCarga: 260,
+    tripulantesMax: 2,
+    categoriaWKF: 'CA3',
+    certificado: false,
+    certificadoOficial: false,
+    verificado: false,
+    notas: 'Canoa de expedición de gran eslora para aguas abiertas.',
+  },
+
+  // ── Nova Craft (Canadá, canoas de recreo) ─────────────────────────
+  {
+    id: 'nova-craft-prospector-16',
+    marca: 'Nova Craft',
+    modelo: 'Prospector 16',
+    tipoEmbarcacion: 'canoa',
+    material: 'Fibra de vidrio / polietileno',
+    eslora: 4.88,
+    manga: 0.91,
+    peso: 34,
+    capacidadCarga: 220,
+    tripulantesMax: 2,
+    categoriaWKF: 'CA2',
+    certificado: false,
+    certificadoOficial: false,
+    verificado: false,
+    notas: 'Canoa doble de carga, polivalente.',
+  },
+
+  // ── Esquif (Canadá, canoas de río y recreo) ───────────────────────
+  {
+    id: 'esquif-presage',
+    marca: 'Esquif',
+    modelo: 'Presage',
+    tipoEmbarcacion: 'canoa',
+    material: 'Polietileno',
+    eslora: 4.27,
+    manga: 0.86,
+    peso: 30,
+    capacidadCarga: 180,
+    tripulantesMax: 2,
+    categoriaWKF: 'CA2',
+    certificado: false,
+    certificadoOficial: false,
+    verificado: false,
+    notas: 'Canoa doble, orientada a río y lago.',
+  },
+
+  // ── Pakboats (USA, canoas plegables) ──────────────────────────────
+  {
+    id: 'pakboats-puffin-12',
+    marca: 'Pakboats',
+    modelo: 'Puffin 12',
+    tipoEmbarcacion: 'canoa',
+    material: 'Lona / estructura de aluminio',
+    eslora: 3.66,
+    manga: 0.76,
+    peso: 18,
+    capacidadCarga: 120,
+    tripulantesMax: 1,
+    categoriaWKF: 'CA2',
+    certificado: false,
+    certificadoOficial: false,
+    verificado: false,
+    notas: 'Canoa plegable individual, transportable en mochila.',
+  },
+  {
+    id: 'pakboats-xt-15',
+    marca: 'Pakboats',
+    modelo: 'XT-15',
+    tipoEmbarcacion: 'canoa',
+    material: 'Lona / estructura de aluminio',
+    eslora: 4.57,
+    manga: 0.86,
+    peso: 22,
+    capacidadCarga: 180,
+    tripulantesMax: 2,
+    categoriaWKF: 'CA2',
+    certificado: false,
+    certificadoOficial: false,
+    verificado: false,
+    notas: 'Canoa plegable doble, ideal para viajes.',
+  },
+
+  // ── Ally (Noruega, canoas plegables) ──────────────────────────────
+  {
+    id: 'ally-ally-165',
+    marca: 'Ally',
+    modelo: 'Ally 16.5',
+    tipoEmbarcacion: 'canoa',
+    material: 'Lona PVC / estructura aluminio',
+    eslora: 5.03,
+    manga: 0.91,
+    peso: 20,
+    capacidadCarga: 200,
+    tripulantesMax: 2,
+    categoriaWKF: 'CA3',
+    certificado: false,
+    certificadoOficial: false,
+    verificado: false,
+    notas: 'Canoa plegable de gran eslora para expedición.',
+  },
+
+  // ── Klepper (Alemania, canoas plegables) ──────────────────────────
+  {
+    id: 'klepper-aerius-480',
+    marca: 'Klepper',
+    modelo: 'Aerius 480',
+    tipoEmbarcacion: 'canoa',
+    material: 'Lona / estructura de madera y aluminio',
+    eslora: 4.80,
+    manga: 0.72,
+    peso: 22,
+    capacidadCarga: 180,
+    tripulantesMax: 2,
+    categoriaWKF: 'CA2',
+    certificado: false,
+    certificadoOficial: false,
+    verificado: false,
+    notas: 'Canoa plegable clásica, uso recreativo y expedición.',
+  },
+
+  // ── Wayland (España, canoas de recreo) ────────────────────────────
+  {
+    id: 'wayland-amazon',
+    marca: 'Wayland',
+    modelo: 'Amazon',
+    tipoEmbarcacion: 'canoa',
+    material: 'Polietileno',
+    eslora: 4.00,
+    manga: 0.80,
+    peso: 30,
+    capacidadCarga: 200,
+    tripulantesMax: 2,
+    categoriaWKF: 'CA2',
+    certificado: false,
+    certificadoOficial: false,
+    verificado: false,
+    notas: 'Canoa doble de recreo, uso en lagos y aguas tranquilas.',
+  },
+
+  // ── Silverbirch (UK, canoas de recreo) ────────────────────────────
+  {
+    id: 'silverbirch-broadland-15',
+    marca: 'Silverbirch',
+    modelo: 'Broadland 15',
+    tipoEmbarcacion: 'canoa',
+    material: 'Polietileno',
+    eslora: 4.57,
+    manga: 0.86,
+    peso: 32,
+    capacidadCarga: 200,
+    tripulantesMax: 2,
+    categoriaWKF: 'CA2',
+    certificado: false,
+    certificadoOficial: false,
+    verificado: false,
+    notas: 'Canoa doble de recreo orientada a ríos lentos.',
+  },
+
+  // ── Hou Canoes (UK, canoas de recreo) ─────────────────────────────
+  {
+    id: 'hou-canoes-prospector-15',
+    marca: 'Hou Canoes',
+    modelo: 'Prospector 15',
+    tipoEmbarcacion: 'canoa',
+    material: 'Polietileno',
+    eslora: 4.57,
+    manga: 0.91,
+    peso: 30,
+    capacidadCarga: 200,
+    tripulantesMax: 2,
+    categoriaWKF: 'CA2',
+    certificado: false,
+    certificadoOficial: false,
+    verificado: false,
+    notas: 'Canoa doble polivalente para río y lago.',
+  },
+];
+
+// Alias histórico: el catálogo unificado de embarcaciones ligeras.
+// Se usa donde antes se esperaba solo patos y ahora queremos
+// patos + canoas. Se mantiene CATALOGO_PATOS como lista de patos
+// puros para compatibilidad, y CATALOGO_CANOAS como lista
+// separada. El consumidor elige.
+export const CATALOGO_EMBARCACIONES_LIGERAS: EmbarcacionLigera[] = [
+  ...CATALOGO_PATOS,
+  ...CATALOGO_CANOAS,
+];
+
 export function buscarPatoPorId(id: string): Pato | undefined {
   return CATALOGO_PATOS.find((p) => p.id === id);
+}
+
+export function buscarCanoaPorId(id: string): Canoa | undefined {
+  return CATALOGO_CANOAS.find((c) => c.id === id);
+}
+
+export function buscarEmbarcacionLigeraPorId(
+  id: string
+): EmbarcacionLigera | undefined {
+  return buscarPatoPorId(id) ?? buscarCanoaPorId(id);
 }
 
 export function buscarPatosPorNombre(texto: string): Pato[] {
@@ -439,6 +773,14 @@ export function buscarPatosPorNombre(texto: string): Pato[] {
   ).slice(0, 50);
 }
 
+export function buscarCanoasPorNombre(texto: string): Canoa[] {
+  const q = texto.trim().toLowerCase();
+  if (!q) return [];
+  return CATALOGO_CANOAS.filter((c) =>
+    `${c.marca} ${c.modelo}`.toLowerCase().includes(q)
+  ).slice(0, 50);
+}
+
 export const TECHOS_PATOS: Record<CategoriaPato, { vientoMaxBf: number; olaMaxM: number }> = {
   P1: { vientoMaxBf: 3, olaMaxM: 0.3 },
   P2: { vientoMaxBf: 4, olaMaxM: 0.4 },
@@ -446,6 +788,19 @@ export const TECHOS_PATOS: Record<CategoriaPato, { vientoMaxBf: number; olaMaxM:
   P4: { vientoMaxBf: 6, olaMaxM: 0.8 },
 };
 
+export const TECHOS_CANOAS: Record<CategoriaCanoa, { vientoMaxBf: number; olaMaxM: number }> = {
+  CA1: { vientoMaxBf: 3, olaMaxM: 0.4 },
+  CA2: { vientoMaxBf: 4, olaMaxM: 0.6 },
+  CA3: { vientoMaxBf: 5, olaMaxM: 1.0 },
+};
+
 export function etiquetaCategoriaPato(pato: Pato): string {
   return pato.categoriaWKF;
 }
+
+export function etiquetaCategoriaCanoa(canoa: Canoa): string {
+  return canoa.categoriaWKF;
+}
+
+// Compatibilidad con el código existente que esperaba TECHOS_PATOS
+// y etiquetaCategoriaPato. Nada más cambia en este archivo.
