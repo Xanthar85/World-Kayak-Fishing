@@ -1,4 +1,10 @@
-// src/screens/SpotScreen.tsx — v1.022
+// src/screens/SpotScreen.tsx — v1.025
+// Cambios v1.025:
+//   - Pasa pesoKayakistaKg y pesoEquipoKg desde el perfil a
+//     calcularAutonomia.
+//   - Tolera techoAbsoluto opcional (kayaks a pala exentos).
+//   - Peso del casco del kayak propio se toma de pesoKg si existe;
+//     si no, se estima por categoría WKF.
 // Cambios v1.022:
 //   - Indicador grande de la cabecera calculado sobre el día y la
 //     franja seleccionados (máximo por pestaña, media en barómetro).
@@ -83,6 +89,7 @@ import {
   etiquetaBateria,
 } from '../lib/motores-electricos.ts';
 import { calcularAutonomia, type ResultadoAutonomia } from '../lib/autonomia.ts';
+import { pesoEstimadoPorCategoria } from '../lib/kayaks.ts';
 
 export interface SpotScreenProps {
   spotId: string;
@@ -781,20 +788,36 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
   }, [ajustes.perfil.bateriaElectricaId]);
 
   // ============================================================
-  // CÁLCULO DE AUTONOMÍA — v1.022
-  // El cálculo usa el casco del kayak activo (eslora, manga,
-  // peso y tipo de casco) y el peso del kayakista configurado
-  // en el perfil. Si faltan eslora o manga, se devuelve un
-  // resultado con datosIncompletos = true y la pestaña se bloquea.
+  // CÁLCULO DE AUTONOMÍA — v1.025
+  // Usa el casco del kayak activo (eslora, manga, peso, tipo de
+  // casco), el peso del kayakista y el peso del equipo configurados
+  // en el perfil. Si el kayak no tiene peso declarado, se estima
+  // por categoría WKF. Si faltan eslora o manga, se bloquea.
   // ============================================================
   const resultadoAutonomia = useMemo<ResultadoAutonomia | null>(() => {
     if (!tieneMotorConfigurado) return null;
 
     const esloraM = (kayakActivo as { eslora?: number }).eslora ?? 0;
     const mangaM = (kayakActivo as { manga?: number }).manga ?? 0;
-    const pesoCascoKg = (kayakActivo as { peso?: number }).peso ?? 30;
     const tipoCasco =
       (kayakActivo as { tipoCasco?: 'V' | 'U' | 'plano' }).tipoCasco ?? 'U';
+
+    // Peso del casco: si el modelo lo declara (pesoKg) se usa; si
+    // es un kayak propio sin peso, se estima por categoría.
+    let pesoCascoKg: number | undefined =
+      (kayakActivo as { pesoKg?: number }).pesoKg;
+
+    if (pesoCascoKg == null || !Number.isFinite(pesoCascoKg) || pesoCascoKg <= 0) {
+      // Los patos y canoas tienen peso obligatorio. Los kayaks
+      // propios pueden no tenerlo. Estimamos por categoría.
+      const categoria = kayakActivo.categoriaWKF;
+      if (categoria === 'K1' || categoria === 'K2' || categoria === 'K3' || categoria === 'K4' || categoria === 'K5') {
+        pesoCascoKg = pesoEstimadoPorCategoria(categoria);
+      } else {
+        // Pato o canoa: si no tiene peso, usamos un valor conservador.
+        pesoCascoKg = (kayakActivo as { peso?: number }).peso ?? 25;
+      }
+    }
 
     const casco =
       esloraM > 0 && mangaM > 0
@@ -808,6 +831,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
       bateria: bateriaInfo,
       bateriaCustom: ajustes.perfil.bateriaElectricaCustom ?? null,
       pesoKayakistaKg: ajustes.perfil.pesoKayakistaKg,
+      pesoEquipoKg: ajustes.perfil.pesoEquipoKg,
     });
   }, [
     tieneMotorConfigurado,
@@ -816,6 +840,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
     bateriaInfo,
     ajustes.perfil.bateriaElectricaCustom,
     ajustes.perfil.pesoKayakistaKg,
+    ajustes.perfil.pesoEquipoKg,
     kayakActivo,
   ]);
 
@@ -1871,11 +1896,12 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
         )}
 
         {/* ============================================================
-            AUTONOMÍA — v1.022
+            AUTONOMÍA — v1.025
             Si faltan datos del casco, se bloquea con aviso central.
             Si no, se muestran las dos tarjetas comparativas con
             velocidad en km/h grande y kt entre paréntesis, y
             distancia en km grande y mn entre paréntesis.
+            El peso total incluye kayak + kayakista + equipo + batería.
             ============================================================ */}
         {tabActiva === 'autonomia' && resultadoAutonomia && resultadoAutonomia.datosIncompletos && (
           <div style={{

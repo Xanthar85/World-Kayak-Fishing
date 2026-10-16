@@ -1,7 +1,10 @@
 // src/lib/verdict.ts
-// WKF â€” NÃºcleo de cÃ¡lculo de veredictos.
-// Sin cambios funcionales desde v1.010.
-// v1.022: aÃ±adido pesoKayakistaKg al perfil (para cÃ¡lculo de autonomÃ­a).
+// WKF — Núcleo de cálculo de veredictos.
+// v1.024:
+//   - techoAbsoluto pasa a ser opcional en Kayak/Pato/Canoa.
+//     Los kayaks a pala están exentos de Directiva y no llevan techo CE.
+//   - categoriaDirectiva admite 'exento'.
+//   - PerfilKayakista incluye pesoKayakistaKg y pesoEquipoKg.
 
 import {
   UMBRALES_BASE,
@@ -59,21 +62,24 @@ export interface PerfilKayakista {
   remoRepuesto: boolean;
   ropaSeca: boolean;
   compartimentosEstancos: boolean;
-  /** Peso del kayakista en kg. Se usa para el cÃ¡lculo de autonomÃ­a. */
+  /** Peso del kayakista en kg. Se usa para el cálculo de autonomía. */
   pesoKayakistaKg: number;
-  /** Id del motor del catÃ¡logo, o null si no usa motor o si es
+  /** Peso total del equipo que lleva a bordo (kg). Se suma al
+   *  kayak y al kayakista para calcular la autonomía. */
+  pesoEquipoKg: number;
+  /** Id del motor del catálogo, o null si no usa motor o si es
    *  personalizado. */
   motorElectricoId: string | null;
-  /** Datos del motor si es personalizado (fuera de catÃ¡logo). */
+  /** Datos del motor si es personalizado (fuera de catálogo). */
   motorElectricoCustom: {
     empujeLbs: number;
     voltajeV: number;
     amperajeCruceroA: number | null;
   } | null;
-  /** Id de la baterÃ­a del catÃ¡logo, o null si no usa o si es
+  /** Id de la batería del catálogo, o null si no usa o si es
    *  personalizada. */
   bateriaElectricaId: string | null;
-  /** Datos de la baterÃ­a si es personalizada (fuera de catÃ¡logo). */
+  /** Datos de la batería si es personalizada (fuera de catálogo). */
   bateriaElectricaCustom: {
     quimica: 'litio' | 'agm' | 'gel';
     voltajeV: number;
@@ -266,10 +272,16 @@ export function calcularVeredicto(
       fuente: 'estimado',
     };
   } else {
-    techo =
-      embarcacion && 'techoAbsoluto' in embarcacion && embarcacion.techoAbsoluto
-        ? (embarcacion.techoAbsoluto as TechoAbsoluto)
-        : (embarcacion as TechoAbsoluto | undefined);
+    // Kayak. El techo puede venir de la embarcación (kayak del
+    // catálogo con techoAbsoluto opcional) o pasarse directo
+    // como TechoAbsoluto.
+    if (embarcacion && 'techoAbsoluto' in embarcacion) {
+      techo = embarcacion.techoAbsoluto; // puede ser undefined
+    } else if (embarcacion && 'vientoMaxBf' in embarcacion) {
+      techo = embarcacion as TechoAbsoluto;
+    } else {
+      techo = undefined;
+    }
 
     const catKayak: CategoriaKayakTabla =
       categoria === 'K1' || categoria === 'K2' || categoria === 'K3' || categoria === 'K4' || categoria === 'K5'
@@ -373,7 +385,8 @@ export function calcularVeredicto(
     else if (vMarea === veredicto) factorDisparador = 'marea';
   }
 
-  // Techo absoluto del kayak (lÃ­mite duro de diseÃ±o/certificaciÃ³n).
+  // Techo absoluto del kayak (límite duro de diseño/certificación).
+  // Solo si EXISTE techo. Los kayaks a pala exentos no tienen techo.
   if (techo && typeof techo.vientoMaxBf === 'number' && typeof techo.olaMaxM === 'number') {
     const superaViento = condiciones.viento > techo.vientoMaxBf;
     const superaOla = condiciones.ola > techo.olaMaxM;

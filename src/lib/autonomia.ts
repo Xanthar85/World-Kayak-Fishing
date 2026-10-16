@@ -18,6 +18,9 @@
 //   4. Velocidad y autonomía se calculan para dos modos: máxima
 //      autonomía (35% del empuje) y crucero (65% del empuje).
 //
+// v1.025: el peso total incluye pesoKayak + pesoKayakista + pesoEquipo
+//         + pesoBatería + 3 kg de motor y cables.
+//
 // Aviso legal: es experimental. Lo dice la UI en cada cálculo.
 
 import type { MotorElectrico, BateriaElectrica } from './motores-electricos.ts';
@@ -48,7 +51,10 @@ export interface EntradaAutonomia {
     capacidadAh: number;
     pesoKg: number;
   } | null;
-  pesoKayakistaKg: number;   // por defecto 90
+  /** Peso del kayakista en kg. */
+  pesoKayakistaKg: number;
+  /** Peso del equipo a bordo en kg (opcional, default 0). */
+  pesoEquipoKg: number;
 }
 
 export interface ResultadoModo {
@@ -99,7 +105,7 @@ function resistenciaCasco(
   pesoTotalKg: number
 ): number {
   if (velocidadKt <= 0) return 0;
-  const lwl = casco.esloraM * 0.95;   // eslora en flotación aproximada
+  const lwl = casco.esloraM * 0.95;
   const vRel = velocidadKt / Math.sqrt(lwl);
   const k = 0.018 * factorForma(casco.tipoCasco);
   const resistencia = k * pesoTotalKg * vRel * vRel;
@@ -121,7 +127,7 @@ function calcularVelocidadTope(
   const fuerzaKgf = empujeAKgf(empujeLbs);
   if (fuerzaKgf <= 0) return 0;
   let lo = 0;
-  let hi = 8;   // 8 kt es un techo absurdo para kayak, se usa como límite superior
+  let hi = 8;
   for (let i = 0; i < 40; i++) {
     const mid = (lo + hi) / 2;
     const r = resistenciaCasco(mid, casco, pesoTotalKg);
@@ -134,7 +140,15 @@ function calcularVelocidadTope(
 export function calcularAutonomia(
   entrada: EntradaAutonomia
 ): ResultadoAutonomia | null {
-  const { casco, motor, motorCustom, bateria, bateriaCustom, pesoKayakistaKg } = entrada;
+  const {
+    casco,
+    motor,
+    motorCustom,
+    bateria,
+    bateriaCustom,
+    pesoKayakistaKg,
+    pesoEquipoKg,
+  } = entrada;
 
   // Determinar motor
   let empujeLbs = 0;
@@ -198,8 +212,11 @@ export function calcularAutonomia(
     };
   }
 
-  // Peso total estimado
-  const pesoTotalKg = casco.pesoKg + pesoBateriaKg + pesoKayakistaKg + 3;   // 3 kg motor + cables
+  // Peso total estimado: casco + batería + kayakista + equipo + 3 kg
+  // de motor, cables y accesorios.
+  const pesoEquipoSeguro = Number.isFinite(pesoEquipoKg) && pesoEquipoKg > 0 ? pesoEquipoKg : 0;
+  const pesoTotalKg =
+    casco.pesoKg + pesoBateriaKg + pesoKayakistaKg + pesoEquipoSeguro + 3;
   const cascoFinal: DatosCasco = { ...casco, pesoKg: pesoTotalKg };
 
   // Velocidad tope del conjunto
@@ -210,8 +227,7 @@ export function calcularAutonomia(
   const velocidadCruceroTope = calcularVelocidadTope(empujeCrucero, cascoFinal, pesoTotalKg);
   const velocidadCrucero = Math.min(velocidadCruceroTope, velocidadTopeKt);
 
-  // Consumo real a esa velocidad: proporcional al empuje usado
-  const fraccionEmpujeCrucero = empujeCrucero / empujeLbs;   // 0.65
+  const fraccionEmpujeCrucero = empujeCrucero / empujeLbs;
   const amperajeCrucero = amperajeNominalA * fraccionEmpujeCrucero;
   const potenciaCrucero = estimarPotencia(voltajeBateriaV, amperajeCrucero);
   const horasCrucero = potenciaCrucero > 0

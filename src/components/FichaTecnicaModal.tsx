@@ -1,5 +1,9 @@
 // src/components/FichaTecnicaModal.tsx
-// WKF — Modal con la ficha técnica completa de un kayak o pato.
+// WKF — Modal con la ficha técnica completa de un kayak, pato o canoa.
+// v1.025: tolera techoAbsoluto opcional. Los kayaks a pala exentos
+//         muestran "Exento de Directiva" en vez de techo CE.
+//         Muestra peso con etiqueta según fuente (fabricante,
+//         distribuidor, estimado).
 
 import React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -67,14 +71,27 @@ export const FichaTecnicaModal: React.FC<FichaTecnicaModalProps> = ({
   const esPato = 'tipoEmbarcacion' in embarcacion && embarcacion.tipoEmbarcacion === 'pato';
   const esCanoa = 'tipoEmbarcacion' in embarcacion && embarcacion.tipoEmbarcacion === 'canoa';
 
-  const filas = esCanoa
+  // Devuelve la etiqueta de fuente del peso para mostrarla junto al
+  // número. Fabricante → sin sufijo; distribuidor → "(estimado)";
+  // estimado → "~X kg (estimado)".
+  const formatearPeso = (
+    peso: number | undefined,
+    fuente: 'fabricante' | 'distribuidor' | 'estimado' | undefined
+  ): string => {
+    if (peso == null) return '—';
+    if (fuente === 'fabricante') return `${peso} kg`;
+    if (fuente === 'distribuidor') return `${peso} kg (estimado)`;
+    return `~${peso} kg (estimado)`;
+  };
+
+  const filas: Array<{ label: string; val: string }> = esCanoa
     ? (() => {
         const canoa = embarcacion as Canoa;
         const tc = TECHOS_CANOAS[canoa.categoriaWKF] ?? TECHOS_CANOAS.CA1;
         return [
           { label: t('kayak.length'), val: `${canoa.eslora.toFixed(2)} m` },
           { label: t('kayak.beam'), val: `${canoa.manga.toFixed(2)} m` },
-          { label: 'Peso', val: `${canoa.peso} kg` },
+          { label: 'Peso', val: formatearPeso(canoa.peso, canoa.pesoFuente) },
           { label: t('kayak.capacity'), val: `${canoa.capacidadCarga} kg` },
           { label: 'Tripulantes', val: `${canoa.tripulantesMax}` },
           { label: 'Material', val: canoa.material },
@@ -103,7 +120,7 @@ export const FichaTecnicaModal: React.FC<FichaTecnicaModalProps> = ({
         return [
           { label: t('kayak.length'), val: `${pato.eslora.toFixed(2)} m` },
           { label: t('kayak.beam'), val: `${pato.manga.toFixed(2)} m` },
-          { label: 'Peso', val: `${pato.peso} kg` },
+          { label: 'Peso', val: formatearPeso(pato.peso, pato.pesoFuente) },
           { label: t('kayak.capacity'), val: `${pato.capacidadCarga} kg` },
           { label: 'Estructura', val: pato.tipoEstructura },
           { label: 'Material', val: pato.material },
@@ -127,7 +144,7 @@ export const FichaTecnicaModal: React.FC<FichaTecnicaModalProps> = ({
       })()
     : (() => {
         const kayak = embarcacion as Kayak;
-        return [
+        const filasKayak: Array<{ label: string; val: string }> = [
           { label: t('kayak.length'), val: `${kayak.eslora.toFixed(2)} m` },
           { label: t('kayak.beam'), val: `${kayak.manga.toFixed(2)} m` },
           { label: t('kayak.volume'), val: `${kayak.volumen} L` },
@@ -139,19 +156,46 @@ export const FichaTecnicaModal: React.FC<FichaTecnicaModalProps> = ({
           { label: t('kayak.propulsion'), val: kayak.propulsion },
           { label: t('kayak.category'), val: kayak.categoriaWKF },
           { label: t('kayak.directiveCategory'), val: kayak.categoriaDirectiva },
-          {
+        ];
+
+        // Peso. Se muestra si existe. Con sufijo según la fuente.
+        if (kayak.pesoKg != null) {
+          filasKayak.push({
+            label: t('kayak.peso'),
+            val: formatearPeso(kayak.pesoKg, kayak.pesoFuente),
+          });
+        }
+
+        // Techo absoluto: solo si existe. Los kayaks a pala exentos
+        // de Directiva no lo llevan.
+        if (kayak.techoAbsoluto) {
+          filasKayak.push({
             label: t('kayak.techoAbsoluto'),
             val: `${kayak.techoAbsoluto.vientoMaxBf} Bf / ${kayak.techoAbsoluto.olaMaxM.toFixed(1)} m`,
-          },
-          { label: t('kayak.fuente'), val: kayak.techoAbsoluto.fuente },
-          {
-            label: t('kayak.certificado'),
-            val: kayak.certificado
-              ? t('kayak.certificadoSiWkf')
-              : t('kayak.certificadoNoWkf'),
-          },
-          { label: t('kayak.verificado'), val: kayak.verificado ? '✓' : '—' },
-        ];
+          });
+          filasKayak.push({
+            label: t('kayak.fuente'),
+            val: kayak.techoAbsoluto.fuente,
+          });
+        } else {
+          filasKayak.push({
+            label: t('kayak.techoAbsoluto'),
+            val: t('kayak.sinTecho'),
+          });
+        }
+
+        filasKayak.push({
+          label: t('kayak.certificado'),
+          val: kayak.certificado
+            ? t('kayak.certificadoSiWkf')
+            : t('kayak.certificadoNoWkf'),
+        });
+        filasKayak.push({
+          label: t('kayak.verificado'),
+          val: kayak.verificado ? '✓' : '—',
+        });
+
+        return filasKayak;
       })();
 
   return (

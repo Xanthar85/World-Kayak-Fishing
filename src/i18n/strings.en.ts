@@ -1,5 +1,8 @@
-// src/i18n/strings.en.ts
+﻿// src/i18n/strings.en.ts
 // WKF — Strings en inglés.
+// v1.025: añadidas claves pesoEquipo, pesoEquipoAyuda, campoPeso,
+//         campoPesoAyuda, peso, sinTecho, pesoFabricante,
+//         pesoDistribuidor, pesoEstimado.
 // v1.022: añadidas claves peso y pesoAyuda en el objeto perfil.
 
 import type { StringsSchema } from './strings.es.ts';
@@ -110,6 +113,7 @@ export const stringsEn: StringsSchema = {
     maxWave: 'Max wave',
     maxWind: 'Max wind',
     clima: 'Weather',
+    marCruzada: 'Warning',
     legendWaves: '— Wave',
     legendWind: '┄ Wind',
     legendDrift: '┈ Drift',
@@ -153,8 +157,8 @@ export const stringsEn: StringsSchema = {
     waveHeightTotal: 'Total height',
     waveHeightWind: 'Wind wave',
     waveHeightSwell: 'Swell',
-    olaFondo: 'OlaF',
-    olaViento: 'OlaV',
+    olaFondo: 'Swell',
+    olaViento: 'Wind wave',
     deriva: 'Drift',
     racha: 'Gust',
     clima: 'Weather',
@@ -574,7 +578,12 @@ Please explain all this to me as if I had little technical experience. What does
     noCertNote: 'Not certified model. WKF applies conservatism.',
     assumptionNote: 'Assumed category: {{cat}}.',
     techoAbsoluto: 'Absolute ceiling',
+    sinTecho: 'Exempt from Directive (paddle kayak)',
     fuente: 'Source',
+    peso: 'Weight',
+    pesoFabricante: 'Manufacturer',
+    pesoDistribuidor: 'Distributor',
+    pesoEstimado: 'Estimated',
     certificaciones: 'Certifications',
     certCE: 'CE (Directive 2013/53/EU)',
     certUKCA: 'UKCA',
@@ -601,6 +610,9 @@ Please explain all this to me as if I had little technical experience. What does
     campoCompartimentos: 'Bulkheads',
     campoCapacidad: 'Load capacity (kg)',
     campoPropulsion: 'Propulsion',
+    campoPeso: 'Kayak weight (kg)',
+    campoPesoAyuda:
+      'Optional. If left blank, WKF will estimate the weight by category ({{peso}} kg for your kayak).',
     guardarKayakPropio: 'Save kayak',
     cancelar: 'Cancel',
     limiteKayaksPropios: 'Limit of 2 own kayaks reached',
@@ -633,6 +645,8 @@ Please explain all this to me as if I had little technical experience. What does
     experienceExperto: 'Expert (over 10 years)',
     peso: 'Kayaker weight',
     pesoAyuda: 'Used to calculate range and total weight of the setup. A heavier kayaker gets less speed and less range with the same motor and battery.',
+    pesoEquipo: 'Equipment weight',
+    pesoEquipoAyuda: 'Total weight of the gear you carry on board: boxes, rods, outboard motor, anchors, etc. Used to calculate range and total weight of the setup.',
     equipment: 'Equipment',
     equipmentVhf: 'VHF radio',
     equipmentRemoRepuesto: 'Spare paddle',

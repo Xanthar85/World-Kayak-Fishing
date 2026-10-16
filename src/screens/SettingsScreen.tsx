@@ -1,6 +1,11 @@
 // src/screens/SettingsScreen.tsx
 // WKF — Pantalla de Ajustes.
-// v1.022: añadido campo "Peso del kayakista" en Mi perfil de kayakista.
+// v1.025:
+//   - Campo "Peso del equipo" en Mi perfil de kayakista.
+//   - Campo "Peso del kayak propio" en el modal de kayak propio
+//     (opcional, default vacío → se estima por categoría).
+//   - Compatibilidad con techoAbsoluto opcional en kayaks a pala.
+// v1.022: campo "Peso del kayakista" en Mi perfil de kayakista.
 // v1.024: fix del input del peso en Android. type="text" inputMode="numeric",
 //         estado string, clamp en onBlur. Sigue la lección v1.021.
 
@@ -18,6 +23,7 @@ import {
   buscarKayakPorId,
   etiquetaCategoria,
   deducirCategoriaWKF,
+  pesoEstimadoPorCategoria,
   type Kayak,
   type KayakEditado,
   type CertificacionesKayak,
@@ -170,6 +176,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [modalBateriaAbierto, setModalBateriaAbierto] = useState(false);
   const [pesoTexto, setPesoTexto] = useState<string>(
     String(ajustes.perfil.pesoKayakistaKg ?? 90)
+  );
+  const [pesoEquipoTexto, setPesoEquipoTexto] = useState<string>(
+    String(ajustes.perfil.pesoEquipoKg ?? 0)
   );
 
   const motorSeleccionado = useMemo(() => {
@@ -1360,6 +1369,69 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </div>
           </div>
 
+          {/* Peso del equipo */}
+          <div style={{ marginBottom: 14 }}>
+            <div
+              style={{
+                fontSize: '0.8rem',
+                color: 'var(--text-muted)',
+                marginBottom: 6,
+              }}
+            >
+              {t('perfil.pesoEquipo')}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                value={pesoEquipoTexto}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/[^0-9]/g, '');
+                  setPesoEquipoTexto(raw);
+                  if (raw === '') return;
+                  const v = parseInt(raw, 10);
+                  if (!Number.isFinite(v)) return;
+                  if (v < 0 || v > 500) return;
+                  setPerfil({ pesoEquipoKg: v });
+                }}
+                onBlur={() => {
+                  const v = parseInt(pesoEquipoTexto, 10);
+                  const clamped = !Number.isFinite(v)
+                    ? 0
+                    : Math.max(0, Math.min(500, v));
+                  setPerfil({ pesoEquipoKg: clamped });
+                  setPesoEquipoTexto(String(clamped));
+                }}
+                style={{
+                  width: 90,
+                  padding: '8px 10px',
+                  backgroundColor: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 6,
+                  color: 'var(--text)',
+                  fontFamily: 'Fira Code, monospace',
+                  fontSize: '0.9rem',
+                  textAlign: 'center',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                kg
+              </span>
+            </div>
+            <div
+              style={{
+                fontSize: '0.72rem',
+                color: 'var(--text-muted)',
+                marginTop: 4,
+                lineHeight: 1.4,
+              }}
+            >
+              {t('perfil.pesoEquipoAyuda')}
+            </div>
+          </div>
+
           <div style={{ marginBottom: 12 }}>
             <div
               style={{
@@ -2041,7 +2113,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 fontWeight: 600,
               }}
             >
-              v1.014
+              v1.025
             </span>
           </div>
 
@@ -2096,6 +2168,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 capacidadCarga: datos.entrada.capacidadCarga,
                 propulsion: datos.entrada.propulsion,
                 categoriaWKF: deducirCategoriaWKF(datos.entrada),
+                pesoKg: datos.entrada.pesoKg,
+                pesoFuente: datos.entrada.pesoKg != null ? 'estimado' : undefined,
               });
             }
             setEditandoKayakPropio(null);
@@ -2208,7 +2282,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               }
 
               const kayak = fichaTecnicaKayak as Kayak;
-              return [
+              const filas: Array<{ label: string; val: string }> = [
                 {
                   label: t('kayak.length'),
                   val: `${kayak.eslora.toFixed(2)} m`,
@@ -2250,25 +2324,38 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                   label: t('kayak.directiveCategory'),
                   val: kayak.categoriaDirectiva,
                 },
-                {
+              ];
+
+              // Techo absoluto: solo si existe. Los kayaks a pala
+              // exentos no lo llevan.
+              if (kayak.techoAbsoluto) {
+                filas.push({
                   label: t('kayak.techoAbsoluto'),
                   val: `${kayak.techoAbsoluto.vientoMaxBf} Bf / ${kayak.techoAbsoluto.olaMaxM.toFixed(1)} m`,
-                },
-                {
+                });
+                filas.push({
                   label: t('kayak.fuente'),
                   val: kayak.techoAbsoluto.fuente,
-                },
-                {
-                  label: t('kayak.certificado'),
-                  val: kayak.certificado
-                    ? t('kayak.certificadoSiWkf')
-                    : t('kayak.certificadoNoWkf'),
-                },
-                {
-                  label: t('kayak.verificado'),
-                  val: kayak.verificado ? '✓' : '—',
-                },
-              ];
+                });
+              } else {
+                filas.push({
+                  label: t('kayak.techoAbsoluto'),
+                  val: t('kayak.sinTecho'),
+                });
+              }
+
+              filas.push({
+                label: t('kayak.certificado'),
+                val: kayak.certificado
+                  ? t('kayak.certificadoSiWkf')
+                  : t('kayak.certificadoNoWkf'),
+              });
+              filas.push({
+                label: t('kayak.verificado'),
+                val: kayak.verificado ? '✓' : '—',
+              });
+
+              return filas;
             })().map(({ label, val }) => (
               <div key={label} style={fichaRowStyle}>
                 <span style={fichaLabelStyle}>{label}</span>
@@ -2417,11 +2504,15 @@ const ModalKayakPropio: React.FC<{
   const [propulsion, setPropulsion] = useState<'pala' | 'pedal_aletas' | 'pedal_helice'>(
     inicial?.propulsion ?? 'pala'
   );
+  const [pesoKgTexto, setPesoKgTexto] = useState<string>(
+    inicial?.pesoKg != null ? String(inicial.pesoKg) : ''
+  );
   const [mostrarManual, setMostrarManual] = useState(false);
 
   const esloraNum = parseFloat(eslora) || 0;
   const mangaNum = parseFloat(manga) || 0;
   const capacidadCargaNum = parseFloat(capacidadCarga) || 0;
+  const pesoKgNum = pesoKgTexto.trim() === '' ? undefined : parseFloat(pesoKgTexto);
 
   const entrada: EntradaKayakEditado = {
     eslora: esloraNum,
@@ -2432,8 +2523,10 @@ const ModalKayakPropio: React.FC<{
     compartimentosEstancos,
     capacidadCarga: capacidadCargaNum,
     propulsion,
+    pesoKg: Number.isFinite(pesoKgNum) ? pesoKgNum : undefined,
   };
   const categoriaDeducida = deducirCategoriaWKF(entrada);
+  const pesoEstimado = pesoEstimadoPorCategoria(categoriaDeducida);
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
@@ -2631,6 +2724,37 @@ const ModalKayakPropio: React.FC<{
               onChange={(e) => setCapacidadCarga(e.target.value)}
               style={inputStyle}
             />
+          </div>
+
+          {/* Peso del kayak propio (opcional) */}
+          <div>
+            <label style={labelStyle}>{t('kayak.campoPeso')}</label>
+            <input
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              value={pesoKgTexto}
+              onChange={(e) => {
+                const raw = e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.');
+                setPesoKgTexto(raw);
+              }}
+              placeholder={`${pesoEstimado}`}
+              style={inputStyle}
+            />
+            <div
+              style={{
+                fontSize: '0.72rem',
+                color: 'var(--text-dim)',
+                marginTop: 4,
+                lineHeight: 1.4,
+              }}
+            >
+              {t('kayak.campoPesoAyuda', {
+                defaultValue:
+                  'Opcional. Si lo dejas vacío, WKF estimará el peso por categoría ({{peso}} kg para tu kayak).',
+                peso: pesoEstimado,
+              })}
+            </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>

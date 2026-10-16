@@ -1,7 +1,8 @@
-// src/state/store.ts
+﻿// src/state/store.ts
 // WKF — Estado global Zustand con persistencia en localStorage.
 // Persist version 3. Clave "wkf-state-v1".
-// v1.022: perfil con pesoKayakistaKg (default 90).
+// v1.025: perfil con pesoEquipoKg (default 0).
+// v1.024: perfil con pesoKayakistaKg (default 90).
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
@@ -136,6 +137,7 @@ const PERFIL_DEFECTO: PerfilKayakista = {
   ropaSeca: true,
   compartimentosEstancos: true,
   pesoKayakistaKg: 90,
+  pesoEquipoKg: 0,
   motorElectricoId: null,
   motorElectricoCustom: null,
   bateriaElectricaId: null,
@@ -181,7 +183,6 @@ export function sanearKayakIds(ids: string[] | undefined): {
     };
   }
 
-  // Si alguna embarcación seleccionada ya no existe en el catálogo, se sustituye por la por defecto.
   const existeEnCatalogo = (id: string) =>
     buscarKayakPorId(id) != null ||
     buscarPatoPorId(id) != null ||
@@ -283,15 +284,22 @@ function validarPerfil(raw: unknown): raw is PerfilKayakista {
   if (typeof raw.ropaSeca !== 'boolean') return false;
   if (typeof raw.compartimentosEstancos !== 'boolean') return false;
 
-  // pesoKayakistaKg es opcional en ficheros antiguos: si falta, se
-  // rellena con 90 al hacer merge. Si viene, debe ser un número
-  // razonable.
   if (raw.pesoKayakistaKg !== undefined) {
     if (
       typeof raw.pesoKayakistaKg !== 'number' ||
       !Number.isFinite(raw.pesoKayakistaKg) ||
       raw.pesoKayakistaKg < 30 ||
       raw.pesoKayakistaKg > 250
+    )
+      return false;
+  }
+
+  if (raw.pesoEquipoKg !== undefined) {
+    if (
+      typeof raw.pesoEquipoKg !== 'number' ||
+      !Number.isFinite(raw.pesoEquipoKg) ||
+      raw.pesoEquipoKg < 0 ||
+      raw.pesoEquipoKg > 500
     )
       return false;
   }
@@ -429,7 +437,6 @@ export const useAppStore = create<AppState>()(
         franjaActivaId: 'manana',
         subpestanasOcultas: [],
         ordenSubpestanas: [],
-        // DP-092: color de tabla por defecto = "todo".
         colorTabla: 'todo',
         filtroFranja: true,
         unidades: { ...UNIDADES_POR_DEFECTO },
@@ -481,7 +488,6 @@ export const useAppStore = create<AppState>()(
               spotMap.delete(id);
             }
           }
-          // Conservar cualquier punto no listado al final
           for (const spot of spotMap.values()) {
             reordenados.push(spot);
           }
@@ -562,7 +568,9 @@ export const useAppStore = create<AppState>()(
             capacidadCarga: entrada.capacidadCarga,
             propulsion: entrada.propulsion,
             categoriaWKF: categoria,
-            categoriaDirectiva: 'no_certificado',
+            categoriaDirectiva: 'exento',
+            pesoKg: entrada.pesoKg,
+            pesoFuente: entrada.pesoKg != null ? 'estimado' : undefined,
             certificado: false,
             certificadoOficial: false,
             verificado: false,
@@ -570,11 +578,6 @@ export const useAppStore = create<AppState>()(
               ce: null, ukca: null, uscg: false, abyc: false, nmma: false,
               as_nzs: false, jci: false, iso_12217: false, iso_14946: false,
               iso_10087: false,
-            },
-            techoAbsoluto: {
-              vientoMaxBf: 4,
-              olaMaxM: 0.5,
-              fuente: 'estimado',
             },
             origen: 'usuario',
           };
@@ -753,7 +756,6 @@ export const useAppStore = create<AppState>()(
         if (!state.ajustes.unidades) {
           state.ajustes.unidades = { ...UNIDADES_POR_DEFECTO };
         } else {
-          // Rellenar campos que falten con el valor por defecto.
           state.ajustes.unidades = {
             ...UNIDADES_POR_DEFECTO,
             ...state.ajustes.unidades,
@@ -779,6 +781,16 @@ export const useAppStore = create<AppState>()(
           state.ajustes.perfil.pesoKayakistaKg = 90;
         }
 
+        // Rellenar pesoEquipoKg si falta o no es válido.
+        if (
+          typeof state.ajustes.perfil.pesoEquipoKg !== 'number' ||
+          !Number.isFinite(state.ajustes.perfil.pesoEquipoKg) ||
+          state.ajustes.perfil.pesoEquipoKg < 0 ||
+          state.ajustes.perfil.pesoEquipoKg > 500
+        ) {
+          state.ajustes.perfil.pesoEquipoKg = 0;
+        }
+
         return state;
       },
       onRehydrateStorage: () => (state) => {
@@ -793,9 +805,6 @@ export const useAppStore = create<AppState>()(
   )
 );
 
-// En carga de la app, si los kayaks seleccionados están vacíos o contienen modelos
-// que ya no existen en el catálogo, se asigna automáticamente el primer kayak del catálogo
-// y la categoría WKF se calcula siempre a partir del kayak activo.
 (() => {
   try {
     const estadoInicial = useAppStore.getState();

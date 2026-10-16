@@ -1,5 +1,8 @@
-// src/i18n/strings.es.ts
+﻿// src/i18n/strings.es.ts
 // WKF — Strings en español.
+// v1.025: añadidas claves pesoEquipo, pesoEquipoAyuda, campoPeso,
+//         campoPesoAyuda, peso, sinTecho, pesoFabricante,
+//         pesoDistribuidor, pesoEstimado.
 // v1.022: añadidas claves peso y pesoAyuda en el objeto perfil.
 
 export const stringsEs = {
@@ -108,6 +111,7 @@ export const stringsEs = {
     maxWave: 'Ola máx.',
     maxWind: 'Viento máx.',
     clima: 'Clima',
+    marCruzada: 'Aviso',
     legendWaves: '— Ola',
     legendWind: '┄ Viento',
     legendDrift: '┈ Deriva',
@@ -573,7 +577,12 @@ Por favor, explícame todo esto como si tuviera poca experiencia técnica. Qué 
     noCertNote: 'Modelo no certificado. WKF aplica conservadurismo.',
     assumptionNote: 'Categoría asumida por defecto: {{cat}}.',
     techoAbsoluto: 'Techo absoluto',
+    sinTecho: 'Exento de Directiva (kayak a pala)',
     fuente: 'Fuente',
+    peso: 'Peso',
+    pesoFabricante: 'Fabricante',
+    pesoDistribuidor: 'Distribuidor',
+    pesoEstimado: 'Estimado',
     certificaciones: 'Certificaciones',
     certCE: 'CE (Directiva 2013/53/UE)',
     certUKCA: 'UKCA',
@@ -600,6 +609,9 @@ Por favor, explícame todo esto como si tuviera poca experiencia técnica. Qué 
     campoCompartimentos: 'Compartimentos estancos',
     campoCapacidad: 'Capacidad de carga (kg)',
     campoPropulsion: 'Propulsión',
+    campoPeso: 'Peso del kayak (kg)',
+    campoPesoAyuda:
+      'Opcional. Si lo dejas vacío, WKF estimará el peso por categoría ({{peso}} kg para tu kayak).',
     guardarKayakPropio: 'Guardar kayak',
     cancelar: 'Cancelar',
     limiteKayaksPropios: 'Límite de 2 kayaks propios alcanzado',
@@ -632,6 +644,8 @@ Por favor, explícame todo esto como si tuviera poca experiencia técnica. Qué 
     experienceExperto: 'Experto (más de 10 años)',
     peso: 'Peso del kayakista',
     pesoAyuda: 'Se usa para calcular la autonomía y el peso total del conjunto. Un kayakista más pesado obtiene menos velocidad y menos autonomía con el mismo motor y batería.',
+    pesoEquipo: 'Peso del equipo',
+    pesoEquipoAyuda: 'Suma del equipo que llevas a bordo: cajas, cañas, motor fuera de borda, anclas, etc. Se usa para calcular la autonomía y el peso total del conjunto.',
     equipment: 'Equipo',
     equipmentVhf: 'VHF',
     equipmentRemoRepuesto: 'Remo de repuesto',
