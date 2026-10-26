@@ -406,7 +406,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 
   const franjaActiva = ajustes.franjas.find((f) => f.id === ajustes.franjaActivaId) ?? ajustes.franjas[0] ?? null;
 
-  // 1. VEREDICTOS DEL DÍA (Arreglado para pasar la racha al motor)
+  // 1. VEREDICTOS DEL DÍA (Arreglado para pasar la racha al motor y la corriente)
   const veredictos = useMemo(() => {
     if (!spot || !weather) return {};
     const out: Record<string, Veredicto | null> = {};
@@ -424,13 +424,14 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 
         const franjaDia: FranjaDia = hora < 12 ? 'manana' : hora < 20 ? 'tarde' : 'noche';
         
-        // TRUCO: Evaluamos usando las rachas (windGusts) como "viento".
+        // TRUCO: Evaluamos usando las rachas (windGusts) como "viento" y pasamos la corriente real.
         const vientoParaEvaluar = h.windGusts ?? h.windSpeed ?? 0;
+        const corrienteParaEvaluar = h.currentVelocity ?? 0;
         
         const res = calcularVeredicto(
           spot.zona ?? 'mediterraneo_espanol',
           categoriaKayak, ajustes.perfil, franjaDia,
-          { viento: kmhABf(vientoParaEvaluar) ?? 0, ola: h.waveHeight, periodo: h.wavePeriod ?? 0, corriente: 0, marea: 0 },
+          { viento: kmhABf(vientoParaEvaluar) ?? 0, ola: h.waveHeight, periodo: h.wavePeriod ?? 0, corriente: corrienteParaEvaluar, marea: 0 },
           kayakActivo
         );
         if (!peor || orden.indexOf(res.veredicto) > orden.indexOf(peor)) {
@@ -444,7 +445,7 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
 
   const veredictoFranjaActiva = franjaActiva ? veredictos[franjaActiva.id] : null;
 
-  // 2. DETALLE DE LA FRANJA (Arreglado para mostrar el factor correcto)
+  // 2. DETALLE DE LA FRANJA (Arreglado para mostrar el factor correcto y la corriente)
   const detalleFranjaActiva = useMemo<{
     resultado: ResultadoVeredicto;
     horaPeor: HourlyPoint;
@@ -468,13 +469,14 @@ export const SpotScreen: React.FC<SpotScreenProps> = ({
       } else dentro = true;
       if (!dentro || h.waveHeight == null) continue;
 
-      // TRUCO: Evaluamos usando las rachas (windGusts) como "viento".
+      // TRUCO: Evaluamos usando las rachas (windGusts) como "viento" y pasamos la corriente real.
       const vientoParaEvaluar = h.windGusts ?? h.windSpeed ?? 0;
+      const corrienteParaEvaluar = h.currentVelocity ?? 0;
       
       const res = calcularVeredicto(
         spot.zona ?? 'mediterraneo_espanol',
         categoriaKayak, ajustes.perfil, franjaDia,
-        { viento: kmhABf(vientoParaEvaluar) ?? 0, ola: h.waveHeight, periodo: h.wavePeriod ?? 0, corriente: 0, marea: 0 },
+        { viento: kmhABf(vientoParaEvaluar) ?? 0, ola: h.waveHeight, periodo: h.wavePeriod ?? 0, corriente: corrienteParaEvaluar, marea: 0 },
         kayakActivo
       );
       const score = orden.indexOf(res.veredicto);
@@ -1226,3 +1228,4 @@ const TablaLuna: React.FC<{ lang: string; lat: number; lon: number }> = ({ lang,
 };
 
 export default SpotScreen;
+// src/screens/SpotScreen.tsx

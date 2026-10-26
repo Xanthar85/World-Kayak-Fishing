@@ -1,10 +1,8 @@
 // src/lib/verdict.ts
-// WKF � N�cleo de c�lculo de veredictos.
-// v1.024:
-//   - techoAbsoluto pasa a ser opcional en Kayak/Pato/Canoa.
-//     Los kayaks a pala est�n exentos de Directiva y no llevan techo CE.
-//   - categoriaDirectiva admite 'exento'.
-//   - PerfilKayakista incluye pesoKayakistaKg y pesoEquipoKg.
+// WKF — Núcleo de cálculo de veredictos.
+// v1.025:
+//   - El periodo solo penaliza si la ola supera 0.6m (exigente) o 0.8m (desaconsejado).
+//   - Corriente evaluada correctamente.
 
 import {
   UMBRALES_BASE,
@@ -62,24 +60,24 @@ export interface PerfilKayakista {
   remoRepuesto: boolean;
   ropaSeca: boolean;
   compartimentosEstancos: boolean;
-  /** Peso del kayakista en kg. Se usa para el c�lculo de autonom�a. */
+  /** Peso del kayakista en kg. Se usa para el cálculo de autonomía. */
   pesoKayakistaKg: number;
   /** Peso total del equipo que lleva a bordo (kg). Se suma al
-   *  kayak y al kayakista para calcular la autonom�a. */
+   *  kayak y al kayakista para calcular la autonomía. */
   pesoEquipoKg: number;
-  /** Id del motor del cat�logo, o null si no usa motor o si es
+  /** Id del motor del catálogo, o null si no usa motor o si es
    *  personalizado. */
   motorElectricoId: string | null;
-  /** Datos del motor si es personalizado (fuera de cat�logo). */
+  /** Datos del motor si es personalizado (fuera de catálogo). */
   motorElectricoCustom: {
     empujeLbs: number;
     voltajeV: number;
     amperajeCruceroA: number | null;
   } | null;
-  /** Id de la bater�a del cat�logo, o null si no usa o si es
+  /** Id de la batería del catálogo, o null si no usa o si es
    *  personalizada. */
   bateriaElectricaId: string | null;
-  /** Datos de la bater�a si es personalizada (fuera de cat�logo). */
+  /** Datos de la batería si es personalizada (fuera de catálogo). */
   bateriaElectricaCustom: {
     quimica: 'litio' | 'agm' | 'gel';
     voltajeV: number;
@@ -272,8 +270,8 @@ export function calcularVeredicto(
       fuente: 'estimado',
     };
   } else {
-    // Kayak. El techo puede venir de la embarcaci�n (kayak del
-    // cat�logo con techoAbsoluto opcional) o pasarse directo
+    // Kayak. El techo puede venir de la embarcación (kayak del
+    // catálogo con techoAbsoluto opcional) o pasarse directo
     // como TechoAbsoluto.
     if (embarcacion && 'techoAbsoluto' in embarcacion) {
       techo = embarcacion.techoAbsoluto; // puede ser undefined
@@ -365,7 +363,18 @@ export function calcularVeredicto(
 
   let vViento = evaluarFactor(condiciones.viento, umbralAplicado.viento);
   let vOla = evaluarFactor(condiciones.ola, umbralAplicado.ola);
-  const vPeriodo = evaluarFactor(condiciones.periodo, umbralAplicado.periodo, true);
+  
+  // LÓGICA DEL PERIODO: Solo penaliza si la ola es suficientemente grande
+  let vPeriodo: Veredicto = 'FAVORABLE';
+  if (condiciones.ola > 0.8) {
+    vPeriodo = 'DESACONSEJADO';
+  } else if (condiciones.ola > 0.6) {
+    vPeriodo = 'EXIGENTE';
+  } else if (condiciones.periodo > 0) {
+    // Si la ola es pequeña, el periodo corto no es peligroso
+    vPeriodo = evaluarFactor(condiciones.periodo, umbralAplicado.periodo, true);
+  }
+
   const vCorriente = evaluarFactor(condiciones.corriente, umbralAplicado.corriente);
   const vMarea = evaluarFactor(condiciones.marea, umbralAplicado.marea);
 
@@ -385,7 +394,7 @@ export function calcularVeredicto(
     else if (vMarea === veredicto) factorDisparador = 'marea';
   }
 
-  // Techo absoluto del kayak (l�mite duro de dise�o/certificaci�n).
+  // Techo absoluto del kayak (límite duro de diseño/certificación).
   // Solo si EXISTE techo. Los kayaks a pala exentos no tienen techo.
   if (techo && typeof techo.vientoMaxBf === 'number' && typeof techo.olaMaxM === 'number') {
     const superaViento = condiciones.viento > techo.vientoMaxBf;
@@ -429,3 +438,4 @@ export function calcularVeredictoAcceso(
   if (olaCorregida <= u.dificil) return 'DIFICIL';
   return 'NO_SALIR';
 }
+// src/lib/verdict.ts
