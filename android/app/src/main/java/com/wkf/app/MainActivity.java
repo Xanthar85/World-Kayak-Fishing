@@ -1,4 +1,4 @@
-package com.wkftrabajo.wkftrabajo;
+package com.wkf.app;
 
 import com.getcapacitor.BridgeActivity;
 

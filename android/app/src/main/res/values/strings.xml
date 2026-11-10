@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">WKF</string>
-    <string name="title_activity_main">WKF</string>
+    <string name="app_name">World Kayak Fishing</string>
+    <string name="title_activity_main">World Kayak Fishing</string>
     <string name="package_name">com.wkf.app</string>
     <string name="custom_url_scheme">com.wkf.app</string>
 </resources>
