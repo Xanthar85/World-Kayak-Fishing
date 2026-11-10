@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { APP_VERSION } from '../lib/version';
 
-const VERSION_URL = 'https://raw.githubusercontent.com/Xanthar85/WKFTRABAJO/main/version.json';
+const VERSION_URL = 'https://raw.githubusercontent.com/Xanthar85/World-Kayak-Fishing/main/version.json';
 
 const esVersionMayor = (v1: string, v2: string): boolean => {
   const a = v1.split('.').map(Number);
