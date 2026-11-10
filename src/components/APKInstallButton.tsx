@@ -3,6 +3,7 @@
 // WKF1.088: ahora también se muestra en el APK si hay versión nueva.
 
 import React, { useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { APP_VERSION } from '../lib/version';
 
 const VERSION_URL = 'https://raw.githubusercontent.com/Xanthar85/World-Kayak-Fishing/main/version.json';
@@ -20,6 +21,7 @@ const esVersionMayor = (v1: string, v2: string): boolean => {
 };
 
 export const APKInstallButton: React.FC = () => {
+  const esNativo = Capacitor.isNativePlatform();
   const [showGuide, setShowGuide] = useState(false);
   const [hayNuevaVersion, setHayNuevaVersion] = useState(false);
   const [apkUrl, setApkUrl] = useState('');
@@ -33,15 +35,17 @@ export const APKInstallButton: React.FC = () => {
       })
       .then((json: { version?: string; url?: string }) => {
         if (!activo) return;
-        if (json?.version && json?.url && esVersionMayor(json.version, APP_VERSION)) {
-          setHayNuevaVersion(true);
+        if (json?.url) {
           setApkUrl(json.url);
+          setHayNuevaVersion(Boolean(json.version && esVersionMayor(json.version, APP_VERSION)));
         } else {
+          setApkUrl('');
           setHayNuevaVersion(false);
         }
       })
       .catch(() => {
         if (activo) {
+          setApkUrl('');
           setHayNuevaVersion(false);
         }
       });
@@ -51,8 +55,10 @@ export const APKInstallButton: React.FC = () => {
     };
   }, []);
 
-  // Solo se oculta si NO hay versión nueva. Ya no importa si es PWA o APK.
-  if (!hayNuevaVersion) {
+  if (!apkUrl) {
+    return null;
+  }
+  if (esNativo && !hayNuevaVersion) {
     return null;
   }
 
@@ -127,7 +133,9 @@ export const APKInstallButton: React.FC = () => {
                 margin: '0 0 16px 0',
               }}
             >
-              Hay una nueva versión de WKF disponible. Pulsa en 'Descargar APK' para actualizar.
+              {esNativo
+                ? "Hay una nueva versión de WKF disponible. Pulsa en 'Descargar APK' para actualizar."
+                : 'Descarga la app nativa de WKF para Android. Instala el archivo APK para tener GPS en segundo plano y todas las funciones nativas.'}
               <br /><br />
               Al no venir de Google Play, tendrás que permitir la instalación desde "Orígenes desconocidos" en tu móvil Android. Es totalmente segura.
             </p>
